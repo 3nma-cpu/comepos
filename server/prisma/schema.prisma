@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// Roles y Permisos
+// ==========================================
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  protected   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+  users       User[]
+}
+
+model RolePermission {
+  id     String @id @default(cuid())
+  roleId String
+  module String // dashboard, users, roles, clients, purchases, sales, reports
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, module])
+}
+
+// ==========================================
+// Usuarios del Sistema
+// ==========================================
+
+model User {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  password  String
+  name      String
+  email     String   @unique
+  roleId    String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  role      Role       @relation(fields: [roleId], references: [id])
+  sales     Sale[]
+  purchases Purchase[]
+}
+
+// ==========================================
+// Clientes / Funcionarios
+// ==========================================
+
+enum EmployeeCategory {
+  DIRECTIVO
+  GERENTE
+  JEFE_DE_AREA
+  ANALISTA
+  ASISTENTE
+  OPERARIO
+  PRACTICANTE
+  CONTRATISTA
+}
+
+model Client {
+  id         String           @id @default(cuid())
+  name       String
+  cedula     String           @unique
+  department String?
+  position   String?
+  category   EmployeeCategory
+  email      String?
+  phone      String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  sales Sale[]
+}
+
+// ==========================================
+// Productos
+// ==========================================
+
+enum ProductCategory {
+  PLATOS_PRINCIPALES
+  BEBIDAS
+  POSTRES
+  ENTRADAS
+  EXTRAS
+}
+
+model Product {
+  id        String          @id @default(cuid())
+  name      String
+  category  ProductCategory
+  price     Int             // Precio en guaraníes (sin decimales)
+  cost      Int             // Costo en guaraníes
+  stock     Int             @default(0)
+  emoji     String          @default("🍽️")
+  active    Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  saleItems     SaleItem[]
+  purchaseItems PurchaseItem[]
+}
+
+// ==========================================
+// Proveedores
+// ==========================================
+
+model Provider {
+  id        String   @id @default(cuid())
+  name      String
+  ruc       String?
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchases Purchase[]
+}
+
+// ==========================================
+// Ventas
+// ==========================================
+
+enum PaymentMethod {
+  EFECTIVO
+  TARJETA
+  NOMINA
+}
+
+model Sale {
+  id            String        @id @default(cuid())
+  clientId      String
+  userId        String
+  total         Int
+  paymentMethod PaymentMethod
+  createdAt     DateTime      @default(now())
+
+  client Client     @relation(fields: [clientId], references: [id])
+  user   User       @relation(fields: [userId], references: [id])
+  items  SaleItem[]
+}
+
+model SaleItem {
+  id        String @id @default(cuid())
+  saleId    String
+  productId String
+  quantity  Int
+  unitPrice Int    // Precio al momento de la venta
+
+  sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+}
+
+// ==========================================
+// Compras
+// ==========================================
+
+model Purchase {
+  id         String   @id @default(cuid())
+  providerId String
+  userId     String
+  total      Int
+  createdAt  DateTime @default(now())
+
+  provider Provider       @relation(fields: [providerId], references: [id])
+  user     User           @relation(fields: [userId], references: [id])
+  items    PurchaseItem[]
+}
+
+model PurchaseItem {
+  id         String @id @default(cuid())
+  purchaseId String
+  productId  String
+  quantity   Int
+  unitCost   Int    // Costo al momento de la compra
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+}
