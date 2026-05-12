@@ -2,8 +2,8 @@
 // Purchases Module
 // ============================================
 
-import { getCollection, addItem, updateItem, deleteItem } from '../store.js';
-import { generateId, showToast, createModal, closeModal, escapeHTML, formatCurrency, formatDate, PRODUCT_CATEGORIES } from '../utils.js';
+import { api } from '../api.js';
+import { generateId, showToast, createModal, closeModal, escapeHTML, formatCurrency, formatDate } from '../utils.js';
 
 export function renderPurchases() {
     const container = document.getElementById('module-content');
@@ -11,7 +11,6 @@ export function renderPurchases() {
     <div class="fade-in">
       <div class="category-tabs" id="purchaseTabs">
         <div class="category-tab active" data-tab="purchases">Compras</div>
-        <div class="category-tab" data-tab="products">Productos</div>
         <div class="category-tab" data-tab="providers">Proveedores</div>
       </div>
       <div id="purchaseTabContent"></div>
@@ -20,12 +19,19 @@ export function renderPurchases() {
     if (window.lucide) lucide.createIcons();
     let currentTab = 'purchases';
 
-    function showTab(tab) {
+    async function showTab(tab) {
         currentTab = tab;
         document.querySelectorAll('#purchaseTabs .category-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-        if (tab === 'purchases') renderPurchasesList();
-        else if (tab === 'products') renderProductsList();
-        else renderProvidersList();
+        
+        const content = document.getElementById('purchaseTabContent');
+        content.innerHTML = '<div class="empty-state"><p>Cargando...</p></div>';
+
+        try {
+            if (tab === 'purchases') await renderPurchasesList();
+            else await renderProvidersList();
+        } catch (e) {
+            content.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
+        }
     }
 
     document.getElementById('purchaseTabs').addEventListener('click', e => {
@@ -36,23 +42,30 @@ export function renderPurchases() {
     showTab('purchases');
 }
 
-function renderPurchasesList() {
+async function renderPurchasesList() {
     const content = document.getElementById('purchaseTabContent');
-    const purchases = getCollection('purchases').sort((a, b) => new Date(b.date) - new Date(a.date));
+    const purchases = await api.get('/purchases');
+    purchases.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     content.innerHTML = `
     <div class="filters-bar">
+      <div style="display:flex;align-items:center;gap:.5rem">
+        <label style="font-size:.85rem;color:var(--text-secondary)">% Margen de Ganancia:</label>
+        <input type="number" class="form-control" id="globalMarkup" value="${localStorage.getItem('purchMarkup') || 30}" style="width:80px" />
+      </div>
       <div style="flex:1"></div>
       <button class="btn btn-primary" id="btnAddPurchase"><i data-lucide="plus"></i>Nueva Compra</button>
     </div>
     <div class="table-container">
       <table>
-        <thead><tr><th>Fecha</th><th>Proveedor</th><th>Productos</th><th>Total</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Proveedor</th><th>Detalle de Productos</th><th>Total</th><th>Acciones</th></tr></thead>
         <tbody>${purchases.map(p => `
           <tr>
             <td>${formatDate(p.date)}</td>
             <td><strong>${escapeHTML(p.providerName)}</strong></td>
-            <td style="color:var(--text-secondary);font-size:.82rem">${p.items.map(i => `${i.name} x${i.quantity}`).join(', ')}</td>
+            <td style="color:var(--text-secondary);font-size:.82rem">
+              ${p.items.map(i => `<div>${i.name} (x${i.quantity}) a ${formatCurrency(i.cost)}/u</div>`).join('')}
+            </td>
             <td><strong style="color:var(--primary-light)">${formatCurrency(p.total)}</strong></td>
             <td><button class="btn btn-ghost btn-sm btn-icon" data-del="${p.id}"><i data-lucide="trash-2"></i></button></td>
           </tr>`).join('')}</tbody>
@@ -60,15 +73,31 @@ function renderPurchasesList() {
     </div>`;
     if (window.lucide) lucide.createIcons();
 
-    document.getElementById('btnAddPurchase')?.addEventListener('click', () => openPurchaseModal());
+    document.getElementById('btnAddPurchase')?.addEventListener('click', async () => {
+        try {
+            const [providers, products] = await Promise.all([api.get('/providers'), api.get('/products')]);
+            openPurchaseModal(providers, products);
+        } catch (e) { showToast(e.message, 'error'); }
+    });
+
+    document.getElementById('globalMarkup')?.addEventListener('input', e => {
+        localStorage.setItem('purchMarkup', e.target.value);
+    });
+    
     content.querySelectorAll('[data-del]').forEach(btn => {
-        btn.onclick = () => { if (confirm('¿Eliminar compra?')) { deleteItem('purchases', btn.dataset.del); renderPurchases(); showToast('Compra eliminada'); } };
+        btn.onclick = async () => { 
+            if (confirm('¿Eliminar compra?')) { 
+                try {
+                    await api.delete(`/purchases/${btn.dataset.del}`);
+                    showToast('Compra eliminada');
+                    renderPurchasesList();
+                } catch (e) { showToast(e.message, 'error'); }
+            } 
+        };
     });
 }
 
-function openPurchaseModal() {
-    const providers = getCollection('providers');
-    const products = getCollection('products');
+function openPurchaseModal(providers, products) {
     const body = `
     <div class="form-group"><label>Proveedor</label>
       <select class="form-control" id="mPurchProv">${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
@@ -82,8 +111,11 @@ function openPurchaseModal() {
     let items = [];
 
     function addItemRow() {
-        const idx = items.length;
-        items.push({ productId: products[0]?.id || '', quantity: 1 });
+        const defaultProd = products[0];
+        const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+        const cost = defaultProd?.cost || 0;
+        const price = Math.round(cost * (1 + markup / 100));
+        items.push({ productId: defaultProd?.id || '', quantity: 1, cost, price });
         renderItems();
     }
 
@@ -91,17 +123,53 @@ function openPurchaseModal() {
         const container = document.getElementById('mPurchItems');
         container.innerHTML = items.map((it, i) => `
       <div style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
-        <select class="form-control" data-item-prod="${i}" style="flex:2">${products.map(p => `<option value="${p.id}" ${p.id === it.productId ? 'selected' : ''}>${p.name} (${formatCurrency(p.cost)})</option>`).join('')}</select>
-        <input type="number" class="form-control" data-item-qty="${i}" value="${it.quantity}" min="1" style="flex:.7" />
-        <button class="btn btn-ghost btn-icon btn-sm" data-remove="${i}"><i data-lucide="x"></i></button>
+        <div style="flex:2">
+          <label style="font-size:0.7rem;margin-bottom:2px">Producto</label>
+          <select class="form-control" data-item-prod="${i}">
+            ${products.map(p => `<option value="${p.id}" ${p.id === it.productId ? 'selected' : ''}>${p.name}</option>`).join('')}
+          </select>
+        </div>
+        <div style="flex:0.8">
+          <label style="font-size:0.7rem;margin-bottom:2px">Cant.</label>
+          <input type="number" class="form-control" data-item-qty="${i}" value="${it.quantity}" min="1" />
+        </div>
+        <div style="flex:1.2">
+          <label style="font-size:0.7rem;margin-bottom:2px">Costo Unit. (₲)</label>
+          <input type="number" class="form-control" data-item-cost="${i}" value="${it.cost}" min="0" />
+        </div>
+        <div style="flex:1.2">
+          <label style="font-size:0.7rem;margin-bottom:2px">Precio Venta (₲)</label>
+          <input type="number" class="form-control" data-item-price="${i}" value="${it.price}" min="0" />
+        </div>
+        <button class="btn btn-ghost btn-icon btn-sm" data-remove="${i}" style="margin-top:auto"><i data-lucide="x"></i></button>
       </div>`).join('');
         if (window.lucide) lucide.createIcons();
 
+        const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+
         container.querySelectorAll('[data-item-prod]').forEach(sel => {
-            sel.onchange = () => { items[sel.dataset.itemProd].productId = sel.value; updateTotal(); };
+            sel.onchange = () => { 
+                const prod = products.find(p => p.id === sel.value);
+                items[sel.dataset.itemProd].productId = sel.value; 
+                items[sel.dataset.itemProd].cost = prod ? prod.cost : 0;
+                items[sel.dataset.itemProd].price = Math.round(items[sel.dataset.itemProd].cost * (1 + markup / 100));
+                renderItems();
+            };
         });
         container.querySelectorAll('[data-item-qty]').forEach(inp => {
             inp.oninput = () => { items[inp.dataset.itemQty].quantity = parseInt(inp.value) || 1; updateTotal(); };
+        });
+        container.querySelectorAll('[data-item-cost]').forEach(inp => {
+            inp.oninput = () => { 
+                const cost = parseInt(inp.value) || 0;
+                items[inp.dataset.itemCost].cost = cost; 
+                items[inp.dataset.itemCost].price = Math.round(cost * (1 + markup / 100));
+                container.querySelector(`[data-item-price="${inp.dataset.itemCost}"]`).value = items[inp.dataset.itemCost].price;
+                updateTotal(); 
+            };
+        });
+        container.querySelectorAll('[data-item-price]').forEach(inp => {
+            inp.oninput = () => { items[inp.dataset.itemPrice].price = parseInt(inp.value) || 0; };
         });
         container.querySelectorAll('[data-remove]').forEach(btn => {
             btn.onclick = () => { items.splice(parseInt(btn.dataset.remove), 1); renderItems(); };
@@ -110,122 +178,32 @@ function openPurchaseModal() {
     }
 
     function updateTotal() {
-        const prodMap = {}; products.forEach(p => prodMap[p.id] = p);
-        const total = items.reduce((s, it) => s + (prodMap[it.productId]?.cost || 0) * it.quantity, 0);
+        const total = items.reduce((s, it) => s + it.cost * it.quantity, 0);
         document.getElementById('mPurchTotal').textContent = 'Total: ' + formatCurrency(total);
     }
 
     document.getElementById('btnAddPurchItem').onclick = addItemRow;
     addItemRow();
 
-    document.getElementById('btnSavePurch').onclick = () => {
+    document.getElementById('btnSavePurch').onclick = async () => {
         if (items.length === 0) return showToast('Agregue al menos un producto', 'error');
         const provId = document.getElementById('mPurchProv').value;
-        const prov = providers.find(p => p.id === provId);
-        const prodMap = {}; products.forEach(p => prodMap[p.id] = p);
         const purchItems = items.map(it => {
-            const p = prodMap[it.productId];
-            return { productId: it.productId, name: p?.name || '', cost: p?.cost || 0, quantity: it.quantity };
+            return { productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price };
         });
-        const total = purchItems.reduce((s, it) => s + it.cost * it.quantity, 0);
 
-        // Update stock
-        purchItems.forEach(it => { const p = prodMap[it.productId]; if (p) updateItem('products', p.id, { stock: p.stock + it.quantity }); });
-
-        addItem('purchases', { id: generateId(), providerId: provId, providerName: prov?.name || '', items: purchItems, total, date: new Date().toISOString(), userId: '' });
-        showToast('Compra registrada y stock actualizado');
-        closeModal(overlay);
-        renderPurchases();
+        try {
+            await api.post('/purchases', { providerId: provId, items: purchItems });
+            showToast('Compra registrada y stock actualizado');
+            closeModal(overlay);
+            renderPurchasesList();
+        } catch (e) { showToast(e.message, 'error'); }
     };
 }
 
-function renderProductsList() {
+async function renderProvidersList() {
     const content = document.getElementById('purchaseTabContent');
-    const products = getCollection('products');
-
-    content.innerHTML = `
-    <div class="filters-bar">
-      <div class="search-bar"><i data-lucide="search"></i><input type="text" class="form-control" id="searchProds" placeholder="Buscar productos..." /></div>
-      <button class="btn btn-primary" id="btnAddProd"><i data-lucide="plus"></i>Nuevo Producto</button>
-    </div>
-    <div class="table-container">
-      <table>
-        <thead><tr><th></th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Costo</th><th>Stock</th><th>Acciones</th></tr></thead>
-        <tbody id="prodsBody">${products.map(p => `
-          <tr>
-            <td style="font-size:1.5rem">${p.emoji}</td>
-            <td><strong>${escapeHTML(p.name)}</strong></td>
-            <td><span class="badge badge-primary">${p.category}</span></td>
-            <td>${formatCurrency(p.price)}</td>
-            <td style="color:var(--text-secondary)">${formatCurrency(p.cost)}</td>
-            <td><span class="badge ${p.stock < 10 ? 'badge-danger' : p.stock < 20 ? 'badge-warning' : 'badge-success'}">${p.stock}</span></td>
-            <td>
-              <button class="btn btn-ghost btn-sm btn-icon" data-edit-prod="${p.id}"><i data-lucide="pencil"></i></button>
-              <button class="btn btn-ghost btn-sm btn-icon" data-del-prod="${p.id}"><i data-lucide="trash-2"></i></button>
-            </td>
-          </tr>`).join('')}</tbody>
-      </table>
-    </div>`;
-    if (window.lucide) lucide.createIcons();
-
-    document.getElementById('searchProds')?.addEventListener('input', e => {
-        const q = e.target.value.toLowerCase();
-        document.querySelectorAll('#prodsBody tr').forEach(tr => { tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none'; });
-    });
-
-    document.getElementById('btnAddProd')?.addEventListener('click', () => openProductModal(null));
-    content.querySelectorAll('[data-edit-prod]').forEach(btn => {
-        btn.onclick = () => { const p = getCollection('products').find(x => x.id === btn.dataset.editProd); if (p) openProductModal(p); };
-    });
-    content.querySelectorAll('[data-del-prod]').forEach(btn => {
-        btn.onclick = () => { if (confirm('¿Eliminar producto?')) { deleteItem('products', btn.dataset.delProd); renderPurchases(); showToast('Producto eliminado'); } };
-    });
-}
-
-function openProductModal(product) {
-    const isEdit = !!product;
-    const p = product || {};
-    const emojis = ['🍚', '🥩', '🍗', '🍝', '🥟', '🧀', '🌽', '🧃', '🥤', '💧', '🧉', '☕', '🍮', '🍓', '🍫', '🥔', '🥗', '🍲', '🥘', '🍜'];
-    const body = `
-    <div class="form-row">
-      <div class="form-group"><label>Nombre</label><input type="text" class="form-control" id="mProdName" value="${isEdit ? escapeHTML(p.name) : ''}" required /></div>
-      <div class="form-group"><label>Categoría</label>
-        <select class="form-control" id="mProdCat">${PRODUCT_CATEGORIES.map(c => `<option value="${c}" ${isEdit && p.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Precio Venta (₲)</label><input type="number" class="form-control" id="mProdPrice" value="${isEdit ? p.price : ''}" required /></div>
-      <div class="form-group"><label>Costo (₲)</label><input type="number" class="form-control" id="mProdCost" value="${isEdit ? p.cost : ''}" required /></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Stock</label><input type="number" class="form-control" id="mProdStock" value="${isEdit ? p.stock : 0}" /></div>
-      <div class="form-group"><label>Ícono</label>
-        <select class="form-control" id="mProdEmoji">${emojis.map(e => `<option value="${e}" ${isEdit && p.emoji === e ? 'selected' : ''}>${e}</option>`).join('')}</select>
-      </div>
-    </div>`;
-    const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveProd">${isEdit ? 'Guardar' : 'Crear'}</button>`;
-    const overlay = createModal(isEdit ? 'Editar Producto' : 'Nuevo Producto', body, footer);
-
-    document.getElementById('btnSaveProd').onclick = () => {
-        const data = {
-            name: document.getElementById('mProdName').value.trim(),
-            category: document.getElementById('mProdCat').value,
-            price: parseInt(document.getElementById('mProdPrice').value) || 0,
-            cost: parseInt(document.getElementById('mProdCost').value) || 0,
-            stock: parseInt(document.getElementById('mProdStock').value) || 0,
-            emoji: document.getElementById('mProdEmoji').value
-        };
-        if (!data.name || !data.price) return showToast('Complete nombre y precio', 'error');
-        if (isEdit) { updateItem('products', product.id, data); showToast('Producto actualizado'); }
-        else { addItem('products', { id: generateId(), ...data }); showToast('Producto creado'); }
-        closeModal(overlay);
-        renderPurchases();
-    };
-}
-
-function renderProvidersList() {
-    const content = document.getElementById('purchaseTabContent');
-    const providers = getCollection('providers');
+    const providers = await api.get('/providers');
 
     content.innerHTML = `
     <div class="filters-bar"><div style="flex:1"></div><button class="btn btn-primary" id="btnAddProv"><i data-lucide="plus"></i>Nuevo Proveedor</button></div>
@@ -235,9 +213,9 @@ function renderProvidersList() {
         <tbody>${providers.map(p => `
           <tr>
             <td><strong>${escapeHTML(p.name)}</strong></td>
-            <td>${escapeHTML(p.ruc)}</td>
-            <td style="color:var(--text-secondary)">${escapeHTML(p.phone)}</td>
-            <td style="color:var(--text-secondary)">${escapeHTML(p.email)}</td>
+            <td>${escapeHTML(p.ruc || '')}</td>
+            <td style="color:var(--text-secondary)">${escapeHTML(p.phone || '')}</td>
+            <td style="color:var(--text-secondary)">${escapeHTML(p.email || '')}</td>
             <td>
               <button class="btn btn-ghost btn-sm btn-icon" data-edit-prov="${p.id}"><i data-lucide="pencil"></i></button>
               <button class="btn btn-ghost btn-sm btn-icon" data-del-prov="${p.id}"><i data-lucide="trash-2"></i></button>
@@ -249,10 +227,18 @@ function renderProvidersList() {
 
     document.getElementById('btnAddProv')?.addEventListener('click', () => openProviderModal(null));
     content.querySelectorAll('[data-edit-prov]').forEach(btn => {
-        btn.onclick = () => { const p = getCollection('providers').find(x => x.id === btn.dataset.editProv); if (p) openProviderModal(p); };
+        btn.onclick = () => { const p = providers.find(x => x.id === btn.dataset.editProv); if (p) openProviderModal(p); };
     });
     content.querySelectorAll('[data-del-prov]').forEach(btn => {
-        btn.onclick = () => { if (confirm('¿Eliminar proveedor?')) { deleteItem('providers', btn.dataset.delProv); renderPurchases(); showToast('Proveedor eliminado'); } };
+        btn.onclick = async () => { 
+            if (confirm('¿Eliminar proveedor?')) { 
+                try {
+                    await api.delete(`/providers/${btn.dataset.delProv}`);
+                    showToast('Proveedor eliminado');
+                    renderProvidersList();
+                } catch (e) { showToast(e.message, 'error'); }
+            } 
+        };
     });
 }
 
@@ -262,19 +248,32 @@ function openProviderModal(provider) {
     const body = `
     <div class="form-group"><label>Nombre</label><input type="text" class="form-control" id="mProvName" value="${isEdit ? escapeHTML(p.name) : ''}" required /></div>
     <div class="form-row">
-      <div class="form-group"><label>RUC</label><input type="text" class="form-control" id="mProvRuc" value="${isEdit ? escapeHTML(p.ruc) : ''}" /></div>
-      <div class="form-group"><label>Teléfono</label><input type="text" class="form-control" id="mProvPhone" value="${isEdit ? escapeHTML(p.phone) : ''}" /></div>
+      <div class="form-group"><label>RUC</label><input type="text" class="form-control" id="mProvRuc" value="${isEdit ? escapeHTML(p.ruc || '') : ''}" /></div>
+      <div class="form-group"><label>Teléfono</label><input type="text" class="form-control" id="mProvPhone" value="${isEdit ? escapeHTML(p.phone || '') : ''}" /></div>
     </div>
-    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="mProvEmail" value="${isEdit ? escapeHTML(p.email) : ''}" /></div>`;
+    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="mProvEmail" value="${isEdit ? escapeHTML(p.email || '') : ''}" /></div>`;
     const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveProv">${isEdit ? 'Guardar' : 'Crear'}</button>`;
     const overlay = createModal(isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor', body, footer);
 
-    document.getElementById('btnSaveProv').onclick = () => {
-        const data = { name: document.getElementById('mProvName').value.trim(), ruc: document.getElementById('mProvRuc').value.trim(), phone: document.getElementById('mProvPhone').value.trim(), email: document.getElementById('mProvEmail').value.trim() };
+    document.getElementById('btnSaveProv').onclick = async () => {
+        const data = { 
+            name: document.getElementById('mProvName').value.trim(), 
+            ruc: document.getElementById('mProvRuc').value.trim(), 
+            phone: document.getElementById('mProvPhone').value.trim(), 
+            email: document.getElementById('mProvEmail').value.trim() 
+        };
         if (!data.name) return showToast('Ingrese el nombre', 'error');
-        if (isEdit) { updateItem('providers', provider.id, data); showToast('Proveedor actualizado'); }
-        else { addItem('providers', { id: generateId(), ...data }); showToast('Proveedor creado'); }
-        closeModal(overlay);
-        renderPurchases();
+        
+        try {
+            if (isEdit) { 
+                await api.put(`/providers/${provider.id}`, data); 
+                showToast('Proveedor actualizado'); 
+            } else { 
+                await api.post('/providers', data); 
+                showToast('Proveedor creado'); 
+            }
+            closeModal(overlay);
+            renderProvidersList();
+        } catch (e) { showToast(e.message, 'error'); }
     };
 }

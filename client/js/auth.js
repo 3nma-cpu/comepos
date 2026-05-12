@@ -2,42 +2,39 @@
 // Auth — Authentication module
 // ============================================
 
-import { getCollection, setSession, getSession, clearSession } from './store.js';
+import { api } from './api.js';
 
-export function login(username, password) {
-    const users = getCollection('users');
-    const user = users.find(u => u.username === username && u.password === password && u.active);
-    if (!user) return null;
-    const roles = getCollection('roles');
-    const role = roles.find(r => r.id === user.roleId);
-    const session = { ...user, roleName: role?.name || '', permissions: role?.permissions || [] };
-    delete session.password;
-    setSession(session);
-    return session;
+export async function login(username, password) {
+  try {
+    return await api.login(username, password);
+  } catch (err) {
+    console.error('Login error:', err);
+    return null;
+  }
 }
 
 export function logout() {
-    clearSession();
+  api.logout();
 }
 
 export function getCurrentUser() {
-    return getSession();
+  return api.getCurrentUser();
 }
 
 export function hasPermission(module) {
-    const user = getSession();
-    if (!user) return false;
-    return user.permissions.includes(module);
+  const user = getCurrentUser();
+  if (!user) return false;
+  return user.permissions && user.permissions.includes(module);
 }
 
 export function renderLoginScreen(onLogin) {
-    const app = document.getElementById('app');
-    app.innerHTML = `
+  const app = document.getElementById('app');
+  app.innerHTML = `
     <div class="login-screen">
       <div class="login-card slide-up">
         <div class="login-logo">
-          <h1>🍽️ ComePOS</h1>
-          <p>Sistema POS — Comedor Empresarial</p>
+          <h1>Comedor TTA S.A.</h1>
+          <p>Sistema de Gestión - Comedor Empresarial</p>
         </div>
         <div class="login-error" id="loginError"></div>
         <form id="loginForm">
@@ -49,30 +46,31 @@ export function renderLoginScreen(onLogin) {
             <label for="loginPass">Contraseña</label>
             <input type="password" id="loginPass" class="form-control" placeholder="Ingrese su contraseña" autocomplete="current-password" required />
           </div>
-          <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+          <button type="submit" class="btn btn-primary" id="btnLogin">Iniciar Sesión</button>
         </form>
-        <div class="login-demo">
-          <p>Usuarios de demostración:</p>
-          <table>
-            <tr><td><strong>admin</strong></td><td>admin123</td><td>Administrador</td></tr>
-            <tr><td><strong>cajero</strong></td><td>cajero123</td><td>Cajero</td></tr>
-            <tr><td><strong>almacen</strong></td><td>almacen123</td><td>Almacén</td></tr>
-          </table>
-        </div>
       </div>
     </div>`;
 
-    document.getElementById('loginForm').addEventListener('submit', e => {
-        e.preventDefault();
-        const username = document.getElementById('loginUser').value.trim();
-        const password = document.getElementById('loginPass').value;
-        const user = login(username, password);
-        if (user) {
-            onLogin(user);
-        } else {
-            const err = document.getElementById('loginError');
-            err.textContent = 'Usuario o contraseña incorrectos';
-            err.style.display = 'block';
-        }
-    });
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const username = document.getElementById('loginUser').value.trim();
+    const password = document.getElementById('loginPass').value;
+    const btn = document.getElementById('btnLogin');
+    const err = document.getElementById('loginError');
+
+    btn.disabled = true;
+    btn.textContent = 'Verificando...';
+    err.style.display = 'none';
+
+    const user = await login(username, password);
+
+    if (user) {
+      onLogin(user);
+    } else {
+      err.textContent = 'Usuario o contraseña incorrectos';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Iniciar Sesión';
+    }
+  });
 }

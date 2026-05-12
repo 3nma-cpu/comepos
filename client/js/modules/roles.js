@@ -2,7 +2,7 @@
 // Roles Module
 // ============================================
 
-import { getCollection, addItem, updateItem, deleteItem } from '../store.js';
+import { api } from '../api.js';
 import { generateId, showToast, createModal, closeModal, escapeHTML } from '../utils.js';
 
 const ALL_PERMISSIONS = [
@@ -10,27 +10,32 @@ const ALL_PERMISSIONS = [
     { id: 'users', label: 'Usuarios' },
     { id: 'roles', label: 'Roles' },
     { id: 'clients', label: 'Clientes' },
+    { id: 'products', label: 'Productos' },
     { id: 'purchases', label: 'Compras' },
     { id: 'sales', label: 'Ventas' },
     { id: 'reports', label: 'Reportes' }
 ];
 
-export function renderRoles() {
+export async function renderRoles() {
     const container = document.getElementById('module-content');
-    const roles = getCollection('roles');
+    try {
+        const roles = await api.get('/roles');
 
-    container.innerHTML = `
-    <div class="fade-in">
-      <div class="filters-bar">
-        <div style="flex:1"></div>
-        <button class="btn btn-primary" id="btnAddRole"><i data-lucide="plus"></i>Nuevo Rol</button>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem" id="rolesGrid"></div>
-    </div>`;
+        container.innerHTML = `
+        <div class="fade-in">
+          <div class="filters-bar">
+            <div style="flex:1"></div>
+            <button class="btn btn-primary" id="btnAddRole"><i data-lucide="plus"></i>Nuevo Rol</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem" id="rolesGrid"></div>
+        </div>`;
 
-    if (window.lucide) lucide.createIcons();
-    renderRolesGrid(roles);
-    document.getElementById('btnAddRole').addEventListener('click', () => openRoleModal(null));
+        if (window.lucide) lucide.createIcons();
+        renderRolesGrid(roles);
+        document.getElementById('btnAddRole').addEventListener('click', () => openRoleModal(null, roles));
+    } catch (err) {
+        container.innerHTML = `<div class="empty-state"><p>Error al cargar roles: ${err.message}</p></div>`;
+    }
 }
 
 function renderRolesGrid(roles) {
@@ -56,23 +61,27 @@ function renderRolesGrid(roles) {
 
     grid.querySelectorAll('[data-edit]').forEach(btn => {
         btn.onclick = () => {
-            const role = getCollection('roles').find(r => r.id === btn.dataset.edit);
-            if (role) openRoleModal(role);
+            const role = roles.find(r => r.id === btn.dataset.edit);
+            if (role) openRoleModal(role, roles);
         };
     });
 
     grid.querySelectorAll('[data-delete]').forEach(btn => {
-        btn.onclick = () => {
+        btn.onclick = async () => {
             if (confirm('¿Eliminar este rol?')) {
-                deleteItem('roles', btn.dataset.delete);
-                showToast('Rol eliminado');
-                renderRoles();
+                try {
+                    await api.delete(`/roles/${btn.dataset.delete}`);
+                    showToast('Rol eliminado');
+                    renderRoles();
+                } catch (e) {
+                    showToast(e.message, 'error');
+                }
             }
         };
     });
 }
 
-function openRoleModal(role) {
+function openRoleModal(role, roles) {
     const isEdit = !!role;
     const body = `
     <div class="form-group"><label>Nombre del Rol</label><input type="text" class="form-control" id="mRoleName" value="${isEdit ? escapeHTML(role.name) : ''}" ${isEdit && role.protected ? 'disabled' : ''} /></div>
@@ -89,21 +98,26 @@ function openRoleModal(role) {
     const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveRole">${isEdit ? 'Guardar' : 'Crear'}</button>`;
     const overlay = createModal(isEdit ? 'Editar Rol' : 'Nuevo Rol', body, footer);
 
-    document.getElementById('btnSaveRole').onclick = () => {
+    document.getElementById('btnSaveRole').onclick = async () => {
         const name = document.getElementById('mRoleName').value.trim();
         const description = document.getElementById('mRoleDesc').value.trim();
         const permissions = [...overlay.querySelectorAll('.permission-item input:checked')].map(cb => cb.value);
         if (!name) return showToast('Ingrese un nombre', 'error');
         if (permissions.length === 0) return showToast('Seleccione al menos un permiso', 'error');
 
-        if (isEdit) {
-            updateItem('roles', role.id, { name: role.protected ? role.name : name, description, permissions });
-            showToast('Rol actualizado');
-        } else {
-            addItem('roles', { id: generateId(), name, description, permissions, protected: false });
-            showToast('Rol creado');
+        try {
+            if (isEdit) {
+                await api.put(`/roles/${role.id}`, { name: role.protected ? role.name : name, description, permissions });
+                showToast('Rol actualizado');
+            } else {
+                await api.post('/roles', { name, description, permissions });
+                showToast('Rol creado');
+            }
+            closeModal(overlay);
+            renderRoles();
+        } catch (err) {
+            showToast(err.message, 'error');
         }
-        closeModal(overlay);
-        renderRoles();
     };
 }
+

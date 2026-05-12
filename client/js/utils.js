@@ -89,18 +89,19 @@ export function debounce(fn, ms = 300) {
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
-export function exportCSV(headers, rows, filename) {
-    const csv = [headers.join(','), ...rows.map(r => r.map(c => `"${c}"`).join(','))].join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
+export function exportExcel(headers, rows, filename) {
+    const ws_data = [headers, ...rows];
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+    
+    // Check if filename already has .xlsx, otherwise append it
+    const finalFilename = filename.endsWith('.xlsx') ? filename : filename.replace('.csv', '.xlsx') + (!filename.includes('.') ? '.xlsx' : '');
+    XLSX.writeFile(wb, finalFilename);
 }
 
 export const EMPLOYEE_CATEGORIES = [
-    'Directivo', 'Gerente', 'Jefe de Área', 'Analista',
-    'Asistente', 'Operario', 'Practicante', 'Contratista'
+    'ADM', 'CHOFER'
 ];
 
 export const PRODUCT_CATEGORIES = [
@@ -114,12 +115,6 @@ export const PAYMENT_METHODS = [
 ];
 
 export const CATEGORY_BADGE_COLORS = {
-    'Directivo': 'badge-purple',
-    'Gerente': 'badge-primary',
-    'Jefe de Área': 'badge-info',
-    'Analista': 'badge-success',
-    'Asistente': 'badge-warning',
-    'Operario': 'badge-danger',
-    'Practicante': 'badge-info',
-    'Contratista': 'badge-warning'
+    'ADM': 'badge-primary',
+    'CHOFER': 'badge-warning'
 };

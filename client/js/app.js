@@ -2,8 +2,6 @@
 // App — Main entry point
 // ============================================
 
-import { initStore, isSeeded } from './store.js';
-import { seedData } from './seed.js';
 import { getCurrentUser, renderLoginScreen, logout, hasPermission } from './auth.js';
 import { registerRoute, initRouter, navigate } from './router.js';
 import { renderDashboard } from './modules/dashboard.js';
@@ -11,12 +9,9 @@ import { renderUsers } from './modules/users.js';
 import { renderRoles } from './modules/roles.js';
 import { renderClients } from './modules/clients.js';
 import { renderPurchases } from './modules/purchases.js';
+import { renderProducts } from './modules/products.js';
 import { renderSales } from './modules/sales.js';
 import { renderReports } from './modules/reports.js';
-
-// Initialize store and seed data
-initStore();
-if (!isSeeded()) seedData();
 
 // Navigation items
 const NAV_ITEMS = [
@@ -29,7 +24,8 @@ const NAV_ITEMS = [
         section: 'Gestión', items: [
             { route: 'users', label: 'Usuarios', icon: 'users', perm: 'users' },
             { route: 'roles', label: 'Roles', icon: 'shield', perm: 'roles' },
-            { route: 'clients', label: 'Clientes', icon: 'contact', perm: 'clients' }
+            { route: 'clients', label: 'Clientes', icon: 'contact', perm: 'clients' },
+            { route: 'products', label: 'Productos', icon: 'box', perm: 'products' }
         ]
     },
     {
@@ -50,6 +46,7 @@ const ROUTE_TITLES = {
     users: 'Gestión de Usuarios',
     roles: 'Gestión de Roles',
     clients: 'Clientes / Funcionarios',
+    products: 'Catálogo de Productos',
     purchases: 'Compras e Inventario',
     sales: 'Punto de Venta',
     reports: 'Reportes'
@@ -60,6 +57,7 @@ const ROUTE_HANDLERS = {
     users: renderUsers,
     roles: renderRoles,
     clients: renderClients,
+    products: renderProducts,
     purchases: renderPurchases,
     sales: renderSales,
     reports: renderReports
@@ -67,11 +65,30 @@ const ROUTE_HANDLERS = {
 
 // Boot
 function boot() {
+    initTheme();
     const user = getCurrentUser();
     if (!user) {
         renderLoginScreen(onLogin);
     } else {
         renderApp(user);
+    }
+}
+
+function initTheme() {
+    const theme = localStorage.getItem('comepos_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', theme);
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('comepos_theme', next);
+
+    const icon = document.getElementById('themeIcon');
+    if (icon) {
+        icon.setAttribute('data-lucide', next === 'dark' ? 'sun' : 'moon');
+        if (window.lucide) lucide.createIcons();
     }
 }
 
@@ -86,11 +103,14 @@ function renderApp(user) {
         items: section.items.filter(item => hasPermission(item.perm))
     })).filter(s => s.items.length > 0);
 
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+
     app.innerHTML = `
     <div class="app-layout">
-      <aside class="sidebar">
+      <div class="sidebar-overlay" id="sidebarOverlay"></div>
+      <aside class="sidebar" id="mainSidebar">
         <div class="sidebar-header">
-          <span class="logo-text">🍽️ ComePOS</span>
+          <span class="logo-text">Comedor TTA S.A.</span>
         </div>
         <nav class="sidebar-nav">
           ${visibleNav.map(section => `
@@ -116,8 +136,16 @@ function renderApp(user) {
       </aside>
       <main class="main-content">
         <header class="content-header">
-          <h2 id="pageTitle">Dashboard</h2>
+          <div style="display:flex;align-items:center;gap:0.5rem">
+            <button class="btn-menu-toggle" id="btnMenuToggle">
+              <i data-lucide="menu"></i>
+            </button>
+            <h2 id="pageTitle">Dashboard</h2>
+          </div>
           <div class="content-header-actions">
+            <button class="btn btn-ghost btn-icon" id="btnThemeToggle" title="Cambiar tema">
+              <i data-lucide="${currentTheme === 'dark' ? 'sun' : 'moon'}" id="themeIcon"></i>
+            </button>
             <span style="color:var(--text-muted);font-size:.82rem" id="currentDateTime"></span>
           </div>
         </header>
@@ -125,7 +153,23 @@ function renderApp(user) {
       </main>
     </div>`;
 
-    if (window.lucide) lucide.createIcons();
+
+
+    // Sidebar Mobile Toggle
+    const sidebar = document.getElementById('mainSidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const btnMenu = document.getElementById('btnMenuToggle');
+
+    function toggleMobileSidebar() {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+
+    btnMenu.addEventListener('click', toggleMobileSidebar);
+    overlay.addEventListener('click', toggleMobileSidebar);
+
+    // Theme toggle
+    document.getElementById('btnThemeToggle').addEventListener('click', toggleTheme);
 
     // Update datetime
     function updateClock() {
@@ -143,7 +187,12 @@ function renderApp(user) {
 
     // Nav clicks
     document.querySelectorAll('.nav-item').forEach(item => {
-        item.addEventListener('click', () => navigate(item.dataset.route));
+        item.addEventListener('click', () => {
+            navigate(item.dataset.route);
+            if (window.innerWidth <= 768) {
+                toggleMobileSidebar();
+            }
+        });
     });
 
     // Register routes
