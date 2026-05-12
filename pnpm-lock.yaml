@@ -10,7 +10,13 @@ importers:
     devDependencies:
       vite:
         specifier: ^6.3.0
-        version: 6.4.2
+        version: 6.4.2(jiti@2.4.2)
+
+  client:
+    devDependencies:
+      vite:
+        specifier: ^6.3.0
+        version: 6.4.2(jiti@2.4.2)
 
   server:
     dependencies:
@@ -1434,7 +1440,7 @@ snapshots:
 
   vary@1.1.2: {}
 
-  vite@6.4.2:
+  vite@6.4.2(jiti@2.4.2):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.4)
@@ -1444,5 +1450,6 @@ snapshots:
       tinyglobby: 0.2.16
     optionalDependencies:
       fsevents: 2.3.3
+      jiti: 2.4.2
 
   wrappy@1.0.2: {}
