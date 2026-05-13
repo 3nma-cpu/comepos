@@ -7,10 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==========================================
-// Roles y Permisos
-// ==========================================
-
 model Role {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -18,7 +14,6 @@ model Role {
   protected   Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   permissions RolePermission[]
   users       User[]
 }
@@ -26,16 +21,10 @@ model Role {
 model RolePermission {
   id     String @id @default(cuid())
   roleId String
-  module String // dashboard, users, roles, clients, purchases, sales, reports
-
+  module String
   role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
-
   @@unique([roleId, module])
 }
-
-// ==========================================
-// Usuarios del Sistema
-// ==========================================
 
 model User {
   id        String   @id @default(cuid())
@@ -47,15 +36,10 @@ model User {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   role      Role       @relation(fields: [roleId], references: [id])
   sales     Sale[]
   purchases Purchase[]
 }
-
-// ==========================================
-// Clientes / Funcionarios
-// ==========================================
 
 enum EmployeeCategory {
   ADM
@@ -73,13 +57,8 @@ model Client {
   phone      String?
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
-
   sales Sale[]
 }
-
-// ==========================================
-// Productos
-// ==========================================
 
 enum ProductCategory {
   PLATOS_PRINCIPALES
@@ -93,21 +72,16 @@ model Product {
   id        String          @id @default(cuid())
   name      String
   category  ProductCategory
-  price     Int             // Precio en guaraníes (sin decimales)
-  cost      Int             // Costo en guaraníes
+  price     Int
+  cost      Int
   stock     Int             @default(0)
   emoji     String          @default("🍽️")
   active    Boolean         @default(true)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
-
   saleItems     SaleItem[]
   purchaseItems PurchaseItem[]
 }
-
-// ==========================================
-// Proveedores
-// ==========================================
 
 model Provider {
   id        String   @id @default(cuid())
@@ -117,13 +91,8 @@ model Provider {
   email     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   purchases Purchase[]
 }
-
-// ==========================================
-// Ventas
-// ==========================================
 
 enum PaymentMethod {
   EFECTIVO
@@ -138,7 +107,6 @@ model Sale {
   total         Int
   paymentMethod PaymentMethod
   createdAt     DateTime      @default(now())
-
   client Client     @relation(fields: [clientId], references: [id])
   user   User       @relation(fields: [userId], references: [id])
   items  SaleItem[]
@@ -149,15 +117,10 @@ model SaleItem {
   saleId    String
   productId String
   quantity  Int
-  unitPrice Int    // Precio al momento de la venta
-
+  unitPrice Int
   sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
 }
-
-// ==========================================
-// Compras
-// ==========================================
 
 enum PurchasePaymentMethod {
   CONTADO
@@ -177,7 +140,6 @@ model Purchase {
   t2            String?
   invoiceNumber String?
   createdAt     DateTime              @default(now())
-
   provider Provider       @relation(fields: [providerId], references: [id])
   user     User           @relation(fields: [userId], references: [id])
   items    PurchaseItem[]
@@ -188,8 +150,7 @@ model PurchaseItem {
   purchaseId String
   productId  String
   quantity   Int
-  unitCost   Int    // Costo al momento de la compra
-
+  unitCost   Int
   purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   product  Product  @relation(fields: [productId], references: [id])
 }
