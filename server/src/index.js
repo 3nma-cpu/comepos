@@ -18,10 +18,17 @@ import purchasesRoutes from './routes/purchases.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 
+import helmet from 'helmet';
+import compression from 'compression';
+
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+}));
+app.use(compression());
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:5173',
