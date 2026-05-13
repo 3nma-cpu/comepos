@@ -5,13 +5,13 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "db:migrate": "npx prisma@6.8.0 migrate dev",
-    "db:push": "npx prisma@6.8.0 db push",
+    "db:migrate": "npx prisma migrate dev",
+    "db:push": "npx prisma db push",
     "db:seed": "node src/seed.js",
-    "db:studio": "npx prisma@6.8.0 studio"
+    "db:studio": "npx prisma studio"
   },
   "dependencies": {
-    "@prisma/client": "^6.8.0",
+    "@prisma/client": "5.10.0",
     "bcryptjs": "^3.0.2",
     "compression": "^1.8.1",
     "cors": "^2.8.5",
@@ -22,6 +22,6 @@
     "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
-    "prisma": "^6.8.0"
+    "prisma": "5.10.0"
   }
 }
