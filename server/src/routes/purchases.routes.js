@@ -20,6 +20,13 @@ router.get('/', async (req, res) => {
       total: p.total,
       date: p.createdAt.toISOString(),
       userId: p.userId,
+      paymentMethod: p.paymentMethod,
+      dueDate: p.dueDate ? p.dueDate.toISOString() : null,
+      noInvoice: p.noInvoice,
+      timbrado: p.timbrado,
+      t1: p.t1,
+      t2: p.t2,
+      invoiceNumber: p.invoiceNumber,
       items: p.items.map(i => ({
         productId: i.productId, name: i.product.name, cost: i.unitCost, quantity: i.quantity
       }))
@@ -32,7 +39,11 @@ router.get('/', async (req, res) => {
 // POST /api/purchases
 router.post('/', async (req, res) => {
   try {
-    const { providerId, items } = req.body;
+    const { 
+      providerId, items, paymentMethod, dueDate, 
+      noInvoice, timbrado, t1, t2, invoiceNumber 
+    } = req.body;
+
     if (!providerId || !items?.length) {
       return res.status(400).json({ error: 'Proveedor y productos son obligatorios' });
     }
@@ -43,7 +54,7 @@ router.post('/', async (req, res) => {
     const prodMap = {};
     products.forEach(p => prodMap[p.id] = p);
 
-    // Calculate total based on provided cost or fallback to product cost
+    // Calculate total
     const total = items.reduce((sum, it) => {
         const itemCost = it.cost !== undefined ? it.cost : (prodMap[it.productId]?.cost || 0);
         return sum + itemCost * it.quantity;
@@ -56,6 +67,13 @@ router.post('/', async (req, res) => {
           providerId,
           userId: req.user.id,
           total,
+          paymentMethod: paymentMethod === 'CREDITO' ? 'CREDITO' : 'CONTADO',
+          dueDate: dueDate ? new Date(dueDate) : null,
+          noInvoice: !!noInvoice,
+          timbrado: timbrado || null,
+          t1: t1 || null,
+          t2: t2 || null,
+          invoiceNumber: invoiceNumber || null,
           items: {
             create: items.map(it => ({
               productId: it.productId,
@@ -67,7 +85,7 @@ router.post('/', async (req, res) => {
         include: { provider: true, items: { include: { product: true } } }
       });
 
-      // Update stock, cost and price
+      // Update stock and cost
       for (const item of items) {
         const newCost = item.cost !== undefined ? item.cost : (prodMap[item.productId]?.cost || 0);
         const updateData = {
@@ -91,6 +109,8 @@ router.post('/', async (req, res) => {
       providerName: purchase.provider.name,
       total: purchase.total,
       date: purchase.createdAt.toISOString(),
+      paymentMethod: purchase.paymentMethod,
+      invoiceNumber: purchase.invoiceNumber,
       items: purchase.items.map(i => ({ productId: i.productId, name: i.product.name, cost: i.unitCost, quantity: i.quantity }))
     });
   } catch (err) {

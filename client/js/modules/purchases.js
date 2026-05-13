@@ -58,11 +58,13 @@ async function renderPurchasesList() {
     </div>
     <div class="table-container">
       <table>
-        <thead><tr><th>Fecha</th><th>Proveedor</th><th>Detalle de Productos</th><th>Total</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Proveedor</th><th>Factura</th><th>Condición</th><th>Detalle de Productos</th><th>Total</th><th>Acciones</th></tr></thead>
         <tbody>${purchases.map(p => `
           <tr>
             <td>${formatDate(p.date)}</td>
             <td><strong>${escapeHTML(p.providerName)}</strong></td>
+            <td><code style="color:var(--primary-light)">${escapeHTML(p.invoiceNumber || '---')}</code></td>
+            <td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td>
             <td style="color:var(--text-secondary);font-size:.82rem">
               ${p.items.map(i => `<div>${i.name} (x${i.quantity}) a ${formatCurrency(i.cost)}/u</div>`).join('')}
             </td>
@@ -99,9 +101,51 @@ async function renderPurchasesList() {
 
 function openPurchaseModal(providers, products) {
     const body = `
-    <div class="form-group"><label>Proveedor</label>
-      <select class="form-control" id="mPurchProv">${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
+    <div class="form-row">
+      <div class="form-group" style="flex:1">
+        <label>Proveedor</label>
+        <select class="form-control" id="mPurchProv">${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
+      </div>
+      <div class="form-group" style="width:120px">
+        <label>Forma de Pago</label>
+        <select class="form-control" id="mPurchPayment">
+          <option value="CONTADO">Contado</option>
+          <option value="CREDITO">Crédito</option>
+        </select>
+      </div>
+      <div class="form-group" id="mPurchDueGroup" style="display:none;width:150px">
+        <label>Fecha a Pagar</label>
+        <input type="date" class="form-control" id="mPurchDueDate" />
+      </div>
     </div>
+
+    <div style="background:var(--bg-secondary);padding:1rem;border-radius:var(--radius-md);margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.5rem">
+        <label class="checkbox-container">
+          <input type="checkbox" id="mPurchNoInvoice" />
+          <span class="checkmark"></span>
+          Sin factura
+        </label>
+        <div style="flex:1"></div>
+        <button class="btn btn-secondary btn-sm" id="btnRecoverPurch" style="background:#f39c12;color:white;border:none">Recuperar</button>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:.5rem">
+        <div class="form-group"><label style="font-size:.7rem;background:#e74c3c;color:white;padding:2px 5px;display:block">Timbrado</label>
+          <input type="text" class="form-control" id="mPurchTimb" placeholder="00000000" />
+        </div>
+        <div class="form-group"><label style="font-size:.7rem;background:#34495e;color:white;padding:2px 5px;display:block">T1</label>
+          <input type="text" class="form-control" id="mPurchT1" placeholder="001" />
+        </div>
+        <div class="form-group"><label style="font-size:.7rem;background:#34495e;color:white;padding:2px 5px;display:block">T2</label>
+          <input type="text" class="form-control" id="mPurchT2" placeholder="001" />
+        </div>
+        <div class="form-group"><label style="font-size:.7rem;background:#f1c40f;color:black;padding:2px 5px;display:block">Factura</label>
+          <input type="text" class="form-control" id="mPurchFact" placeholder="0000000" />
+        </div>
+      </div>
+    </div>
+
     <div class="form-group"><label>Productos</label><div id="mPurchItems"></div>
       <button class="btn btn-secondary btn-sm" id="btnAddPurchItem" style="margin-top:.5rem"><i data-lucide="plus"></i>Agregar Producto</button>
     </div>
@@ -185,6 +229,47 @@ function openPurchaseModal(providers, products) {
     document.getElementById('btnAddPurchItem').onclick = addItemRow;
     addItemRow();
 
+    // Toggle Due Date
+    const paySel = document.getElementById('mPurchPayment');
+    paySel.onchange = () => {
+        document.getElementById('mPurchDueGroup').style.display = paySel.value === 'CREDITO' ? 'block' : 'none';
+    };
+
+    // Sin factura logic
+    const noInvCheck = document.getElementById('mPurchNoInvoice');
+    noInvCheck.onchange = () => {
+        if (noInvCheck.checked) {
+            const now = new Date();
+            const dateStr = now.getDate().toString().padStart(2, '0') + (now.getMonth() + 1).toString().padStart(2, '0') + now.getFullYear();
+            document.getElementById('mPurchTimb').value = dateStr;
+            document.getElementById('mPurchT1').value = '001';
+            document.getElementById('mPurchT2').value = '001';
+            document.getElementById('mPurchFact').value = dateStr.slice(0, 7); // Similar to image
+        }
+    };
+
+    // Recover functionality
+    document.getElementById('btnRecoverPurch').onclick = async () => {
+        const fact = document.getElementById('mPurchFact').value;
+        if (!fact) return showToast('Ingrese un número de factura para buscar', 'info');
+        
+        try {
+            const purchases = await api.get('/purchases');
+            const found = purchases.find(p => p.invoiceNumber === fact);
+            if (found) {
+                document.getElementById('mPurchTimb').value = found.timbrado || '';
+                document.getElementById('mPurchT1').value = found.t1 || '';
+                document.getElementById('mPurchT2').value = found.t2 || '';
+                document.getElementById('mPurchProv').value = found.providerId;
+                document.getElementById('mPurchPayment').value = found.paymentMethod;
+                paySel.onchange();
+                showToast('Datos recuperados');
+            } else {
+                showToast('No se encontró ninguna factura con ese número', 'warning');
+            }
+        } catch (e) { showToast(e.message, 'error'); }
+    };
+
     document.getElementById('btnSavePurch').onclick = async () => {
         if (items.length === 0) return showToast('Agregue al menos un producto', 'error');
         const provId = document.getElementById('mPurchProv').value;
@@ -192,8 +277,20 @@ function openPurchaseModal(providers, products) {
             return { productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price };
         });
 
+        const data = {
+            providerId: provId,
+            items: purchItems,
+            paymentMethod: document.getElementById('mPurchPayment').value,
+            dueDate: document.getElementById('mPurchDueDate').value || null,
+            noInvoice: document.getElementById('mPurchNoInvoice').checked,
+            timbrado: document.getElementById('mPurchTimb').value,
+            t1: document.getElementById('mPurchT1').value,
+            t2: document.getElementById('mPurchT2').value,
+            invoiceNumber: document.getElementById('mPurchFact').value
+        };
+
         try {
-            await api.post('/purchases', { providerId: provId, items: purchItems });
+            await api.post('/purchases', data);
             showToast('Compra registrada y stock actualizado');
             closeModal(overlay);
             renderPurchasesList();

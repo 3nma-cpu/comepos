@@ -167,11 +167,11 @@ function reportPurchasesPeriod(area, purchases, providers) {
 
         if (window.lucide) lucide.createIcons();
 
-        document.getElementById('rppTable').innerHTML = `<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Productos</th><th>Total</th></tr></thead>
-      <tbody>${filtered.slice(0, 50).map(p => `<tr><td>${formatDate(p.date)}</td><td><strong>${p.providerName}</strong></td><td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td><td><strong>${formatCurrency(p.total)}</strong></td></tr>`).join('')}</tbody></table>`;
+        document.getElementById('rppTable').innerHTML = `<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Factura</th><th>Pago</th><th>Productos</th><th>Total</th></tr></thead>
+      <tbody>${filtered.slice(0, 50).map(p => `<tr><td>${formatDate(p.date)}</td><td><strong>${p.providerName}</strong></td><td><code>${p.invoiceNumber || '---'}</code></td><td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td><td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td><td><strong>${formatCurrency(p.total)}</strong></td></tr>`).join('')}</tbody></table>`;
 
         document.getElementById('rppExport').onclick = () => {
-            exportExcel(['Fecha', 'Proveedor', 'Productos', 'Total'], filtered.map(p => [formatDate(p.date), p.providerName, p.items.map(i => `${i.name} (x${i.quantity})`).join(', '), p.total]), 'reporte_compras.xlsx');
+            exportExcel(['Fecha', 'Proveedor', 'Factura', 'Pago', 'Productos', 'Total'], filtered.map(p => [formatDate(p.date), p.providerName, p.invoiceNumber || '', p.paymentMethod, p.items.map(i => `${i.name} (x${i.quantity})`).join(', '), p.total]), 'reporte_compras.xlsx');
             showToastLocal('Excel exportado');
         };
     }

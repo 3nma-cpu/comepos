@@ -160,12 +160,24 @@ model SaleItem {
 // Compras
 // ==========================================
 
+enum PurchasePaymentMethod {
+  CONTADO
+  CREDITO
+}
+
 model Purchase {
-  id         String   @id @default(cuid())
-  providerId String
-  userId     String
-  total      Int
-  createdAt  DateTime @default(now())
+  id            String                @id @default(cuid())
+  providerId    String
+  userId        String
+  total         Int
+  paymentMethod PurchasePaymentMethod @default(CONTADO)
+  dueDate       DateTime?
+  noInvoice     Boolean               @default(false)
+  timbrado      String?
+  t1            String?
+  t2            String?
+  invoiceNumber String?
+  createdAt     DateTime              @default(now())
 
   provider Provider       @relation(fields: [providerId], references: [id])
   user     User           @relation(fields: [userId], references: [id])
