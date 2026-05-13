@@ -75,7 +75,7 @@ model Product {
   price     Int
   cost      Int
   stock     Int             @default(0)
-  emoji     String          @default("🍽️")
+  emoji     String          @default("plate")
   active    Boolean         @default(true)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
