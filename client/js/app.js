@@ -1,3 +1,4 @@
+// v1.0.1 - Fractional stock and stability update
 // ============================================
 // App — Main entry point
 // ============================================
