@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "build": "npm install && npx prisma generate && npx prisma db push --accept-data-loss",
+    "build": "npm install && npx prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "node src/seed.js",
