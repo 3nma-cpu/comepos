@@ -28,10 +28,19 @@ function productToJSON(p) {
 // GET /api/products
 router.get('/', async (req, res) => {
   try {
-    const products = await prisma.product.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
-    res.json(products.map(productToJSON));
+    const products = await prisma.product.findMany({ 
+      where: { active: true }, 
+      orderBy: { name: 'asc' } 
+    });
+    // Ensure every product has a unit even if missing in DB
+    const processed = products.map(p => ({
+      ...p,
+      unit: p.unit || 'UNI'
+    }));
+    res.json(processed.map(productToJSON));
   } catch (err) {
-    res.status(500).json({ error: 'Error al obtener productos' });
+    console.error('Error fetching products:', err);
+    res.status(500).json({ error: 'Error al obtener productos', details: err.message });
   }
 });
 
