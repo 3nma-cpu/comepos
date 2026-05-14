@@ -47,7 +47,7 @@ app.use(express.json());
 
 // Serve static files from client directory
 // Serve static files
-const publicPath = path.resolve(__dirname, '../client');
+const publicPath = path.join(process.cwd(), 'client');
 app.use(express.static(publicPath));
 
 // Routes
