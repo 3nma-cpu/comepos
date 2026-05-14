@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+// Final Restoration: Stable state with button fixes.
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
