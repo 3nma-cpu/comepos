@@ -36,14 +36,14 @@ router.get('/', async (req, res) => {
     res.json(sales.map(s => ({
       id: s.id,
       clientId: s.clientId,
-      clientName: s.client.name,
-      clientCategory: CAT_REVERSE[s.client.category] || s.client.category,
+      clientName: s.client?.name || 'Cliente Eliminado',
+      clientCategory: CAT_REVERSE[s.client?.category] || s.client?.category || 'Sin Categoría',
       total: s.total,
       paymentMethod: PAY_REVERSE[s.paymentMethod] || s.paymentMethod,
       date: s.createdAt.toISOString(),
       userId: s.userId,
       items: s.items.map(i => ({
-        productId: i.productId, name: i.product.name, price: i.unitPrice, quantity: i.quantity
+        productId: i.productId, name: i.product?.name || 'Producto Eliminado', price: i.unitPrice, quantity: i.quantity
       }))
     })));
   } catch (err) {
