@@ -36,10 +36,7 @@ export async function renderDashboard() {
             api.get('/sales?limit=8')
         ]);
 
-        const todayClients = new Set((todayReport?.sales || []).map(s => s.clientName)).size;
-        const totalRev = todayReport?.totalRevenue || 0;
-        const totalSales = todayReport?.totalSales || 0;
-        const avgTicket = todayReport?.avgTicket || 0;
+        const todayClients = new Set(todayReport.sales.map(s => s.clientName)).size;
 
         container.innerHTML = `
         <div class="fade-in">
@@ -48,14 +45,14 @@ export async function renderDashboard() {
               <div class="kpi-icon blue"><i data-lucide="shopping-bag"></i></div>
               <div class="kpi-content">
                 <div class="kpi-label">Ventas Hoy</div>
-                <div class="kpi-value">${totalSales}</div>
+                <div class="kpi-value">${todayReport.totalSales}</div>
               </div>
             </div>
             <div class="kpi-card">
               <div class="kpi-icon green"><i data-lucide="trending-up"></i></div>
               <div class="kpi-content">
                 <div class="kpi-label">Ingresos Hoy</div>
-                <div class="kpi-value">${formatCurrency(totalRev)}</div>
+                <div class="kpi-value">${formatCurrency(todayReport.totalRevenue)}</div>
               </div>
             </div>
             <div class="kpi-card">
@@ -69,7 +66,7 @@ export async function renderDashboard() {
               <div class="kpi-icon purple"><i data-lucide="receipt"></i></div>
               <div class="kpi-content">
                 <div class="kpi-label">Ticket Promedio</div>
-                <div class="kpi-value">${formatCurrency(avgTicket)}</div>
+                <div class="kpi-value">${formatCurrency(todayReport.avgTicket)}</div>
               </div>
             </div>
           </div>

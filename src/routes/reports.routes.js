@@ -46,11 +46,11 @@ router.get('/sales-period', async (req, res) => {
       avgTicket,
       daily: Object.entries(dailyMap).sort(([a], [b]) => a.localeCompare(b)).map(([date, total]) => ({ date, total })),
       sales: sales.map(s => ({
-        id: s.id, date: s.createdAt.toISOString(), clientName: s.client?.name || 'Cliente Eliminado',
-        clientCategory: CAT_REVERSE[s.client?.category] || s.client?.category || 'Sin Categoría',
+        id: s.id, date: s.createdAt.toISOString(), clientName: s.client.name,
+        clientCategory: CAT_REVERSE[s.client.category] || s.client.category,
         paymentMethod: PAY_REVERSE[s.paymentMethod] || s.paymentMethod,
         total: s.total,
-        items: s.items.map(i => ({ name: i.product?.name || 'Producto Eliminado', quantity: i.quantity, price: i.unitPrice }))
+        items: s.items.map(i => ({ name: i.product.name, quantity: i.quantity, price: i.unitPrice }))
       }))
     });
   } catch (err) {
@@ -65,7 +65,7 @@ router.get('/sales-category', async (req, res) => {
     const sales = await prisma.sale.findMany({ include: { client: true } });
     const catMap = {};
     sales.forEach(s => {
-      const cat = s.client ? (CAT_REVERSE[s.client.category] || s.client.category) : 'Sin Categoría';
+      const cat = CAT_REVERSE[s.client.category] || s.client.category;
       catMap[cat] = (catMap[cat] || 0) + s.total;
     });
     const total = Object.values(catMap).reduce((s, v) => s + v, 0);
@@ -84,7 +84,6 @@ router.get('/top-products', async (req, res) => {
     const items = await prisma.saleItem.findMany({ include: { product: true } });
     const prodMap = {};
     items.forEach(i => {
-      if (!i.product) return;
       if (!prodMap[i.productId]) prodMap[i.productId] = { name: i.product.name, qty: 0, revenue: 0 };
       prodMap[i.productId].qty += i.quantity;
       prodMap[i.productId].revenue += i.unitPrice * i.quantity;
@@ -153,7 +152,6 @@ router.get('/client-consumption', async (req, res) => {
     const sales = await prisma.sale.findMany({ include: { client: true } });
     const clientMap = {};
     sales.forEach(s => {
-      if (!s.clientId || !s.client) return;
       if (!clientMap[s.clientId]) clientMap[s.clientId] = { name: s.client.name, category: CAT_REVERSE[s.client.category] || s.client.category, count: 0, total: 0 };
       clientMap[s.clientId].count++;
       clientMap[s.clientId].total += s.total;

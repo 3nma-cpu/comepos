@@ -36,14 +36,14 @@ router.get('/', async (req, res) => {
     res.json(sales.map(s => ({
       id: s.id,
       clientId: s.clientId,
-      clientName: s.client?.name || 'Cliente Eliminado',
-      clientCategory: CAT_REVERSE[s.client?.category] || s.client?.category || 'Sin Categoría',
+      clientName: s.client.name,
+      clientCategory: CAT_REVERSE[s.client.category] || s.client.category,
       total: s.total,
       paymentMethod: PAY_REVERSE[s.paymentMethod] || s.paymentMethod,
       date: s.createdAt.toISOString(),
       userId: s.userId,
       items: s.items.map(i => ({
-        productId: i.productId, name: i.product?.name || 'Producto Eliminado', price: i.unitPrice, quantity: i.quantity
+        productId: i.productId, name: i.product.name, price: i.unitPrice, quantity: i.quantity
       }))
     })));
   } catch (err) {
@@ -93,19 +93,12 @@ router.post('/', async (req, res) => {
         include: { client: true, items: { include: { product: true } } }
       });
 
-      // Decrease stock with a check to prevent negative stock
+      // Decrease stock
       for (const item of items) {
-        const updated = await tx.product.updateMany({
-          where: { 
-            id: item.productId,
-            stock: { gte: item.quantity } // Ensure we don't go negative
-          },
+        await tx.product.update({
+          where: { id: item.productId },
           data: { stock: { decrement: item.quantity } }
         });
-
-        if (updated.count === 0) {
-          throw new Error(`No hay stock suficiente para ${prodMap[item.productId]?.name || 'el producto'}`);
-        }
       }
 
       return s;

@@ -175,7 +175,7 @@ function openPurchaseModal(providers, products) {
         </div>
         <div style="flex:0.8">
           <label style="font-size:0.7rem;margin-bottom:2px">Cant.</label>
-          <input type="number" step="any" class="form-control" data-item-qty="${i}" value="${it.quantity}" min="0.01" />
+          <input type="number" class="form-control" data-item-qty="${i}" value="${it.quantity}" min="1" />
         </div>
         <div style="flex:1.2">
           <label style="font-size:0.7rem;margin-bottom:2px">Costo Unit. (₲)</label>
@@ -201,7 +201,7 @@ function openPurchaseModal(providers, products) {
             };
         });
         container.querySelectorAll('[data-item-qty]').forEach(inp => {
-            inp.oninput = () => { items[inp.dataset.itemQty].quantity = parseFloat(inp.value) || 0; updateTotal(); };
+            inp.oninput = () => { items[inp.dataset.itemQty].quantity = parseInt(inp.value) || 1; updateTotal(); };
         });
         container.querySelectorAll('[data-item-cost]').forEach(inp => {
             inp.oninput = () => { 

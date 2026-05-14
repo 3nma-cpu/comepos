@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Deploy trigger: 2026-05-14 20:15
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -19,31 +18,29 @@ import purchasesRoutes from './routes/purchases.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 
-// import helmet from 'helmet'; // Temporally disabled for debugging
+import helmet from 'helmet';
 import compression from 'compression';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
-// app.use(helmet(...)); // Temporally disabled
+app.use(helmet({
+  crossOriginResourcePolicy: false,
+}));
 app.use(compression());
 const allowedOrigins = [
   process.env.FRONTEND_URL,
-  'https://comepos.onrender.com',
-  'https://comepos.pages.dev',
   'http://localhost:5173',
   'http://localhost:4173'
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow same-origin (no origin header) or allowed origins
-    if (!origin || allowedOrigins.some(o => origin.startsWith(o)) || origin === 'null') {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.warn('CORS blocked origin:', origin);
-      callback(null, true); // Allow for now to debug, but ideally we match correctly
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true
@@ -51,9 +48,7 @@ app.use(cors({
 app.use(express.json());
 
 // Serve static files from client directory
-// Serve static files
-const publicPath = path.join(process.cwd(), 'client');
-app.use(express.static(publicPath));
+app.use(express.static(path.join(__dirname, '../../client')));
 
 // Routes
 app.use('/api/auth', authRoutes);

@@ -2,8 +2,7 @@
 // API Client
 // ============================================
 
-// Use relative path for same-origin API calls in production
-const API_URL = '/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 function getAuthHeader() {
   const user = JSON.parse(localStorage.getItem('comepos_session') || 'null');
