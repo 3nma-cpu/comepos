@@ -27,6 +27,16 @@ const PORT = process.env.PORT || 4000;
 // Middleware
 app.use(helmet({
   crossOriginResourcePolicy: false,
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://cdn.sheetjs.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https://*"],
+      connectSrc: ["'self'", "https://*"]
+    }
+  }
 }));
 app.use(compression());
 const allowedOrigins = [
