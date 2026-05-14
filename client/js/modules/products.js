@@ -63,7 +63,7 @@ function renderProductList(container, products) {
                 <td><strong>${formatCurrency(p.price)}</strong></td>
                 <td>
                     <span class="badge ${p.stock > 10 ? 'badge-success' : p.stock > 0 ? 'badge-warning' : 'badge-danger'}">
-                        ${p.stock} uni.
+                        ${p.stock} ${p.unit || 'UNI'}
                     </span>
                 </td>
                 <td>
@@ -99,9 +99,17 @@ function showProductModal(product = null) {
     const body = `
     <form id="frmProduct">
         <div class="form-row">
-            <div class="form-group">
+            <div class="form-group" style="flex: 2">
                 <label>Nombre del Producto</label>
                 <input type="text" class="form-control" id="mpName" value="${isEdit ? escapeHTML(p.name) : ''}" required />
+            </div>
+            <div class="form-group" style="flex: 1">
+                <label>Medida</label>
+                <select class="form-control" id="mpUnit">
+                    <option value="UNI" ${p.unit === 'UNI' ? 'selected' : ''}>UNI</option>
+                    <option value="KG" ${p.unit === 'KG' ? 'selected' : ''}>KG</option>
+                    <option value="LTS" ${p.unit === 'LTS' ? 'selected' : ''}>LTS</option>
+                </select>
             </div>
         </div>
         <div class="form-group">
@@ -121,8 +129,8 @@ function showProductModal(product = null) {
             </div>
         </div>
         <div class="form-group">
-            <label>Stock Inicial (Unidades)</label>
-            <input type="number" class="form-control" id="mpStock" value="${p.stock}" ${isEdit ? 'disabled' : 'required min="0"'} />
+            <label>Stock Inicial</label>
+            <input type="number" step="any" class="form-control" id="mpStock" value="${p.stock}" ${isEdit ? 'disabled' : 'required min="0"'} />
             ${isEdit ? '<small style="color:var(--text-muted)">El stock se gestiona mediante compras y ventas.</small>' : ''}
         </div>
     </form>`;
@@ -148,10 +156,11 @@ function showProductModal(product = null) {
 
         const data = {
             name: document.getElementById('mpName').value,
+            unit: document.getElementById('mpUnit').value,
             category: document.getElementById('mpCategory').value,
             cost: parseInt(document.getElementById('mpCost').value) || 0,
             price: parseInt(document.getElementById('mpPrice').value) || 0,
-            stock: parseInt(document.getElementById('mpStock').value) || 0
+            stock: parseFloat(document.getElementById('mpStock').value) || 0
         };
 
         const btnSave = document.getElementById('btnSaveProduct');

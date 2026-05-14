@@ -93,12 +93,19 @@ router.post('/', async (req, res) => {
         include: { client: true, items: { include: { product: true } } }
       });
 
-      // Decrease stock
+      // Decrease stock with a check to prevent negative stock
       for (const item of items) {
-        await tx.product.update({
-          where: { id: item.productId },
+        const updated = await tx.product.updateMany({
+          where: { 
+            id: item.productId,
+            stock: { gte: item.quantity } // Ensure we don't go negative
+          },
           data: { stock: { decrement: item.quantity } }
         });
+
+        if (updated.count === 0) {
+          throw new Error(`No hay stock suficiente para ${prodMap[item.productId]?.name || 'el producto'}`);
+        }
       }
 
       return s;

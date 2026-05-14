@@ -140,7 +140,9 @@ function renderProductGrid(products, category, search) {
     <div class="product-card ${p.stock <= 0 ? 'out-of-stock' : ''}" data-prod-id="${p.id}">
       <div class="product-name" style="font-weight:700">${escapeHTML(p.name)}</div>
       <div class="product-price">${formatCurrency(p.price)}</div>
-      ${p.stock <= 5 ? `<div style="font-size:.7rem;color:var(--warning);margin-top:.25rem">Stock: ${p.stock}</div>` : ''}
+      <div style="font-size:.7rem;color:${p.stock <= 0 ? 'var(--danger)' : p.stock <= 5 ? 'var(--warning)' : 'var(--text-muted)'};margin-top:.25rem">
+        Stock: ${p.stock} ${p.unit || 'UNI'}
+      </div>
     </div>`).join('');
 
   grid.querySelectorAll('.product-card:not(.out-of-stock)').forEach(card => {
@@ -157,7 +159,7 @@ function addToCart(productId) {
     if (existing.quantity >= product.stock) return showToast('Stock insuficiente', 'error');
     existing.quantity++;
   } else {
-    cart.push({ productId, name: product.name, price: product.price, quantity: 1 });
+    cart.push({ productId, name: product.name, price: product.price, quantity: 1, unit: product.unit || 'UNI' });
   }
   updateCartUI();
 }
@@ -178,11 +180,11 @@ function updateCartUI() {
     <div class="cart-item">
       <div class="cart-item-info">
         <div class="cart-item-name">${escapeHTML(item.name)}</div>
-        <div class="cart-item-price">${formatCurrency(item.price)}</div>
+        <div class="cart-item-price">${formatCurrency(item.price)} / ${item.unit}</div>
       </div>
       <div class="cart-item-qty">
         <button data-qty-minus="${i}">−</button>
-        <span>${item.quantity}</span>
+        <input type="number" step="any" class="cart-qty-input" data-qty-idx="${i}" value="${item.quantity}" style="width:50px;text-align:center;background:transparent;border:1px solid var(--border);border-radius:4px;color:white" />
         <button data-qty-plus="${i}">+</button>
       </div>
       <div style="font-weight:700;font-size:.85rem;min-width:80px;text-align:right">${formatCurrency(item.price * item.quantity)}</div>
@@ -195,10 +197,26 @@ function updateCartUI() {
 
   btnProcess.disabled = !selectedClient;
 
+  itemsEl.querySelectorAll('.cart-qty-input').forEach(inp => {
+    inp.onchange = () => {
+      const idx = parseInt(inp.dataset.qtyIdx);
+      const val = parseFloat(inp.value) || 0;
+      const prod = allProducts.find(p => p.id === cart[idx].productId);
+      if (prod && val > prod.stock) {
+        showToast('Stock insuficiente', 'error');
+        inp.value = cart[idx].quantity;
+        return;
+      }
+      if (val <= 0) cart.splice(idx, 1);
+      else cart[idx].quantity = val;
+      updateCartUI();
+    };
+  });
+
   itemsEl.querySelectorAll('[data-qty-minus]').forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.qtyMinus);
-      cart[idx].quantity--;
+      cart[idx].quantity = Math.max(0, cart[idx].quantity - 1);
       if (cart[idx].quantity <= 0) cart.splice(idx, 1);
       updateCartUI();
     };
@@ -208,7 +226,7 @@ function updateCartUI() {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.qtyPlus);
       const prod = allProducts.find(p => p.id === cart[idx].productId);
-      if (prod && cart[idx].quantity >= prod.stock) return showToast('Stock insuficiente', 'error');
+      if (prod && cart[idx].quantity + 1 > prod.stock) return showToast('Stock insuficiente', 'error');
       cart[idx].quantity++;
       updateCartUI();
     };
@@ -227,7 +245,7 @@ function processSale() {
     <div class="table-container" style="margin-bottom:1rem;max-height:200px;overflow-y:auto">
       <table>
         <thead><tr><th>Producto</th><th>Cant.</th><th>Subtotal</th></tr></thead>
-        <tbody>${cart.map(it => `<tr><td>${escapeHTML(it.name)}</td><td>${it.quantity}</td><td>${formatCurrency(it.price * it.quantity)}</td></tr>`).join('')}</tbody>
+        <tbody>${cart.map(it => `<tr><td>${escapeHTML(it.name)}</td><td>${it.quantity} ${it.unit}</td><td>${formatCurrency(it.price * it.quantity)}</td></tr>`).join('')}</tbody>
       </table>
     </div>
     <div style="text-align:right;font-size:1.3rem;font-weight:800;color:var(--primary-light);margin-bottom:1rem">TOTAL: ${formatCurrency(total)}</div>

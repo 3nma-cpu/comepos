@@ -12,7 +12,17 @@ const PROD_CAT_MAP = {
 const PROD_CAT_REVERSE = Object.fromEntries(Object.entries(PROD_CAT_MAP).map(([k, v]) => [v, k]));
 
 function productToJSON(p) {
-  return { id: p.id, name: p.name, category: PROD_CAT_REVERSE[p.category] || p.category, price: p.price, cost: p.cost, stock: p.stock, emoji: p.emoji, active: p.active };
+  return { 
+    id: p.id, 
+    name: p.name, 
+    category: PROD_CAT_REVERSE[p.category] || p.category, 
+    unit: p.unit,
+    price: p.price, 
+    cost: p.cost, 
+    stock: p.stock, 
+    emoji: p.emoji, 
+    active: p.active 
+  };
 }
 
 // GET /api/products
@@ -28,10 +38,18 @@ router.get('/', async (req, res) => {
 // POST /api/products
 router.post('/', requirePermission('purchases'), async (req, res) => {
   try {
-    const { name, category, price, cost, stock, emoji } = req.body;
+    const { name, category, unit, price, cost, stock, emoji } = req.body;
     if (!name || !price) return res.status(400).json({ error: 'Nombre y precio son obligatorios' });
     const product = await prisma.product.create({
-      data: { name, category: PROD_CAT_MAP[category] || category, price, cost: cost || 0, stock: stock || 0, emoji: emoji || '🍽️' }
+      data: { 
+        name, 
+        category: PROD_CAT_MAP[category] || category, 
+        unit: unit || 'UNI',
+        price, 
+        cost: cost || 0, 
+        stock: stock || 0, 
+        emoji: emoji || '🍽️' 
+      }
     });
     res.status(201).json(productToJSON(product));
   } catch (err) {
@@ -42,13 +60,14 @@ router.post('/', requirePermission('purchases'), async (req, res) => {
 // PUT /api/products/:id
 router.put('/:id', requirePermission('purchases'), async (req, res) => {
   try {
-    const { name, category, price, cost, stock, emoji, active } = req.body;
+    const { name, category, unit, price, cost, stock, emoji, active } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (category !== undefined) data.category = PROD_CAT_MAP[category] || category;
+    if (unit !== undefined) data.unit = unit;
     if (price !== undefined) data.price = price;
     if (cost !== undefined) data.cost = cost;
-    if (stock !== undefined) data.stock = stock;
+    if (stock !== undefined) data.stock = parseFloat(stock);
     if (emoji !== undefined) data.emoji = emoji;
     if (active !== undefined) data.active = active;
 
