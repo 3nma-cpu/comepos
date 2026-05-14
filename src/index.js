@@ -18,26 +18,14 @@ import purchasesRoutes from './routes/purchases.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 
-import helmet from 'helmet';
+// import helmet from 'helmet'; // Temporally disabled for debugging
 import compression from 'compression';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
-app.use(helmet({
-  crossOriginResourcePolicy: false,
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://unpkg.com", "https://cdn.sheetjs.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https://*"],
-      connectSrc: ["'self'", "https://*"]
-    }
-  }
-}));
+// app.use(helmet(...)); // Temporally disabled
 app.use(compression());
 const allowedOrigins = [
   process.env.FRONTEND_URL,
@@ -58,7 +46,9 @@ app.use(cors({
 app.use(express.json());
 
 // Serve static files from client directory
-app.use(express.static(path.join(__dirname, '../client')));
+// Serve static files
+const publicPath = path.resolve(__dirname, '../client');
+app.use(express.static(publicPath));
 
 // Routes
 app.use('/api/auth', authRoutes);
