@@ -65,12 +65,18 @@ const ROUTE_HANDLERS = {
 
 // Boot
 function boot() {
-    initTheme();
-    const user = getCurrentUser();
-    if (!user) {
-        renderLoginScreen(onLogin);
-    } else {
-        renderApp(user);
+    try {
+        initTheme();
+        const user = getCurrentUser();
+        if (!user || !user.token) {
+            renderLoginScreen(onLogin);
+        } else {
+            renderApp(user);
+        }
+    } catch (err) {
+        console.error('Boot error:', err);
+        localStorage.removeItem('comepos_session');
+        window.location.reload();
     }
 }
 
@@ -97,6 +103,12 @@ function onLogin(user) {
 }
 
 function renderApp(user) {
+    if (!user || !user.name) {
+        localStorage.removeItem('comepos_session');
+        window.location.reload();
+        return;
+    }
+
     const app = document.getElementById('app');
     const visibleNav = NAV_ITEMS.map(section => ({
         ...section,
