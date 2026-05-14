@@ -120,7 +120,8 @@ function openUserModal(user, roles, currentUsers) {
     const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveUser">${isEdit ? 'Guardar' : 'Crear'}</button>`;
     const overlay = createModal(isEdit ? 'Editar Usuario' : 'Nuevo Usuario', body, footer);
 
-    document.getElementById('btnSaveUser').onclick = async () => {
+    const btnSave = document.getElementById('btnSaveUser');
+    btnSave.onclick = async () => {
         const name = document.getElementById('mUserName').value.trim();
         const username = document.getElementById('mUserUsername').value.trim();
         const email = document.getElementById('mUserEmail').value.trim();
@@ -128,6 +129,10 @@ function openUserModal(user, roles, currentUsers) {
         const roleId = document.getElementById('mUserRole').value;
         if (!name || !username || !email) return showToast('Complete todos los campos', 'error');
         if (!isEdit && !password) return showToast('Ingrese una contraseña', 'error');
+
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<i data-lucide="loader"></i> Guardando...';
+        if (window.lucide) lucide.createIcons();
 
         try {
             if (isEdit) {
@@ -143,6 +148,9 @@ function openUserModal(user, roles, currentUsers) {
             renderUsers();
         } catch (err) {
             showToast(err.message, 'error');
+            btnSave.disabled = false;
+            btnSave.innerHTML = isEdit ? 'Guardar' : 'Crear';
+            if (window.lucide) lucide.createIcons();
         }
     };
 }

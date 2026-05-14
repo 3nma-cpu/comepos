@@ -139,7 +139,8 @@ function openClientModal(client, allClients) {
     const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveClient">${isEdit ? 'Guardar' : 'Crear'}</button>`;
     const overlay = createModal(isEdit ? 'Editar Cliente' : 'Nuevo Cliente', body, footer);
 
-    document.getElementById('btnSaveClient').onclick = async () => {
+    const btnSave = document.getElementById('btnSaveClient');
+    btnSave.onclick = async () => {
         const data = {
             name: document.getElementById('mCliName').value.trim(),
             cedula: document.getElementById('mCliCedula').value.trim(),
@@ -150,6 +151,10 @@ function openClientModal(client, allClients) {
             phone: document.getElementById('mCliPhone').value.trim()
         };
         if (!data.name || !data.cedula) return showToast('Nombre y cédula son obligatorios', 'error');
+
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<i data-lucide="loader"></i> Guardando...';
+        if (window.lucide) lucide.createIcons();
 
         try {
             if (isEdit) {
@@ -163,6 +168,9 @@ function openClientModal(client, allClients) {
             renderClients();
         } catch (err) {
             showToast(err.message, 'error');
+            btnSave.disabled = false;
+            btnSave.innerHTML = isEdit ? 'Guardar' : 'Crear';
+            if (window.lucide) lucide.createIcons();
         }
     };
 }

@@ -238,7 +238,13 @@ function processSale() {
   const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-success" id="btnConfirmSale"><i data-lucide="check"></i>Confirmar Venta</button>`;
   const overlay = createModal('Confirmar Venta', body, footer);
 
-  document.getElementById('btnConfirmSale').onclick = async () => {
+  const btnConfirm = document.getElementById('btnConfirmSale');
+  btnConfirm.onclick = async () => {
+    // Prevent duplicates
+    btnConfirm.disabled = true;
+    btnConfirm.innerHTML = '<i data-lucide="loader"></i> Procesando...';
+    if (window.lucide) lucide.createIcons();
+
     const paymentMethod = document.getElementById('mPayMethod').value;
     const payload = {
       clientId: selectedClient.id,
@@ -250,17 +256,28 @@ function processSale() {
       const newSale = await api.post('/sales', payload);
       closeModal(overlay);
 
-      // Format for ticket
-      newSale.clientName = selectedClient.name;
-      newSale.items = cart;
-      showTicket(newSale);
+      // Save references for ticket before clearing
+      const ticketData = {
+        ...newSale,
+        clientName: selectedClient.name,
+        items: [...cart]
+      };
 
-      showToast('¡Venta registrada con éxito!');
+      // Clear cart
       cart = [];
       selectedClient = null;
+      
+      // Show success modal (ticket)
+      showTicket(ticketData);
+      showToast('¡Venta registrada con éxito!');
+      
+      // Refresh background UI
       renderSales();
     } catch (e) {
       showToast(e.message, 'error');
+      btnConfirm.disabled = false;
+      btnConfirm.innerHTML = '<i data-lucide="check"></i> Confirmar Venta';
+      if (window.lucide) lucide.createIcons();
     }
   };
 }

@@ -270,8 +270,14 @@ function openPurchaseModal(providers, products) {
         } catch (e) { showToast(e.message, 'error'); }
     };
 
-    document.getElementById('btnSavePurch').onclick = async () => {
+    const btnSave = document.getElementById('btnSavePurch');
+    btnSave.onclick = async () => {
         if (items.length === 0) return showToast('Agregue al menos un producto', 'error');
+        
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<i data-lucide="loader"></i> Registrando...';
+        if (window.lucide) lucide.createIcons();
+
         const provId = document.getElementById('mPurchProv').value;
         const purchItems = items.map(it => {
             return { productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price };
@@ -294,7 +300,12 @@ function openPurchaseModal(providers, products) {
             showToast('Compra registrada y stock actualizado');
             closeModal(overlay);
             renderPurchasesList();
-        } catch (e) { showToast(e.message, 'error'); }
+        } catch (e) {
+            showToast(e.message, 'error');
+            btnSave.disabled = false;
+            btnSave.innerHTML = 'Registrar Compra';
+            if (window.lucide) lucide.createIcons();
+        }
     };
 }
 
@@ -352,7 +363,8 @@ function openProviderModal(provider) {
     const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveProv">${isEdit ? 'Guardar' : 'Crear'}</button>`;
     const overlay = createModal(isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor', body, footer);
 
-    document.getElementById('btnSaveProv').onclick = async () => {
+    const btnSave = document.getElementById('btnSaveProv');
+    btnSave.onclick = async () => {
         const data = { 
             name: document.getElementById('mProvName').value.trim(), 
             ruc: document.getElementById('mProvRuc').value.trim(), 
@@ -361,6 +373,10 @@ function openProviderModal(provider) {
         };
         if (!data.name) return showToast('Ingrese el nombre', 'error');
         
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<i data-lucide="loader"></i> Guardando...';
+        if (window.lucide) lucide.createIcons();
+
         try {
             if (isEdit) { 
                 await api.put(`/providers/${provider.id}`, data); 
@@ -371,6 +387,11 @@ function openProviderModal(provider) {
             }
             closeModal(overlay);
             renderProvidersList();
-        } catch (e) { showToast(e.message, 'error'); }
+        } catch (e) {
+            showToast(e.message, 'error');
+            btnSave.disabled = false;
+            btnSave.innerHTML = isEdit ? 'Guardar' : 'Crear';
+            if (window.lucide) lucide.createIcons();
+        }
     };
 }

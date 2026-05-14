@@ -66,7 +66,12 @@ export function createModal(title, bodyHTML, footerHTML = '') {
     </div>`;
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('active'));
-    overlay.querySelector('.modal-close').onclick = () => closeModal(overlay);
+    
+    // Attach close handler to all close buttons (header X and footer buttons)
+    overlay.querySelectorAll('.modal-close').forEach(btn => {
+        btn.onclick = () => closeModal(overlay);
+    });
+
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay); });
     if (window.lucide) lucide.createIcons();
     return overlay;

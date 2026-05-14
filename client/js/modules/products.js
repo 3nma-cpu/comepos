@@ -154,9 +154,10 @@ function showProductModal(product = null) {
             stock: parseInt(document.getElementById('mpStock').value) || 0
         };
 
-        const btn = document.getElementById('btnSaveProduct');
-        btn.disabled = true;
-        btn.innerHTML = '<i class="lucide-loader"></i> Guardando...';
+        const btnSave = document.getElementById('btnSaveProduct');
+        btnSave.disabled = true;
+        btnSave.innerHTML = '<i data-lucide="loader"></i> Guardando...';
+        if (window.lucide) lucide.createIcons();
 
         try {
             if (isEdit) {
@@ -169,9 +170,10 @@ function showProductModal(product = null) {
             import('../utils.js').then(m => m.showToast(isEdit ? 'Producto actualizado' : 'Producto creado'));
             renderProducts();
         } catch (err) {
-            alert('Error: ' + err.message);
-            btn.disabled = false;
-            btn.innerHTML = isEdit ? 'Guardar Cambios' : 'Crear Producto';
+            import('../utils.js').then(m => m.showToast(err.message, 'error'));
+            btnSave.disabled = false;
+            btnSave.innerHTML = isEdit ? 'Guardar Cambios' : 'Crear Producto';
+            if (window.lucide) lucide.createIcons();
         }
     };
 }
