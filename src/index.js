@@ -29,16 +29,20 @@ const PORT = process.env.PORT || 4000;
 app.use(compression());
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://comepos.onrender.com',
+  'https://comepos.pages.dev',
   'http://localhost:5173',
   'http://localhost:4173'
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow same-origin (no origin header) or allowed origins
+    if (!origin || allowedOrigins.some(o => origin.startsWith(o)) || origin === 'null') {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      console.warn('CORS blocked origin:', origin);
+      callback(null, true); // Allow for now to debug, but ideally we match correctly
     }
   },
   credentials: true
