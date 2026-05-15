@@ -315,19 +315,212 @@ function processSale() {
 
 function showTicket(sale) {
   const payLabels = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', nomina: 'Desc. Nómina' };
+  const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
+  const vendorName = user.name || 'Vendedor';
+
+  const ticketId = sale.id.slice(-6).toUpperCase();
+
   const body = `
-    <div class="ticket-preview">
-      <h4>Comedor TTA S.A.</h4>
-      <p style="text-align:center;font-size:.7rem;color:#666">Vale de Comedor</p>
+    <div class="ticket-preview" id="ticketPrintArea">
+      <!-- Encabezado -->
+      <div style="text-align:center;font-family:'Courier New',Courier,monospace">
+        <div style="font-weight:700;font-size:1rem;letter-spacing:1px">COMEDOR TTA S.A.</div>
+        <div style="font-size:.72rem;color:#555;margin-top:2px">Vale de Comedor</div>
+      </div>
       <div class="ticket-divider"></div>
+
+      <!-- Datos de venta -->
+      <div class="ticket-line"><span>Ticket #:</span><span>${ticketId}</span></div>
       <div class="ticket-line"><span>Fecha:</span><span>${formatDateTime(sale.date)}</span></div>
-      <div class="ticket-line"><span>Cliente:</span><span>${sale.clientName}</span></div>
+      <div class="ticket-line"><span>Cliente:</span><span>${escapeHTML(sale.clientName)}</span></div>
       <div class="ticket-line"><span>Pago:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
       <div class="ticket-divider"></div>
-      ${sale.items.map(it => `<div class="ticket-line"><span>${it.name} x${it.quantity}</span><span>${formatCurrency(it.price * it.quantity)}</span></div>`).join('')}
+
+      <!-- Items -->
+      <div style="font-family:'Courier New',Courier,monospace;font-size:.72rem">
+        <div style="display:flex;justify-content:space-between;font-weight:700;border-bottom:1px dashed #ccc;padding-bottom:2px;margin-bottom:4px">
+          <span>Producto</span><span>SubTotal</span>
+        </div>
+        ${sale.items.map(it => `
+        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
+          <span>${escapeHTML(it.name)} x${it.quantity}${it.unit ? ' '+it.unit : ''}</span>
+          <span>${formatCurrency(it.price * it.quantity)}</span>
+        </div>`).join('')}
+      </div>
       <div class="ticket-divider"></div>
+
+      <!-- Total -->
       <div class="ticket-line ticket-total"><span>TOTAL</span><span>${formatCurrency(sale.total)}</span></div>
-      <div class="ticket-footer">¡Gracias por su compra!<br/>Ticket #${sale.id.slice(-6).toUpperCase()}</div>
+      <div class="ticket-divider"></div>
+
+      <!-- Mensaje -->
+      <div style="text-align:center;font-size:.68rem;color:#555;margin:6px 0">¡Gracias por su consumo!</div>
+      <div class="ticket-divider" style="margin-bottom:20px"></div>
+
+      <!-- Firmas -->
+      <div style="display:flex;justify-content:space-between;font-family:'Courier New',Courier,monospace;font-size:.72rem;margin-top:8px">
+        <!-- Vendedor (izquierda) -->
+        <div style="text-align:center;width:45%">
+          <div style="border-top:1px solid #333;padding-top:4px;margin-top:30px">
+            <div style="font-weight:700">${escapeHTML(vendorName)}</div>
+            <div style="color:#555;font-size:.65rem">Vendedor</div>
+          </div>
+        </div>
+        <!-- Cliente (derecha) -->
+        <div style="text-align:center;width:45%">
+          <div style="border-top:1px solid #333;padding-top:4px;margin-top:30px">
+            <div style="font-weight:700">${escapeHTML(sale.clientName)}</div>
+            <div style="color:#555;font-size:.65rem">Cliente</div>
+          </div>
+        </div>
+      </div>
     </div>`;
-  createModal('Ticket de Venta', body, '<button class="btn btn-primary modal-close">Cerrar</button>');
+
+  const footer = `
+    <button class="btn btn-ghost" id="btnPrintTicket">
+      <i data-lucide="printer"></i> Imprimir
+    </button>
+    <button class="btn btn-primary modal-close">Cerrar</button>`;
+
+  const modal = createModal('Ticket de Venta', body, footer);
+  if (window.lucide) lucide.createIcons();
+
+  document.getElementById('btnPrintTicket').onclick = () => printTicket(ticketId, sale, vendorName, payLabels);
+}
+
+function printTicket(ticketId, sale, vendorName, payLabels) {
+  const payLabel = payLabels[sale.paymentMethod] || sale.paymentMethod;
+  const printWin = window.open('', '_blank', 'width=400,height=600');
+
+  const itemsHTML = sale.items.map(it =>
+    `<tr>
+      <td>${escapeHTML(it.name)} x${it.quantity}${it.unit ? ' '+it.unit : ''}</td>
+      <td style="text-align:right">${formatCurrency(it.price * it.quantity)}</td>
+    </tr>`
+  ).join('');
+
+  printWin.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Ticket #${ticketId}</title>
+  <style>
+    /* =============================================
+       EPSON TM-U220D — 76mm paper (~42 chars)
+       ============================================= */
+    @page {
+      margin: 0;
+      size: 76mm auto;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 10pt;
+      width: 72mm;
+      padding: 3mm 2mm;
+      color: #000;
+      background: #fff;
+    }
+    .center  { text-align: center; }
+    .right   { text-align: right; }
+    .bold    { font-weight: bold; }
+    .small   { font-size: 8pt; }
+    .divider {
+      border: none;
+      border-top: 1px dashed #000;
+      margin: 4px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9pt;
+    }
+    table td { padding: 1px 0; vertical-align: top; }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9pt;
+      margin: 2px 0;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      font-weight: bold;
+      font-size: 11pt;
+      margin: 4px 0;
+    }
+    .sig-section {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 18mm; /* espacio para firma a mano */
+    }
+    .sig-box {
+      width: 46%;
+      text-align: center;
+      border-top: 1px solid #000;
+      padding-top: 3px;
+      font-size: 8pt;
+    }
+    .sig-box .sig-name { font-weight: bold; font-size: 9pt; }
+    .sig-space { height: 12mm; } /* espacio en blanco para firma */
+    @media print {
+      body { width: 72mm; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ENCABEZADO -->
+  <div class="center bold" style="font-size:12pt;letter-spacing:1px">COMEDOR TTA S.A.</div>
+  <div class="center small">Vale de Comedor</div>
+  <hr class="divider"/>
+
+  <!-- DATOS -->
+  <div class="info-row"><span>Ticket #:</span><span>${ticketId}</span></div>
+  <div class="info-row"><span>Fecha:</span><span>${formatDateTime(sale.date)}</span></div>
+  <div class="info-row"><span>Cliente:</span><span>${escapeHTML(sale.clientName)}</span></div>
+  <div class="info-row"><span>Pago:</span><span>${payLabel}</span></div>
+  <hr class="divider"/>
+
+  <!-- ITEMS -->
+  <table>
+    <thead>
+      <tr>
+        <td class="bold">Producto</td>
+        <td class="bold right">SubTotal</td>
+      </tr>
+    </thead>
+    <tbody>${itemsHTML}</tbody>
+  </table>
+  <hr class="divider"/>
+
+  <!-- TOTAL -->
+  <div class="total-row">
+    <span>TOTAL</span>
+    <span>${formatCurrency(sale.total)}</span>
+  </div>
+  <hr class="divider"/>
+
+  <!-- PIE -->
+  <div class="center small" style="margin:4px 0">¡Gracias por su consumo!</div>
+  <hr class="divider"/>
+
+  <!-- FIRMAS -->
+  <div class="sig-section">
+    <div class="sig-box">
+      <div class="sig-space"></div>
+      <div class="sig-name">${escapeHTML(vendorName)}</div>
+      <div>Vendedor</div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-space"></div>
+      <div class="sig-name">${escapeHTML(sale.clientName)}</div>
+      <div>Cliente</div>
+    </div>
+  </div>
+</body>
+</html>`);
+
+  printWin.document.close();
+  printWin.focus();
+  setTimeout(() => { printWin.print(); printWin.close(); }, 400);
 }
