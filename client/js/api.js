@@ -2,7 +2,8 @@
 // API Client
 // ============================================
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+// API base URL — uses relative path when served same-origin (Render), full URL otherwise
+const API_URL = (typeof window !== 'undefined' && window.__API_URL__) ? window.__API_URL__ : '/api';
 
 function getAuthHeader() {
   const user = JSON.parse(localStorage.getItem('comepos_session') || 'null');

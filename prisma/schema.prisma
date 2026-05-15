@@ -68,13 +68,20 @@ enum ProductCategory {
   EXTRAS
 }
 
+enum ProductUnit {
+  UNI
+  KG
+  LTS
+}
+
 model Product {
   id        String          @id @default(cuid())
   name      String
   category  ProductCategory
-  price     Int
-  cost      Int
-  stock     Int             @default(0)
+  unit      ProductUnit     @default(UNI)
+  price     Float
+  cost      Float
+  stock     Float           @default(0)
   emoji     String          @default("plate")
   active    Boolean         @default(true)
   createdAt DateTime        @default(now())
@@ -116,8 +123,8 @@ model SaleItem {
   id        String @id @default(cuid())
   saleId    String
   productId String
-  quantity  Int
-  unitPrice Int
+  quantity  Float
+  unitPrice Float
   sale    Sale    @relation(fields: [saleId], references: [id], onDelete: Cascade)
   product Product @relation(fields: [productId], references: [id])
 }
@@ -149,8 +156,8 @@ model PurchaseItem {
   id         String @id @default(cuid())
   purchaseId String
   productId  String
-  quantity   Int
-  unitCost   Int
+  quantity   Float
+  unitCost   Float
   purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   product  Product  @relation(fields: [productId], references: [id])
 }

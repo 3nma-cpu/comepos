@@ -56,8 +56,9 @@ router.post('/', async (req, res) => {
 
     // Calculate total
     const total = items.reduce((sum, it) => {
-        const itemCost = it.cost !== undefined ? it.cost : (prodMap[it.productId]?.cost || 0);
-        return sum + itemCost * it.quantity;
+        const itemCost = it.cost !== undefined ? parseFloat(it.cost) : (prodMap[it.productId]?.cost || 0);
+        const itemQty = parseFloat(it.quantity) || 0;
+        return sum + itemCost * itemQty;
     }, 0);
 
     const purchase = await prisma.$transaction(async (tx) => {
@@ -77,8 +78,8 @@ router.post('/', async (req, res) => {
           items: {
             create: items.map(it => ({
               productId: it.productId,
-              quantity: it.quantity,
-              unitCost: it.cost !== undefined ? it.cost : (prodMap[it.productId]?.cost || 0)
+              quantity: parseFloat(it.quantity) || 0,
+              unitCost: it.cost !== undefined ? parseFloat(it.cost) : (prodMap[it.productId]?.cost || 0)
             }))
           }
         },
@@ -87,14 +88,13 @@ router.post('/', async (req, res) => {
 
       // Update stock and cost
       for (const item of items) {
-        const newCost = item.cost !== undefined ? item.cost : (prodMap[item.productId]?.cost || 0);
+        const newCost = item.cost !== undefined ? parseFloat(item.cost) : (prodMap[item.productId]?.cost || 0);
+        const qty = parseFloat(item.quantity) || 0;
         const updateData = {
-          stock: { increment: item.quantity },
+          stock: { increment: qty },
           cost: newCost
         };
-        if (item.price !== undefined) {
-          updateData.price = item.price;
-        }
+        if (item.price !== undefined) updateData.price = parseFloat(item.price);
         await tx.product.update({
           where: { id: item.productId },
           data: updateData

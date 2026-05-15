@@ -136,12 +136,16 @@ function renderProductGrid(products, category, search) {
   if (category !== 'Todos') filtered = filtered.filter(p => p.category === category);
   if (search) filtered = filtered.filter(p => p.name.toLowerCase().includes(search));
 
-  grid.innerHTML = filtered.map(p => `
+  grid.innerHTML = filtered.map(p => {
+    const unit = p.unit || 'UNI';
+    const stockDisplay = unit === 'UNI' ? Math.floor(p.stock) : Number(p.stock).toFixed(2);
+    return `
     <div class="product-card ${p.stock <= 0 ? 'out-of-stock' : ''}" data-prod-id="${p.id}">
       <div class="product-name" style="font-weight:700">${escapeHTML(p.name)}</div>
-      <div class="product-price">${formatCurrency(p.price)}</div>
-      ${p.stock <= 5 ? `<div style="font-size:.7rem;color:var(--warning);margin-top:.25rem">Stock: ${p.stock}</div>` : ''}
-    </div>`).join('');
+      <div class="product-price">${formatCurrency(p.price)}<span style="font-size:.7rem;color:var(--text-muted)"> / ${unit}</span></div>
+      ${p.stock <= 5 ? `<div style="font-size:.7rem;color:var(--warning);margin-top:.25rem">Stock: ${stockDisplay} ${unit}</div>` : ''}
+    </div>`;
+  }).join('');
 
   grid.querySelectorAll('.product-card:not(.out-of-stock)').forEach(card => {
     card.onclick = () => addToCart(card.dataset.prodId);
@@ -154,10 +158,11 @@ function addToCart(productId) {
 
   const existing = cart.find(c => c.productId === productId);
   if (existing) {
-    if (existing.quantity >= product.stock) return showToast('Stock insuficiente', 'error');
-    existing.quantity++;
+    const newQty = existing.quantity + 1;
+    if (newQty > product.stock) return showToast('Stock insuficiente', 'error');
+    existing.quantity = newQty;
   } else {
-    cart.push({ productId, name: product.name, price: product.price, quantity: 1 });
+    cart.push({ productId, name: product.name, price: product.price, quantity: 1, unit: product.unit || 'UNI', maxStock: product.stock });
   }
   updateCartUI();
 }
@@ -174,19 +179,25 @@ function updateCartUI() {
     return;
   }
 
-  itemsEl.innerHTML = cart.map((item, i) => `
+  itemsEl.innerHTML = cart.map((item, i) => {
+    const unit = item.unit || 'UNI';
+    const step = unit === 'UNI' ? '1' : '0.01';
+    return `
     <div class="cart-item">
       <div class="cart-item-info">
-        <div class="cart-item-name">${escapeHTML(item.name)}</div>
-        <div class="cart-item-price">${formatCurrency(item.price)}</div>
+        <div class="cart-item-name">${escapeHTML(item.name)} <span style="font-size:.7rem;color:var(--text-muted)">(${unit})</span></div>
+        <div class="cart-item-price">${formatCurrency(item.price)} / ${unit}</div>
       </div>
       <div class="cart-item-qty">
         <button data-qty-minus="${i}">−</button>
-        <span>${item.quantity}</span>
+        <input type="number" value="${item.quantity}" min="${step}" max="${item.maxStock}" step="${step}"
+          style="width:60px;text-align:center;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);padding:2px 4px;font-size:.85rem"
+          data-qty-input="${i}" />
         <button data-qty-plus="${i}">+</button>
       </div>
       <div style="font-weight:700;font-size:.85rem;min-width:80px;text-align:right">${formatCurrency(item.price * item.quantity)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   const subtotal = cart.reduce((s, it) => s + it.price * it.quantity, 0);
   summaryEl.innerHTML = `
@@ -195,23 +206,43 @@ function updateCartUI() {
 
   btnProcess.disabled = !selectedClient;
 
+  // Minus button
   itemsEl.querySelectorAll('[data-qty-minus]').forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.qtyMinus);
-      cart[idx].quantity--;
+      const unit = cart[idx].unit || 'UNI';
+      const step = unit === 'UNI' ? 1 : 0.1;
+      cart[idx].quantity = Math.max(0, parseFloat((cart[idx].quantity - step).toFixed(3)));
       if (cart[idx].quantity <= 0) cart.splice(idx, 1);
       updateCartUI();
     };
   });
 
+  // Plus button
   itemsEl.querySelectorAll('[data-qty-plus]').forEach(btn => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.qtyPlus);
       const prod = allProducts.find(p => p.id === cart[idx].productId);
-      if (prod && cart[idx].quantity >= prod.stock) return showToast('Stock insuficiente', 'error');
-      cart[idx].quantity++;
+      const unit = cart[idx].unit || 'UNI';
+      const step = unit === 'UNI' ? 1 : 0.1;
+      const newQty = parseFloat((cart[idx].quantity + step).toFixed(3));
+      if (prod && newQty > prod.stock) return showToast('Stock insuficiente', 'error');
+      cart[idx].quantity = newQty;
       updateCartUI();
     };
+  });
+
+  // Direct quantity input
+  itemsEl.querySelectorAll('[data-qty-input]').forEach(input => {
+    input.addEventListener('change', () => {
+      const idx = parseInt(input.dataset.qtyInput);
+      const val = parseFloat(input.value) || 0;
+      const prod = allProducts.find(p => p.id === cart[idx].productId);
+      if (val <= 0) { cart.splice(idx, 1); updateCartUI(); return; }
+      if (prod && val > prod.stock) { showToast('Stock insuficiente', 'error'); input.value = cart[idx].quantity; return; }
+      cart[idx].quantity = val;
+      updateCartUI();
+    });
   });
 }
 

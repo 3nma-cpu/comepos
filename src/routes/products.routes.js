@@ -5,20 +5,43 @@ import { authMiddleware, requirePermission } from '../middleware/auth.js';
 const router = Router();
 router.use(authMiddleware);
 
-// Category mapping
 const PROD_CAT_MAP = {
-  'Platos Principales': 'PLATOS_PRINCIPALES', 'Bebidas': 'BEBIDAS', 'Postres': 'POSTRES', 'Entradas': 'ENTRADAS', 'Extras': 'EXTRAS'
+  'Platos Principales': 'PLATOS_PRINCIPALES', 'Bebidas': 'BEBIDAS',
+  'Postres': 'POSTRES', 'Entradas': 'ENTRADAS', 'Extras': 'EXTRAS'
 };
 const PROD_CAT_REVERSE = Object.fromEntries(Object.entries(PROD_CAT_MAP).map(([k, v]) => [v, k]));
 
+const UNIT_VALUES = ['UNI', 'KG', 'LTS'];
+
 function productToJSON(p) {
-  return { id: p.id, name: p.name, category: PROD_CAT_REVERSE[p.category] || p.category, price: p.price, cost: p.cost, stock: p.stock, emoji: p.emoji, active: p.active };
+  return {
+    id: p.id,
+    name: p.name,
+    category: PROD_CAT_REVERSE[p.category] || p.category,
+    unit: p.unit || 'UNI',
+    price: p.price,
+    cost: p.cost,
+    stock: p.stock,
+    emoji: p.emoji,
+    active: p.active
+  };
 }
 
 // GET /api/products
 router.get('/', async (req, res) => {
   try {
     const products = await prisma.product.findMany({ where: { active: true }, orderBy: { name: 'asc' } });
+    res.json(products.map(productToJSON));
+  } catch (err) {
+    console.error('Error fetching products:', err);
+    res.status(500).json({ error: 'Error al obtener productos', detail: err.message });
+  }
+});
+
+// GET /api/products/all (includes inactive)
+router.get('/all', requirePermission('purchases'), async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({ orderBy: { name: 'asc' } });
     res.json(products.map(productToJSON));
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener productos' });
@@ -28,27 +51,37 @@ router.get('/', async (req, res) => {
 // POST /api/products
 router.post('/', requirePermission('purchases'), async (req, res) => {
   try {
-    const { name, category, price, cost, stock, emoji } = req.body;
-    if (!name || !price) return res.status(400).json({ error: 'Nombre y precio son obligatorios' });
+    const { name, category, unit, price, cost, stock, emoji } = req.body;
+    if (!name || price === undefined) return res.status(400).json({ error: 'Nombre y precio son obligatorios' });
     const product = await prisma.product.create({
-      data: { name, category: PROD_CAT_MAP[category] || category, price, cost: cost || 0, stock: stock || 0, emoji: emoji || '🍽️' }
+      data: {
+        name,
+        category: PROD_CAT_MAP[category] || category || 'PLATOS_PRINCIPALES',
+        unit: UNIT_VALUES.includes(unit) ? unit : 'UNI',
+        price: parseFloat(price) || 0,
+        cost: parseFloat(cost) || 0,
+        stock: parseFloat(stock) || 0,
+        emoji: emoji || '🍽️'
+      }
     });
     res.status(201).json(productToJSON(product));
   } catch (err) {
-    res.status(500).json({ error: 'Error al crear producto' });
+    console.error('Error creating product:', err);
+    res.status(500).json({ error: 'Error al crear producto', detail: err.message });
   }
 });
 
 // PUT /api/products/:id
 router.put('/:id', requirePermission('purchases'), async (req, res) => {
   try {
-    const { name, category, price, cost, stock, emoji, active } = req.body;
+    const { name, category, unit, price, cost, stock, emoji, active } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (category !== undefined) data.category = PROD_CAT_MAP[category] || category;
-    if (price !== undefined) data.price = price;
-    if (cost !== undefined) data.cost = cost;
-    if (stock !== undefined) data.stock = stock;
+    if (unit !== undefined && UNIT_VALUES.includes(unit)) data.unit = unit;
+    if (price !== undefined) data.price = parseFloat(price);
+    if (cost !== undefined) data.cost = parseFloat(cost);
+    if (stock !== undefined) data.stock = parseFloat(stock);
     if (emoji !== undefined) data.emoji = emoji;
     if (active !== undefined) data.active = active;
 

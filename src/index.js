@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Final Restoration: Stable state with button fixes.
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -32,13 +31,16 @@ app.use(helmet({
 app.use(compression());
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  'https://comepos.onrender.com',
+  'https://comepos.pages.dev',
+  'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173'
 ].filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -48,8 +50,15 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Serve static files from client directory
-app.use(express.static(path.join(__dirname, '../../client')));
+// Serve static files — path relative to src/index.js → ../client
+const clientPath = path.join(__dirname, '../client');
+app.use(express.static(clientPath));
+
+// SPA fallback — serve index.html for any non-API route
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(clientPath, 'index.html'));
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
