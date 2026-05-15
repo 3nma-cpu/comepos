@@ -129,49 +129,101 @@ function reportSalesPeriod(area, sales) {
 function reportPurchasesPeriod(area, purchases, providers) {
     const d30 = new Date(); d30.setDate(d30.getDate() - 30);
     area.innerHTML = `
-    <div class="report-filters">
+    <div class="report-filters" style="flex-wrap:wrap;gap:.75rem">
       <div class="form-group"><label>Desde</label><input type="date" class="form-control" id="rppFrom" value="${formatDateInput(d30)}" /></div>
       <div class="form-group"><label>Hasta</label><input type="date" class="form-control" id="rppTo" value="${todayStr()}" /></div>
       <div class="form-group">
+        <label>Tipo de Filtro</label>
+        <select class="form-control" id="rppFilterType">
+          <option value="">Sin filtro adicional</option>
+          <option value="proveedor">Por Proveedor</option>
+          <option value="tipo">Por Tipo de Pago</option>
+          <option value="factura">Por Factura</option>
+        </select>
+      </div>
+      <!-- Filtro: Proveedor -->
+      <div class="form-group" id="rppProvGroup" style="display:none">
         <label>Proveedor</label>
         <select class="form-control" id="rppProv">
           <option value="">Todos</option>
           ${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
         </select>
       </div>
-      <button class="btn btn-primary" id="rppApply" style="margin-top: auto;"><i data-lucide="filter"></i>Aplicar</button>
-      <button class="btn btn-secondary" id="rppExport" style="margin-top: auto;"><i data-lucide="download"></i>Exportar Excel</button>
+      <!-- Filtro: Tipo de Pago -->
+      <div class="form-group" id="rppTipoGroup" style="display:none">
+        <label>Tipo de Pago</label>
+        <select class="form-control" id="rppTipo">
+          <option value="">Todos</option>
+          <option value="CONTADO">Contado</option>
+          <option value="CREDITO">Crédito</option>
+        </select>
+      </div>
+      <!-- Filtro: Factura -->
+      <div class="form-group" id="rppFacturaGroup" style="display:none">
+        <label>Número de Factura</label>
+        <input type="text" class="form-control" id="rppFactura" placeholder="Ej: 001-001-0000123" />
+      </div>
+      <button class="btn btn-primary" id="rppApply" style="margin-top:auto"><i data-lucide="filter"></i>Aplicar</button>
+      <button class="btn btn-secondary" id="rppExport" style="margin-top:auto"><i data-lucide="download"></i>Exportar Excel</button>
     </div>
     <div class="kpi-grid" id="rppKpis"></div>
     <div class="table-container" id="rppTable"></div>`;
     if (window.lucide) lucide.createIcons();
 
+    // Mostrar/ocultar el sub-filtro dinámicamente
+    document.getElementById('rppFilterType').addEventListener('change', () => {
+        const val = document.getElementById('rppFilterType').value;
+        document.getElementById('rppProvGroup').style.display    = val === 'proveedor' ? '' : 'none';
+        document.getElementById('rppTipoGroup').style.display    = val === 'tipo'      ? '' : 'none';
+        document.getElementById('rppFacturaGroup').style.display = val === 'factura'   ? '' : 'none';
+    });
+
     function apply() {
-        const from = document.getElementById('rppFrom').value;
-        const to = document.getElementById('rppTo').value;
-        const provId = document.getElementById('rppProv').value;
-        
-        const filtered = purchases.filter(p => { 
-            const d = p.date.split('T')[0]; 
-            const dateMatch = d >= from && d <= to;
-            const provMatch = !provId || p.providerId === provId;
-            return dateMatch && provMatch; 
+        const from       = document.getElementById('rppFrom').value;
+        const to         = document.getElementById('rppTo').value;
+        const filterType = document.getElementById('rppFilterType').value;
+        const provId     = document.getElementById('rppProv')?.value    || '';
+        const tipo       = document.getElementById('rppTipo')?.value    || '';
+        const factura    = (document.getElementById('rppFactura')?.value || '').toLowerCase().trim();
+
+        const filtered = purchases.filter(p => {
+            const d = p.date.split('T')[0];
+            if (d < from || d > to) return false;
+            if (filterType === 'proveedor' && provId && p.providerId !== provId) return false;
+            if (filterType === 'tipo'      && tipo   && p.paymentMethod !== tipo) return false;
+            if (filterType === 'factura'   && factura && !(p.invoiceNumber || '').toLowerCase().includes(factura)) return false;
+            return true;
         }).sort((a, b) => new Date(b.date) - new Date(a.date));
-        
+
         const totalCost = filtered.reduce((s, x) => s + x.total, 0);
+        const totalContado = filtered.filter(p => p.paymentMethod !== 'CREDITO').reduce((s, x) => s + x.total, 0);
+        const totalCredito = filtered.filter(p => p.paymentMethod === 'CREDITO').reduce((s, x) => s + x.total, 0);
 
         document.getElementById('rppKpis').innerHTML = `
       <div class="kpi-card"><div class="kpi-icon yellow"><i data-lucide="package"></i></div><div class="kpi-content"><div class="kpi-label">Total Compras</div><div class="kpi-value">${filtered.length}</div></div></div>
-      <div class="kpi-card"><div class="kpi-icon danger"><i data-lucide="trending-down"></i></div><div class="kpi-content"><div class="kpi-label">Gastos Totales</div><div class="kpi-value">${formatCurrency(totalCost)}</div></div></div>`;
+      <div class="kpi-card"><div class="kpi-icon danger"><i data-lucide="trending-down"></i></div><div class="kpi-content"><div class="kpi-label">Gastos Totales</div><div class="kpi-value">${formatCurrency(totalCost)}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon green"><i data-lucide="banknote"></i></div><div class="kpi-content"><div class="kpi-label">Contado</div><div class="kpi-value">${formatCurrency(totalContado)}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon purple"><i data-lucide="clock"></i></div><div class="kpi-content"><div class="kpi-label">Crédito</div><div class="kpi-value">${formatCurrency(totalCredito)}</div></div></div>`;
         if (window.lucide) lucide.createIcons();
 
-        if (window.lucide) lucide.createIcons();
-
-        document.getElementById('rppTable').innerHTML = `<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Factura</th><th>Pago</th><th>Productos</th><th>Total</th></tr></thead>
-      <tbody>${filtered.slice(0, 50).map(p => `<tr><td>${formatDate(p.date)}</td><td><strong>${p.providerName}</strong></td><td><code>${p.invoiceNumber || '---'}</code></td><td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td><td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td><td><strong>${formatCurrency(p.total)}</strong></td></tr>`).join('')}</tbody></table>`;
+        document.getElementById('rppTable').innerHTML = filtered.length === 0
+          ? '<div class="empty-state"><p>No se encontraron compras con los filtros aplicados.</p></div>'
+          : `<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Factura</th><th>Pago</th><th>Productos</th><th>Total</th></tr></thead>
+          <tbody>${filtered.slice(0, 100).map(p => `<tr>
+            <td>${formatDate(p.date)}</td>
+            <td><strong>${p.providerName}</strong></td>
+            <td><code>${p.invoiceNumber || '---'}</code></td>
+            <td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td>
+            <td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td>
+            <td><strong>${formatCurrency(p.total)}</strong></td>
+          </tr>`).join('')}</tbody></table>`;
 
         document.getElementById('rppExport').onclick = () => {
-            exportExcel(['Fecha', 'Proveedor', 'Factura', 'Pago', 'Productos', 'Total'], filtered.map(p => [formatDate(p.date), p.providerName, p.invoiceNumber || '', p.paymentMethod, p.items.map(i => `${i.name} (x${i.quantity})`).join(', '), p.total]), 'reporte_compras.xlsx');
+            exportExcel(
+                ['Fecha', 'Proveedor', 'Factura', 'Tipo Pago', 'Productos', 'Total'],
+                filtered.map(p => [formatDate(p.date), p.providerName, p.invoiceNumber || '', p.paymentMethod, p.items.map(i => `${i.name} (x${i.quantity})`).join(', '), p.total]),
+                'reporte_compras.xlsx'
+            );
             showToastLocal('Excel exportado');
         };
     }
@@ -179,6 +231,7 @@ function reportPurchasesPeriod(area, purchases, providers) {
     document.getElementById('rppApply').onclick = apply;
     apply();
 }
+
 
 function reportTopProducts(area, sales) {
     const d30 = new Date(); d30.setDate(d30.getDate() - 30);
