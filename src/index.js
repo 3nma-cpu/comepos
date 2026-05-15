@@ -54,8 +54,8 @@ app.use(express.json());
 const clientPath = path.join(__dirname, '../client');
 app.use(express.static(clientPath));
 
-// SPA fallback — serve index.html for any non-API route
-app.get('*', (req, res, next) => {
+// SPA fallback — serve index.html for any non-API route (Express 5 compatible)
+app.use((req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(clientPath, 'index.html'));
 });
