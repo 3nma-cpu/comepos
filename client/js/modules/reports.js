@@ -3,7 +3,7 @@
 // ============================================
 
 import { api } from '../api.js';
-import { formatCurrency, formatDate, formatDateInput, todayStr, exportExcel, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
+import { formatCurrency, formatDate, formatDateInput, todayStr, toLocalYMD, exportExcel, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
 
 let activeChart = null;
 
@@ -96,21 +96,21 @@ function reportSalesPeriod(area, sales) {
         const cat = document.getElementById('rpCat').value;
         
         const filtered = sales.filter(s => { 
-            const d = s.date.split('T')[0]; 
+            const d = toLocalYMD(s.date); 
             const dateMatch = d >= from && d <= to;
             const catMatch = !cat || s.clientCategory === cat;
             return dateMatch && catMatch; 
         });
 
         // Obtener fechas únicas en el rango seleccionado que tengan ventas
-        const uniqueDates = [...new Set(filtered.map(s => s.date.split('T')[0]))].sort();
+        const uniqueDates = [...new Set(filtered.map(s => toLocalYMD(s.date)))].sort();
 
         // Agrupar por cliente
         const clientsData = {};
         let totalRev = 0;
         
         filtered.forEach(s => {
-            const d = s.date.split('T')[0];
+            const d = toLocalYMD(s.date);
             const name = s.clientName || 'Consumidor Final';
             if(!clientsData[name]) clientsData[name] = { total: 0, category: s.clientCategory };
             if(!clientsData[name][d]) clientsData[name][d] = 0;
@@ -227,7 +227,7 @@ function reportPurchasesPeriod(area, purchases, providers) {
         const factura    = (document.getElementById('rppFactura')?.value || '').toLowerCase().trim();
 
         const filtered = purchases.filter(p => {
-            const d = p.date.split('T')[0];
+            const d = toLocalYMD(p.date);
             if (d < from || d > to) return false;
             if (filterType === 'proveedor' && provId && p.providerId !== provId) return false;
             if (filterType === 'tipo'      && tipo   && p.paymentMethod !== tipo) return false;
@@ -290,7 +290,7 @@ function reportTopProducts(area, sales) {
         const to = document.getElementById('rtpTo').value;
 
         const filteredSales = sales.filter(s => {
-            const d = s.date.split('T')[0];
+            const d = toLocalYMD(s.date);
             return d >= from && d <= to;
         });
 
@@ -356,7 +356,7 @@ function reportClientConsumption(area, sales) {
         const search = document.getElementById('rccSearch').value.toLowerCase();
 
         const filtered = sales.filter(s => {
-            const d = s.date.split('T')[0];
+            const d = toLocalYMD(s.date);
             const dateMatch = d >= from && d <= to;
             const searchMatch = !search || s.clientName.toLowerCase().includes(search) || (s.client?.cedula && s.client.cedula.includes(search));
             return dateMatch && searchMatch;
@@ -368,7 +368,7 @@ function reportClientConsumption(area, sales) {
                 clientMap[s.clientId] = { id: s.clientId, name: s.clientName, category: s.clientCategory, count: 0, total: 0, days: {} };
             }
             const c = clientMap[s.clientId];
-            const d = s.date.split('T')[0];
+            const d = toLocalYMD(s.date);
             c.count++;
             c.total += s.total;
             c.days[d] = (c.days[d] || 0) + s.total;

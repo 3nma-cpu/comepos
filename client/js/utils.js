@@ -10,15 +10,28 @@ export function formatCurrency(amount) {
     return '₲ ' + Math.round(amount).toLocaleString('es-PY');
 }
 
+function adjustDateStr(dateStr) {
+    if (typeof dateStr === 'string') {
+        if (dateStr.endsWith('T00:00:00.000Z')) return dateStr.replace('T00:00:00.000Z', 'T12:00:00.000Z');
+        if (dateStr.length === 10) return dateStr + 'T12:00:00.000Z';
+    }
+    return dateStr;
+}
+
 export function formatDate(dateStr) {
-    const d = new Date(dateStr);
+    const d = new Date(adjustDateStr(dateStr));
     return d.toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 export function formatDateTime(dateStr) {
-    const d = new Date(dateStr);
+    const d = new Date(adjustDateStr(dateStr));
     return d.toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
         d.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function toLocalYMD(dateStr) {
+    const d = new Date(adjustDateStr(dateStr));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function formatDateInput(date) {
