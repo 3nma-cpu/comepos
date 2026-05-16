@@ -326,6 +326,19 @@ function renderNewPurchaseView(providers, products) {
     }
 
     document.getElementById('npAddBtn').onclick = () => {
+        // Validación de cabecera
+        const provId = document.getElementById('mPurchProv').value;
+        const noInv = document.getElementById('mPurchNoInvoice').checked;
+        const timb = document.getElementById('mPurchTimb').value.trim();
+        const t1 = document.getElementById('mPurchT1').value.trim();
+        const t2 = document.getElementById('mPurchT2').value.trim();
+        const fact = document.getElementById('mPurchFact').value.trim();
+
+        if (!provId) return import('../utils.js').then(m => m.showToast('Seleccione un proveedor primero', 'warning'));
+        if (!noInv && (!timb || !t1 || !t2 || !fact)) {
+            return import('../utils.js').then(m => m.showToast('Complete los datos de la factura (Timbrado, T1, T2, Factura) o marque "Sin factura"', 'warning'));
+        }
+
         const prodId = prodSel.value;
         const q = parseFloat(qtyInp.value) || 0;
         const c = parseFloat(costInp.value) || 0;
@@ -371,6 +384,11 @@ function renderNewPurchaseView(providers, products) {
             document.getElementById('mPurchT1').value = '001';
             document.getElementById('mPurchT2').value = '001';
             document.getElementById('mPurchFact').value = dateStr.slice(0, 7);
+        } else {
+            document.getElementById('mPurchTimb').value = '';
+            document.getElementById('mPurchT1').value = '';
+            document.getElementById('mPurchT2').value = '';
+            document.getElementById('mPurchFact').value = '';
         }
     };
 
@@ -401,6 +419,18 @@ function renderNewPurchaseView(providers, products) {
     btnSave.onclick = async () => {
         if (items.length === 0) return import('../utils.js').then(m => m.showToast('Agregue al menos un producto', 'error'));
         
+        const provId = document.getElementById('mPurchProv').value;
+        const noInv = document.getElementById('mPurchNoInvoice').checked;
+        const timb = document.getElementById('mPurchTimb').value.trim();
+        const t1 = document.getElementById('mPurchT1').value.trim();
+        const t2 = document.getElementById('mPurchT2').value.trim();
+        const fact = document.getElementById('mPurchFact').value.trim();
+
+        if (!provId) return import('../utils.js').then(m => m.showToast('Seleccione un proveedor', 'warning'));
+        if (!noInv && (!timb || !t1 || !t2 || !fact)) {
+            return import('../utils.js').then(m => m.showToast('Complete los datos de la factura (Timbrado, T1, T2, Factura)', 'warning'));
+        }
+
         btnSave.disabled = true;
         btnSave.innerHTML = '<i data-lucide="loader"></i> Registrando...';
         if (window.lucide) lucide.createIcons();
