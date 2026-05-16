@@ -16,6 +16,7 @@ const UNIT_VALUES = ['UNI', 'KG', 'LTS'];
 function productToJSON(p) {
   return {
     id: p.id,
+    barcode: p.barcode,
     name: p.name,
     category: PROD_CAT_REVERSE[p.category] || p.category,
     unit: p.unit || 'UNI',
@@ -51,10 +52,26 @@ router.get('/all', requirePermission('purchases'), async (req, res) => {
 // POST /api/products
 router.post('/', requirePermission('purchases'), async (req, res) => {
   try {
-    const { name, category, unit, price, cost, stock, emoji } = req.body;
+    const { barcode, name, category, unit, price, cost, stock, emoji } = req.body;
     if (!name || price === undefined) return res.status(400).json({ error: 'Nombre y precio son obligatorios' });
+    
+    let finalBarcode = barcode || null;
+    if (finalBarcode === 'auto') {
+      const pbc = await prisma.product.findMany({
+        where: { barcode: { startsWith: '1000' } },
+        select: { barcode: true }
+      });
+      let max = 1000000000;
+      for (const p of pbc) {
+        const num = parseInt(p.barcode, 10);
+        if (!isNaN(num) && num > max) max = num;
+      }
+      finalBarcode = (max + 1).toString();
+    }
+
     const product = await prisma.product.create({
       data: {
+        barcode: finalBarcode,
         name,
         category: PROD_CAT_MAP[category] || category || 'PLATOS_PRINCIPALES',
         unit: UNIT_VALUES.includes(unit) ? unit : 'UNI',
@@ -74,8 +91,26 @@ router.post('/', requirePermission('purchases'), async (req, res) => {
 // PUT /api/products/:id
 router.put('/:id', requirePermission('purchases'), async (req, res) => {
   try {
-    const { name, category, unit, price, cost, stock, emoji, active } = req.body;
+    const { barcode, name, category, unit, price, cost, stock, emoji, active } = req.body;
     const data = {};
+
+    if (barcode !== undefined) {
+      if (barcode === 'auto') {
+        const pbc = await prisma.product.findMany({
+          where: { barcode: { startsWith: '1000' } },
+          select: { barcode: true }
+        });
+        let max = 1000000000;
+        for (const p of pbc) {
+          const num = parseInt(p.barcode, 10);
+          if (!isNaN(num) && num > max) max = num;
+        }
+        data.barcode = (max + 1).toString();
+      } else {
+        data.barcode = barcode || null;
+      }
+    }
+
     if (name !== undefined) data.name = name;
     if (category !== undefined) data.category = PROD_CAT_MAP[category] || category;
     if (unit !== undefined && UNIT_VALUES.includes(unit)) data.unit = unit;

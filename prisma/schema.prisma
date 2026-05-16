@@ -76,6 +76,7 @@ enum ProductUnit {
 
 model Product {
   id        String          @id @default(cuid())
+  barcode   String?         @unique
   name      String
   category  ProductCategory
   unit      ProductUnit     @default(UNI)

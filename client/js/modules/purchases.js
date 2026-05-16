@@ -78,7 +78,7 @@ async function renderPurchasesList() {
     document.getElementById('btnAddPurchase')?.addEventListener('click', async () => {
         try {
             const [providers, products] = await Promise.all([api.get('/providers'), api.get('/products')]);
-            openPurchaseModal(providers, products);
+            renderNewPurchaseView(providers, products);
         } catch (e) { showToast(e.message, 'error'); }
     });
 
@@ -99,135 +99,251 @@ async function renderPurchasesList() {
     });
 }
 
-function openPurchaseModal(providers, products) {
-    const body = `
-    <div class="form-row">
-      <div class="form-group" style="flex:1">
-        <label>Proveedor</label>
-        <select class="form-control" id="mPurchProv">${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
-      </div>
-      <div class="form-group" style="width:120px">
-        <label>Forma de Pago</label>
-        <select class="form-control" id="mPurchPayment">
-          <option value="CONTADO">Contado</option>
-          <option value="CREDITO">Crédito</option>
-        </select>
-      </div>
-      <div class="form-group" id="mPurchDueGroup" style="display:none;width:150px">
-        <label>Fecha a Pagar</label>
-        <input type="date" class="form-control" id="mPurchDueDate" />
-      </div>
-    </div>
-
-    <div style="background:var(--bg-secondary);padding:1rem;border-radius:var(--radius-md);margin-bottom:1rem">
-      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:.5rem">
-        <label class="checkbox-container">
-          <input type="checkbox" id="mPurchNoInvoice" />
-          <span class="checkmark"></span>
-          Sin factura
-        </label>
-        <div style="flex:1"></div>
-        <button class="btn btn-secondary btn-sm" id="btnRecoverPurch" style="background:#f39c12;color:white;border:none">Recuperar</button>
-      </div>
-      
-      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 2fr;gap:.5rem">
-        <div class="form-group"><label style="font-size:.7rem;background:#e74c3c;color:white;padding:2px 5px;display:block">Timbrado</label>
-          <input type="text" class="form-control" id="mPurchTimb" placeholder="00000000" />
-        </div>
-        <div class="form-group"><label style="font-size:.7rem;background:#34495e;color:white;padding:2px 5px;display:block">T1</label>
-          <input type="text" class="form-control" id="mPurchT1" placeholder="001" />
-        </div>
-        <div class="form-group"><label style="font-size:.7rem;background:#34495e;color:white;padding:2px 5px;display:block">T2</label>
-          <input type="text" class="form-control" id="mPurchT2" placeholder="001" />
-        </div>
-        <div class="form-group"><label style="font-size:.7rem;background:#f1c40f;color:black;padding:2px 5px;display:block">Factura</label>
-          <input type="text" class="form-control" id="mPurchFact" placeholder="0000000" />
-        </div>
-      </div>
-    </div>
-
-    <div class="form-group"><label>Productos</label><div id="mPurchItems"></div>
-      <button class="btn btn-secondary btn-sm" id="btnAddPurchItem" style="margin-top:.5rem"><i data-lucide="plus"></i>Agregar Producto</button>
-    </div>
-    <div id="mPurchTotal" style="text-align:right;font-weight:700;font-size:1.1rem;margin-top:.5rem"></div>`;
-    const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSavePurch">Registrar Compra</button>`;
-    const overlay = createModal('Nueva Compra', body, footer);
+function renderNewPurchaseView(providers, products) {
+    const content = document.getElementById('module-content');
     let items = [];
 
-    function addItemRow() {
-        const defaultProd = products[0];
-        const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
-        const cost = defaultProd?.cost || 0;
-        const price = Math.round(cost * (1 + markup / 100));
-        items.push({ productId: defaultProd?.id || '', quantity: 1, cost, price });
-        renderItems();
-    }
+    content.innerHTML = `
+    <div class="fade-in" style="padding-bottom:80px">
+      <div style="display:flex;align-items:center;margin-bottom:1rem;gap:1rem">
+        <button class="btn btn-ghost" id="npBackBtn"><i data-lucide="arrow-left"></i> Volver</button>
+        <h2 style="margin:0;font-size:1.5rem">Nueva Compra</h2>
+      </div>
 
-    function renderItems() {
-        const container = document.getElementById('mPurchItems');
-        container.innerHTML = items.map((it, i) => `
-      <div style="display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center">
+      <!-- Datos de la Factura -->
+      <div class="form-row" style="background:var(--bg-secondary);padding:1rem;border-radius:var(--radius-md);margin-bottom:1rem">
+        <div class="form-group" style="flex:1">
+          <label>Proveedor</label>
+          <select class="form-control" id="mPurchProv">${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
+        </div>
+        <div class="form-group" style="width:120px">
+          <label>Forma de Pago</label>
+          <select class="form-control" id="mPurchPayment">
+            <option value="CONTADO">Contado</option>
+            <option value="CREDITO">Crédito</option>
+          </select>
+        </div>
+        <div class="form-group" id="mPurchDueGroup" style="display:none;width:150px">
+          <label>Fecha a Pagar</label>
+          <input type="date" class="form-control" id="mPurchDueDate" />
+        </div>
+        
+        <div style="flex:2; display:grid; grid-template-columns:1fr 1fr 1fr 1.5fr; gap:.5rem">
+          <div class="form-group"><label style="font-size:.7rem">Timbrado</label><input type="text" class="form-control" id="mPurchTimb" placeholder="00000000" /></div>
+          <div class="form-group"><label style="font-size:.7rem">T1</label><input type="text" class="form-control" id="mPurchT1" placeholder="001" /></div>
+          <div class="form-group"><label style="font-size:.7rem">T2</label><input type="text" class="form-control" id="mPurchT2" placeholder="001" /></div>
+          <div class="form-group"><label style="font-size:.7rem">Factura</label><input type="text" class="form-control" id="mPurchFact" placeholder="0000000" /></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:.5rem;flex-direction:column;justify-content:center">
+          <label class="checkbox-container" style="margin:0;font-size:.8rem">
+            <input type="checkbox" id="mPurchNoInvoice" />
+            <span class="checkmark"></span> Sin factura
+          </label>
+          <button class="btn btn-secondary btn-sm" id="btnRecoverPurch" style="background:#f39c12;color:white;border:none;width:100%">Recuperar</button>
+        </div>
+      </div>
+
+      <!-- Barra de Entrada de Productos -->
+      <div class="purchase-entry-bar" style="display:flex; gap:0.5rem; align-items:flex-end; background:var(--bg-secondary); padding:1rem; border-radius:var(--radius-md); margin-bottom:1rem; border-left:4px solid var(--primary)">
+        <div style="flex:1.5">
+          <label style="font-size:0.75rem">Código de Barra</label>
+          <input type="text" class="form-control" id="npBarcode" placeholder="Escanear o tipear..." autofocus />
+        </div>
         <div style="flex:2">
-          <label style="font-size:0.7rem;margin-bottom:2px">Producto</label>
-          <select class="form-control" data-item-prod="${i}">
-            ${products.map(p => `<option value="${p.id}" ${p.id === it.productId ? 'selected' : ''}>${p.name}</option>`).join('')}
+          <label style="font-size:0.75rem">Descripción del Producto</label>
+          <select class="form-control" id="npProduct">
+            <option value="">Seleccione o escanee...</option>
+            ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
           </select>
         </div>
         <div style="flex:0.8">
-          <label style="font-size:0.7rem;margin-bottom:2px">Cant.</label>
-          <input type="number" class="form-control" data-item-qty="${i}" value="${it.quantity}" min="1" />
+          <label style="font-size:0.75rem">Cantidad</label>
+          <input type="number" class="form-control" id="npQty" value="1" min="0.01" step="any" />
         </div>
-        <div style="flex:1.2">
-          <label style="font-size:0.7rem;margin-bottom:2px">Costo Unit. (₲)</label>
-          <input type="number" class="form-control" data-item-cost="${i}" value="${it.cost}" min="0" />
+        <div style="flex:1">
+          <label style="font-size:0.75rem">Pre. Unit. Compra</label>
+          <input type="number" class="form-control" id="npCost" value="0" min="0" step="any" />
         </div>
-        <div style="flex:1.2">
-          <label style="font-size:0.7rem;margin-bottom:2px">Precio Venta (₲)</label>
-          <input type="number" class="form-control" data-item-price="${i}" value="${it.price}" min="0" />
+        <div style="flex:1">
+          <label style="font-size:0.75rem;font-weight:700">Total</label>
+          <input type="number" class="form-control" id="npTotal" value="0" min="0" step="any" style="background:var(--bg-input);font-weight:700;color:var(--primary-light)" />
         </div>
-        <button class="btn btn-ghost btn-icon btn-sm" data-remove="${i}" style="margin-top:auto"><i data-lucide="x"></i></button>
-      </div>`).join('');
-        if (window.lucide) lucide.createIcons();
+        <div style="flex:1">
+          <label style="font-size:0.75rem">Precio Venta</label>
+          <input type="number" class="form-control" id="npPrice" value="0" min="0" step="any" />
+        </div>
+        <div>
+          <button class="btn btn-primary" id="npAddBtn" style="height:38px"><i data-lucide="plus"></i></button>
+        </div>
+      </div>
 
-        const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+      <!-- Grilla de Ítems -->
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Descripción</th>
+              <th style="text-align:center">Cant.</th>
+              <th style="text-align:right">Costo Unit.</th>
+              <th style="text-align:right">Costo Total</th>
+              <th style="text-align:right">Precio Venta</th>
+              <th style="text-align:center">Acción</th>
+            </tr>
+          </thead>
+          <tbody id="npItemsBody">
+            <tr><td colspan="7" class="text-center" style="color:var(--text-muted)">No hay productos agregados</td></tr>
+          </tbody>
+        </table>
+      </div>
 
-        container.querySelectorAll('[data-item-prod]').forEach(sel => {
-            sel.onchange = () => { 
-                const prod = products.find(p => p.id === sel.value);
-                items[sel.dataset.itemProd].productId = sel.value; 
-                items[sel.dataset.itemProd].cost = prod ? prod.cost : 0;
-                items[sel.dataset.itemProd].price = Math.round(items[sel.dataset.itemProd].cost * (1 + markup / 100));
-                renderItems();
-            };
-        });
-        container.querySelectorAll('[data-item-qty]').forEach(inp => {
-            inp.oninput = () => { items[inp.dataset.itemQty].quantity = parseInt(inp.value) || 1; updateTotal(); };
-        });
-        container.querySelectorAll('[data-item-cost]').forEach(inp => {
-            inp.oninput = () => { 
-                const cost = parseInt(inp.value) || 0;
-                items[inp.dataset.itemCost].cost = cost; 
-                items[inp.dataset.itemCost].price = Math.round(cost * (1 + markup / 100));
-                container.querySelector(`[data-item-price="${inp.dataset.itemCost}"]`).value = items[inp.dataset.itemCost].price;
-                updateTotal(); 
-            };
-        });
-        container.querySelectorAll('[data-item-price]').forEach(inp => {
-            inp.oninput = () => { items[inp.dataset.itemPrice].price = parseInt(inp.value) || 0; };
-        });
-        container.querySelectorAll('[data-remove]').forEach(btn => {
-            btn.onclick = () => { items.splice(parseInt(btn.dataset.remove), 1); renderItems(); };
-        });
-        updateTotal();
+      <!-- Footer Fijo -->
+      <div style="position:fixed;bottom:0;left:0;right:0;background:var(--bg-secondary);padding:1rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;z-index:100;box-shadow:0 -4px 10px rgba(0,0,0,0.1)">
+        <div style="font-size:1.5rem;font-weight:700">Total Factura: <span id="mPurchGrandTotal" style="color:var(--primary-light)">₲ 0</span></div>
+        <button class="btn btn-primary" id="btnSavePurch" style="font-size:1.1rem;padding:0.75rem 2rem"><i data-lucide="save"></i> Registrar Compra</button>
+      </div>
+    </div>`;
+
+    if (window.lucide) lucide.createIcons();
+
+    // Eventos UI
+    document.getElementById('npBackBtn').onclick = renderPurchases;
+
+    const barcodeInp = document.getElementById('npBarcode');
+    const prodSel = document.getElementById('npProduct');
+    const qtyInp = document.getElementById('npQty');
+    const costInp = document.getElementById('npCost');
+    const totalInp = document.getElementById('npTotal');
+    const priceInp = document.getElementById('npPrice');
+    const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+
+    function resetEntryBar() {
+        barcodeInp.value = '';
+        prodSel.value = '';
+        qtyInp.value = '1';
+        costInp.value = '0';
+        totalInp.value = '0';
+        priceInp.value = '0';
+        barcodeInp.focus();
     }
 
-    function updateTotal() {
+    // Matemáticas bidireccionales
+    function calcFromUnit() {
+        const q = parseFloat(qtyInp.value) || 0;
+        const c = parseFloat(costInp.value) || 0;
+        totalInp.value = Math.round(q * c);
+        if (c > 0) priceInp.value = Math.round(c * (1 + markup / 100));
+    }
+
+    function calcFromTotal() {
+        const t = parseFloat(totalInp.value) || 0;
+        const q = parseFloat(qtyInp.value) || 0;
+        if (q > 0) {
+            const c = t / q;
+            costInp.value = c % 1 === 0 ? c : c.toFixed(2);
+            priceInp.value = Math.round(c * (1 + markup / 100));
+        }
+    }
+
+    qtyInp.addEventListener('input', calcFromUnit);
+    costInp.addEventListener('input', calcFromUnit);
+    totalInp.addEventListener('input', calcFromTotal);
+
+    // Escáner de Código de Barras
+    barcodeInp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const code = barcodeInp.value.trim();
+            if (!code) return;
+            const prod = products.find(p => p.barcode === code);
+            if (prod) {
+                prodSel.value = prod.id;
+                costInp.value = prod.cost;
+                priceInp.value = prod.price;
+                calcFromUnit();
+                qtyInp.focus();
+                qtyInp.select();
+            } else {
+                import('../utils.js').then(m => m.showToast('Producto no encontrado', 'warning'));
+                prodSel.value = '';
+            }
+        }
+    });
+
+    // Selector manual de producto
+    prodSel.addEventListener('change', () => {
+        const prod = products.find(p => p.id === prodSel.value);
+        if (prod) {
+            barcodeInp.value = prod.barcode || '';
+            costInp.value = prod.cost;
+            priceInp.value = prod.price;
+            calcFromUnit();
+            qtyInp.focus();
+            qtyInp.select();
+        } else {
+            resetEntryBar();
+        }
+    });
+
+    // Agregar a la grilla
+    function renderItemsGrid() {
+        const tbody = document.getElementById('npItemsBody');
+        if (items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="color:var(--text-muted)">No hay productos agregados</td></tr>';
+        } else {
+            tbody.innerHTML = items.map((it, i) => {
+                const prod = products.find(p => p.id === it.productId);
+                return `
+                <tr>
+                  <td><code>${escapeHTML(prod?.barcode || '---')}</code></td>
+                  <td><strong>${escapeHTML(prod?.name || 'Desconocido')}</strong></td>
+                  <td style="text-align:center">${it.quantity}</td>
+                  <td style="text-align:right">${formatCurrency(it.cost)}</td>
+                  <td style="text-align:right;font-weight:700">${formatCurrency(it.cost * it.quantity)}</td>
+                  <td style="text-align:right;color:var(--primary-light)">${formatCurrency(it.price)}</td>
+                  <td style="text-align:center"><button class="btn btn-ghost btn-icon btn-sm text-danger" data-remove="${i}"><i data-lucide="trash-2"></i></button></td>
+                </tr>`;
+            }).join('');
+            if (window.lucide) lucide.createIcons();
+
+            tbody.querySelectorAll('[data-remove]').forEach(btn => {
+                btn.onclick = () => { items.splice(parseInt(btn.dataset.remove), 1); renderItemsGrid(); };
+            });
+        }
+        
         const total = items.reduce((s, it) => s + it.cost * it.quantity, 0);
-        document.getElementById('mPurchTotal').textContent = 'Total: ' + formatCurrency(total);
+        document.getElementById('mPurchGrandTotal').textContent = formatCurrency(total);
     }
 
-    document.getElementById('btnAddPurchItem').onclick = addItemRow;
-    addItemRow();
+    document.getElementById('npAddBtn').onclick = () => {
+        const prodId = prodSel.value;
+        const q = parseFloat(qtyInp.value) || 0;
+        const c = parseFloat(costInp.value) || 0;
+        const p = parseFloat(priceInp.value) || 0;
+
+        if (!prodId) return import('../utils.js').then(m => m.showToast('Seleccione un producto', 'warning'));
+        if (q <= 0) return import('../utils.js').then(m => m.showToast('Cantidad inválida', 'warning'));
+
+        const existing = items.find(it => it.productId === prodId);
+        if (existing) {
+            existing.quantity += q;
+            existing.cost = c;
+            existing.price = p;
+        } else {
+            items.unshift({ productId: prodId, quantity: q, cost: c, price: p }); // Insertar arriba
+        }
+        
+        renderItemsGrid();
+        resetEntryBar();
+    };
+
+    // Prevent form submission on enter in any entry bar input
+    document.querySelector('.purchase-entry-bar').addEventListener('keydown', e => {
+        if (e.key === 'Enter' && e.target.id !== 'npBarcode') {
+            e.preventDefault();
+            document.getElementById('npAddBtn').click();
+        }
+    });
 
     // Toggle Due Date
     const paySel = document.getElementById('mPurchPayment');
@@ -244,14 +360,14 @@ function openPurchaseModal(providers, products) {
             document.getElementById('mPurchTimb').value = dateStr;
             document.getElementById('mPurchT1').value = '001';
             document.getElementById('mPurchT2').value = '001';
-            document.getElementById('mPurchFact').value = dateStr.slice(0, 7); // Similar to image
+            document.getElementById('mPurchFact').value = dateStr.slice(0, 7);
         }
     };
 
     // Recover functionality
     document.getElementById('btnRecoverPurch').onclick = async () => {
         const fact = document.getElementById('mPurchFact').value;
-        if (!fact) return showToast('Ingrese un número de factura para buscar', 'info');
+        if (!fact) return import('../utils.js').then(m => m.showToast('Ingrese un número de factura para buscar', 'info'));
         
         try {
             const purchases = await api.get('/purchases');
@@ -263,29 +379,25 @@ function openPurchaseModal(providers, products) {
                 document.getElementById('mPurchProv').value = found.providerId;
                 document.getElementById('mPurchPayment').value = found.paymentMethod;
                 paySel.onchange();
-                showToast('Datos recuperados');
+                import('../utils.js').then(m => m.showToast('Datos recuperados'));
             } else {
-                showToast('No se encontró ninguna factura con ese número', 'warning');
+                import('../utils.js').then(m => m.showToast('No se encontró ninguna factura con ese número', 'warning'));
             }
-        } catch (e) { showToast(e.message, 'error'); }
+        } catch (e) { import('../utils.js').then(m => m.showToast(e.message, 'error')); }
     };
 
+    // Guardar compra
     const btnSave = document.getElementById('btnSavePurch');
     btnSave.onclick = async () => {
-        if (items.length === 0) return showToast('Agregue al menos un producto', 'error');
+        if (items.length === 0) return import('../utils.js').then(m => m.showToast('Agregue al menos un producto', 'error'));
         
         btnSave.disabled = true;
         btnSave.innerHTML = '<i data-lucide="loader"></i> Registrando...';
         if (window.lucide) lucide.createIcons();
 
-        const provId = document.getElementById('mPurchProv').value;
-        const purchItems = items.map(it => {
-            return { productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price };
-        });
-
         const data = {
-            providerId: provId,
-            items: purchItems,
+            providerId: document.getElementById('mPurchProv').value,
+            items: items.map(it => ({ productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price })),
             paymentMethod: document.getElementById('mPurchPayment').value,
             dueDate: document.getElementById('mPurchDueDate').value || null,
             noInvoice: document.getElementById('mPurchNoInvoice').checked,
@@ -297,13 +409,12 @@ function openPurchaseModal(providers, products) {
 
         try {
             await api.post('/purchases', data);
-            showToast('Compra registrada y stock actualizado');
-            closeModal(overlay);
-            renderPurchasesList();
+            import('../utils.js').then(m => m.showToast('Compra registrada y stock actualizado'));
+            renderPurchases(); // Volver al listado
         } catch (e) {
-            showToast(e.message, 'error');
+            import('../utils.js').then(m => m.showToast(e.message, 'error'));
             btnSave.disabled = false;
-            btnSave.innerHTML = 'Registrar Compra';
+            btnSave.innerHTML = '<i data-lucide="save"></i> Registrar Compra';
             if (window.lucide) lucide.createIcons();
         }
     };

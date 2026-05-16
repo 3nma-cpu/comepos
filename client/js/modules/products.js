@@ -35,6 +35,7 @@ function renderProductList(container, products) {
                 <thead>
                     <tr>
                         <th>Nombre</th>
+                        <th>Código Barra</th>
                         <th>Categoría</th>
                         <th>Unidad</th>
                         <th>Costo (Compra)</th>
@@ -63,6 +64,7 @@ function renderProductList(container, products) {
             return `
             <tr>
                 <td><strong>${escapeHTML(p.name)}</strong></td>
+                <td><code>${escapeHTML(p.barcode || '---')}</code></td>
                 <td><span class="badge badge-info">${p.category}</span></td>
                 <td><span class="badge badge-secondary">${unit}</span></td>
                 <td>${formatCurrency(p.cost || 0)}</td>
@@ -117,6 +119,16 @@ function showProductModal(product = null) {
             </div>
         </div>
         <div class="form-group">
+            <label style="display:flex;justify-content:space-between">
+                <span>Código de Barras</span>
+                <label class="checkbox-container" style="margin:0;font-size:0.7rem;font-weight:normal">
+                    <input type="checkbox" id="mpAutoBarcode" ${!isEdit ? 'checked' : ''} />
+                    <span class="checkmark" style="width:14px;height:14px"></span> Generar Automático
+                </label>
+            </label>
+            <input type="text" class="form-control" id="mpBarcode" value="${isEdit ? escapeHTML(p.barcode || '') : ''}" placeholder="Ej. 1000000001" ${!isEdit ? 'disabled' : ''} />
+        </div>
+        <div class="form-group">
             <label>Categoría</label>
             <select class="form-control" id="mpCategory">
                 ${PRODUCT_CATEGORIES.map(c => `<option value="${c}" ${p.category === c ? 'selected' : ''}>${c}</option>`).join('')}
@@ -148,6 +160,15 @@ function showProductModal(product = null) {
     const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
     const costInput = document.getElementById('mpCost');
     const priceInput = document.getElementById('mpPrice');
+    const autoBarcode = document.getElementById('mpAutoBarcode');
+    const barcodeInput = document.getElementById('mpBarcode');
+
+    if (autoBarcode && barcodeInput) {
+        autoBarcode.addEventListener('change', () => {
+            barcodeInput.disabled = autoBarcode.checked;
+            if (autoBarcode.checked) barcodeInput.value = '';
+        });
+    }
 
     costInput.addEventListener('input', () => {
         const cost = parseFloat(costInput.value) || 0;
@@ -162,8 +183,12 @@ function showProductModal(product = null) {
         btnSave.disabled = true;
         btnSave.textContent = 'Guardando...';
 
+        let barcodeVal = document.getElementById('mpBarcode').value.trim();
+        if (document.getElementById('mpAutoBarcode').checked) barcodeVal = 'auto';
+
         const data = {
             name: document.getElementById('mpName').value.trim(),
+            barcode: barcodeVal,
             category: document.getElementById('mpCategory').value,
             unit: document.getElementById('mpUnit').value,
             cost: parseFloat(document.getElementById('mpCost').value) || 0,
