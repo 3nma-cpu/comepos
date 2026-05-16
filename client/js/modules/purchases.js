@@ -383,7 +383,7 @@ function renderNewPurchaseView(providers, products) {
             document.getElementById('mPurchTimb').value = dateStr;
             document.getElementById('mPurchT1').value = '001';
             document.getElementById('mPurchT2').value = '001';
-            document.getElementById('mPurchFact').value = dateStr.slice(0, 7);
+            document.getElementById('mPurchFact').value = Date.now().toString().slice(-7);
         } else {
             document.getElementById('mPurchTimb').value = '';
             document.getElementById('mPurchT1').value = '';
