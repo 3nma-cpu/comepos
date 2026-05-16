@@ -250,6 +250,8 @@ function processSale() {
   if (cart.length === 0 || !selectedClient) return;
 
   const total = cart.reduce((s, it) => s + it.price * it.quantity, 0);
+  const today = new Date().toISOString().split('T')[0];
+  
   const body = `
     <div style="margin-bottom:1rem;padding:1rem;background:var(--bg-input);border-radius:var(--radius)">
       <div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:.25rem">Cliente</div>
@@ -265,6 +267,11 @@ function processSale() {
     <div class="form-group">
       <label>Método de Pago</label>
       <select class="form-control" id="mPayMethod">${PAYMENT_METHODS.map(m => `<option value="${m.id}">${m.name}</option>`).join('')}</select>
+    </div>
+    <div class="form-group" style="margin-top:1rem">
+      <label>Fecha de la Venta (Opcional)</label>
+      <input type="date" class="form-control" id="mSaleDate" value="${today}" max="${today}" />
+      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem">Por defecto es hoy. Modificar solo para registrar ventas pasadas.</div>
     </div>`;
   const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-success" id="btnConfirmSale"><i data-lucide="check"></i>Confirmar Venta</button>`;
   const overlay = createModal('Confirmar Venta', body, footer);
@@ -277,10 +284,13 @@ function processSale() {
     if (window.lucide) lucide.createIcons();
 
     const paymentMethod = document.getElementById('mPayMethod').value;
+    const saleDate = document.getElementById('mSaleDate').value;
+    
     const payload = {
       clientId: selectedClient.id,
       items: cart.map(it => ({ productId: it.productId, quantity: it.quantity })),
-      paymentMethod
+      paymentMethod,
+      date: saleDate
     };
 
     try {

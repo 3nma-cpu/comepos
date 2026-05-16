@@ -55,9 +55,18 @@ router.get('/', async (req, res) => {
 // POST /api/sales
 router.post('/', async (req, res) => {
   try {
-    const { clientId, items, paymentMethod } = req.body;
+    const { clientId, items, paymentMethod, date } = req.body;
     if (!clientId || !items?.length || !paymentMethod) {
       return res.status(400).json({ error: 'Cliente, productos y método de pago son obligatorios' });
+    }
+
+    let createdAt = undefined;
+    if (date) {
+      const parsedDate = new Date(date);
+      if (parsedDate > new Date()) {
+        return res.status(400).json({ error: 'No se pueden registrar ventas en el futuro' });
+      }
+      createdAt = parsedDate;
     }
 
     // Normalize quantities to float
@@ -88,6 +97,7 @@ router.post('/', async (req, res) => {
           userId: req.user.id,
           total,
           paymentMethod: PAY_MAP[paymentMethod] || paymentMethod,
+          createdAt: createdAt,
           items: {
             create: normalizedItems.map(it => ({
               productId: it.productId,
