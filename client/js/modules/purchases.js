@@ -250,20 +250,30 @@ function renderNewPurchaseView(providers, products) {
     totalInp.addEventListener('input', calcFromTotal);
 
     // Escáner de Código de Barras
+    function checkBarcode() {
+        const code = barcodeInp.value.trim();
+        if (!code) return false;
+        const prod = products.find(p => p.barcode === code);
+        if (prod) {
+            prodSel.value = prod.id;
+            costInp.value = prod.cost;
+            priceInp.value = prod.price;
+            calcFromUnit();
+            qtyInp.focus();
+            qtyInp.select();
+            return true;
+        }
+        return false;
+    }
+
+    barcodeInp.addEventListener('input', () => {
+        checkBarcode();
+    });
+
     barcodeInp.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
-            const code = barcodeInp.value.trim();
-            if (!code) return;
-            const prod = products.find(p => p.barcode === code);
-            if (prod) {
-                prodSel.value = prod.id;
-                costInp.value = prod.cost;
-                priceInp.value = prod.price;
-                calcFromUnit();
-                qtyInp.focus();
-                qtyInp.select();
-            } else {
+            if (!checkBarcode() && barcodeInp.value.trim() !== '') {
                 import('../utils.js').then(m => m.showToast('Producto no encontrado', 'warning'));
                 prodSel.value = '';
             }
