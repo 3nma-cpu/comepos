@@ -23,17 +23,18 @@ export function formatDateTime(dateStr) {
 
 export function formatDateInput(date) {
     const d = new Date(date);
-    return d.toISOString().split('T')[0];
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function todayStr() {
-    return new Date().toISOString().split('T')[0];
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function daysAgo(n) {
     const d = new Date();
     d.setDate(d.getDate() - n);
-    return d.toISOString();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 export function showToast(message, type = 'success') {

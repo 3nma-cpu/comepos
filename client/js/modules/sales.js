@@ -250,9 +250,10 @@ function processSale() {
   if (cart.length === 0 || !selectedClient) return;
 
   const total = cart.reduce((s, it) => s + it.price * it.quantity, 0);
-  const today = new Date().toISOString().split('T')[0];
-  
-  const body = `
+  import('../utils.js').then(({ todayStr }) => {
+    const today = todayStr();
+    
+    const body = `
     <div style="margin-bottom:1rem;padding:1rem;background:var(--bg-input);border-radius:var(--radius)">
       <div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:.25rem">Cliente</div>
       <div style="font-weight:600">${escapeHTML(selectedClient.name)} <span class="badge badge-primary">${selectedClient.category}</span></div>
@@ -321,6 +322,7 @@ function processSale() {
       if (window.lucide) lucide.createIcons();
     }
   };
+  });
 }
 
 function showTicket(sale) {
