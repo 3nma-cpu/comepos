@@ -358,7 +358,7 @@ function reportClientConsumption(area, sales) {
         const filtered = sales.filter(s => {
             const d = toLocalYMD(s.date);
             const dateMatch = d >= from && d <= to;
-            const searchMatch = !search || s.clientName.toLowerCase().includes(search) || (s.client?.cedula && s.client.cedula.includes(search));
+            const searchMatch = !search || s.clientName.toLowerCase().includes(search) || (s.clientCedula && s.clientCedula.includes(search));
             return dateMatch && searchMatch;
         });
 

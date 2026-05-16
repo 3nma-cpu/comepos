@@ -36,14 +36,15 @@ router.get('/', async (req, res) => {
     res.json(sales.map(s => ({
       id: s.id,
       clientId: s.clientId,
-      clientName: s.client.name,
-      clientCategory: CAT_REVERSE[s.client.category] || s.client.category,
+      clientName: s.client?.name || 'Desconocido',
+      clientCedula: s.client?.cedula || '',
+      clientCategory: CAT_REVERSE[s.client?.category] || s.client?.category || '',
       total: s.total,
       paymentMethod: PAY_REVERSE[s.paymentMethod] || s.paymentMethod,
       date: s.createdAt.toISOString(),
       userId: s.userId,
       items: s.items.map(i => ({
-        productId: i.productId, name: i.product.name, price: i.unitPrice, quantity: i.quantity
+        productId: i.productId, name: i.product?.name || '', price: i.unitPrice, quantity: i.quantity
       }))
     })));
   } catch (err) {
@@ -127,6 +128,7 @@ router.post('/', async (req, res) => {
       id: sale.id,
       clientId: sale.clientId,
       clientName: sale.client?.name || 'Desconocido',
+      clientCedula: sale.client?.cedula || '',
       clientCategory: CAT_REVERSE[sale.client?.category] || sale.client?.category || '',
       total: sale.total,
       paymentMethod: PAY_REVERSE[sale.paymentMethod] || sale.paymentMethod,
