@@ -100,24 +100,64 @@ function reportSalesPeriod(area, sales) {
             const dateMatch = d >= from && d <= to;
             const catMatch = !cat || s.clientCategory === cat;
             return dateMatch && catMatch; 
-        }).sort((a, b) => new Date(b.date) - new Date(a.date));
+        });
+
+        // Obtener fechas únicas en el rango seleccionado que tengan ventas
+        const uniqueDates = [...new Set(filtered.map(s => s.date.split('T')[0]))].sort();
+
+        // Agrupar por cliente
+        const clientsData = {};
+        let totalRev = 0;
         
-        const totalRev = filtered.reduce((s, x) => s + x.total, 0);
+        filtered.forEach(s => {
+            const d = s.date.split('T')[0];
+            const name = s.clientName || 'Consumidor Final';
+            if(!clientsData[name]) clientsData[name] = { total: 0, category: s.clientCategory };
+            if(!clientsData[name][d]) clientsData[name][d] = 0;
+            
+            clientsData[name][d] += s.total;
+            clientsData[name].total += s.total;
+            totalRev += s.total;
+        });
+
+        const sortedClients = Object.entries(clientsData).sort((a,b) => b[1].total - a[1].total);
         const avgTicket = filtered.length ? totalRev / filtered.length : 0;
 
         document.getElementById('rpKpis').innerHTML = `
-      <div class="kpi-card"><div class="kpi-icon blue"><i data-lucide="shopping-bag"></i></div><div class="kpi-content"><div class="kpi-label">Total Ventas</div><div class="kpi-value">${filtered.length}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon blue"><i data-lucide="shopping-bag"></i></div><div class="kpi-content"><div class="kpi-label">Total Transacciones</div><div class="kpi-value">${filtered.length}</div></div></div>
       <div class="kpi-card"><div class="kpi-icon green"><i data-lucide="trending-up"></i></div><div class="kpi-content"><div class="kpi-label">Ingresos Totales</div><div class="kpi-value">${formatCurrency(totalRev)}</div></div></div>
       <div class="kpi-card"><div class="kpi-icon purple"><i data-lucide="receipt"></i></div><div class="kpi-content"><div class="kpi-label">Ticket Promedio</div><div class="kpi-value">${formatCurrency(avgTicket)}</div></div></div>`;
         if (window.lucide) lucide.createIcons();
 
-        if (window.lucide) lucide.createIcons();
+        if (uniqueDates.length === 0) {
+            document.getElementById('rpTable').innerHTML = '<div class="empty-state"><p>No se encontraron ventas en este período.</p></div>';
+            return;
+        }
 
-        document.getElementById('rpTable').innerHTML = `<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Categoría</th><th>Productos</th><th>Pago</th><th>Total</th></tr></thead>
-      <tbody>${filtered.slice(0, 50).map(s => `<tr><td>${formatDate(s.date)}</td><td>${s.clientName}</td><td><span class="badge badge-primary">${s.clientCategory}</span></td><td style="font-size:.8rem;color:var(--text-secondary)">${s.items.map(i => i.product ? i.product.name : (i.name || '')).join(', ')}</td><td>${s.paymentMethod}</td><td><strong>${formatCurrency(s.total)}</strong></td></tr>`).join('')}</tbody></table>`;
+        const headers = `<th>Nombre del Cliente</th><th>Categoría</th>` + uniqueDates.map(d => `<th style="text-align:right">${formatDate(d)}</th>`).join('') + `<th style="text-align:right;background:rgba(99,102,241,0.1)">Total General</th>`;
+        
+        const rows = sortedClients.map(([name, data]) => {
+            const cols = uniqueDates.map(d => `<td style="text-align:right">${data[d] ? formatCurrency(data[d]) : '<span style="color:var(--text-muted)">-</span>'}</td>`).join('');
+            return `<tr><td><strong>${name}</strong></td><td><span class="badge badge-primary">${data.category}</span></td>${cols}<td style="text-align:right;background:rgba(99,102,241,0.05)"><strong>${formatCurrency(data.total)}</strong></td></tr>`;
+        }).join('');
+
+        document.getElementById('rpTable').innerHTML = `
+        <div style="overflow-x:auto">
+            <table style="min-width:max-content">
+                <thead><tr>${headers}</tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
 
         document.getElementById('rpExport').onclick = () => {
-            exportExcel(['Fecha', 'Cliente', 'Categoría', 'Total', 'Pago'], filtered.map(s => [formatDate(s.date), s.clientName, s.clientCategory, s.total, s.paymentMethod]), 'reporte_ventas.xlsx');
+            const exportData = sortedClients.map(([name, data]) => {
+                const rowData = [name, data.category];
+                uniqueDates.forEach(d => rowData.push(data[d] || 0));
+                rowData.push(data.total);
+                return rowData;
+            });
+            const exportHeaders = ['Nombre del Cliente', 'Categoría', ...uniqueDates.map(d => formatDate(d)), 'Total General'];
+            exportExcel(exportHeaders, exportData, 'reporte_ventas_pivot.xlsx');
             showToastLocal('Excel exportado');
         };
     }

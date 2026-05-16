@@ -198,7 +198,7 @@ function renderNewPurchaseView(providers, products) {
       </div>
 
       <!-- Footer Fijo -->
-      <div style="position:fixed;bottom:0;left:0;right:0;background:var(--bg-secondary);padding:1rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;z-index:100;box-shadow:0 -4px 10px rgba(0,0,0,0.1)">
+      <div style="position:sticky;bottom:0;background:var(--bg-secondary);padding:1rem;margin-top:2rem;border-top:1px solid var(--border);border-radius:var(--radius-md);display:flex;justify-content:space-between;align-items:center;z-index:10;box-shadow:0 -4px 10px rgba(0,0,0,0.1)">
         <div style="font-size:1.5rem;font-weight:700">Total Factura: <span id="mPurchGrandTotal" style="color:var(--primary-light)">₲ 0</span></div>
         <button class="btn btn-primary" id="btnSavePurch" style="font-size:1.1rem;padding:0.75rem 2rem"><i data-lucide="save"></i> Registrar Compra</button>
       </div>
