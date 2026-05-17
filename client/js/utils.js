@@ -128,9 +128,9 @@ export const PRODUCT_CATEGORIES = [
 ];
 
 export const PAYMENT_METHODS = [
+    { id: 'nomina', name: 'VALE DE COMEDOR' },
     { id: 'efectivo', name: 'Efectivo' },
-    { id: 'tarjeta', name: 'Tarjeta' },
-    { id: 'nomina', name: 'Descuento por Nómina' }
+    { id: 'tarjeta', name: 'Tarjeta' }
 ];
 
 export const CATEGORY_BADGE_COLORS = {

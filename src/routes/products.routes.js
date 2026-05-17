@@ -116,7 +116,15 @@ router.put('/:id', requirePermission('purchases'), async (req, res) => {
     if (unit !== undefined && UNIT_VALUES.includes(unit)) data.unit = unit;
     if (price !== undefined) data.price = parseFloat(price);
     if (cost !== undefined) data.cost = parseFloat(cost);
-    if (stock !== undefined) data.stock = parseFloat(stock);
+    
+    if (stock !== undefined) {
+      const parsedStock = parseFloat(stock);
+      const currentProduct = await prisma.product.findUnique({ where: { id: req.params.id } });
+      if (currentProduct && parsedStock < currentProduct.stock) {
+         return res.status(400).json({ error: `El stock no puede ser menor al actual (${currentProduct.stock}) desde la edición manual.` });
+      }
+      data.stock = parsedStock;
+    }
     if (emoji !== undefined) data.emoji = emoji;
     if (active !== undefined) data.active = active;
 

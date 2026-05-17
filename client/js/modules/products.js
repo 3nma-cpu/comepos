@@ -145,9 +145,9 @@ function showProductModal(product = null) {
             </div>
         </div>
         <div class="form-group">
-            <label>Stock Inicial</label>
-            <input type="number" class="form-control" id="mpStock" value="${p.stock}" ${isEdit ? 'disabled' : 'required min="0"'} step="any" />
-            ${isEdit ? '<small style="color:var(--text-muted)">El stock se gestiona mediante compras y ventas.</small>' : ''}
+            <label>Stock</label>
+            <input type="number" class="form-control" id="mpStock" value="${p.stock}" required min="${isEdit ? p.stock : 0}" step="any" />
+            ${isEdit ? `<small style="color:var(--text-muted)">El stock no puede ser menor a ${p.stock} desde esta pantalla.</small>` : ''}
         </div>
     </form>`;
 
@@ -194,9 +194,7 @@ function showProductModal(product = null) {
             cost: parseFloat(document.getElementById('mpCost').value) || 0,
             price: parseFloat(document.getElementById('mpPrice').value) || 0,
         };
-        if (!isEdit) {
-            data.stock = parseFloat(document.getElementById('mpStock').value) || 0;
-        }
+        data.stock = parseFloat(document.getElementById('mpStock').value) || 0;
 
         try {
             if (isEdit) {
