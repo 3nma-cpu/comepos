@@ -143,7 +143,7 @@ function renderProductGrid(products, category, search) {
     <div class="product-card ${p.stock <= 0 ? 'out-of-stock' : ''}" data-prod-id="${p.id}">
       <div class="product-name" style="font-weight:700">${escapeHTML(p.name)}</div>
       <div class="product-price">${formatCurrency(p.price)}<span style="font-size:.7rem;color:var(--text-muted)"> / ${unit}</span></div>
-      ${p.stock <= 5 ? `<div style="font-size:.7rem;color:var(--warning);margin-top:.25rem">Stock: ${stockDisplay} ${unit}</div>` : ''}
+      <div style="font-size:.7rem;color:${p.stock <= 5 ? 'var(--warning)' : 'var(--text-muted)'};margin-top:.25rem">Stock: ${stockDisplay} ${unit}</div>
     </div>`;
   }).join('');
 
