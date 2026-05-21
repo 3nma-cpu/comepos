@@ -417,122 +417,223 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
   <meta charset="UTF-8"/>
   <title>Ticket #${ticketId}</title>
   <style>
-    /* =============================================
-       EPSON TM-U220D — 76mm paper (~42 chars)
-       ============================================= */
+    /* EPSON TM-U220PD - 76mm paper (~42 chars max) */
     @page {
       margin: 0;
       size: 76mm auto;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 10pt;
-      width: 72mm;
-      padding: 3mm 2mm;
-      color: #000;
-      background: #fff;
+      font-size: 9pt;
+      width: 70mm;
+      padding: 2mm 2mm 5mm 2mm;
+      margin: 0 auto;
+      background: white;
     }
-    .center  { text-align: center; }
-    .right   { text-align: right; }
-    .bold    { font-weight: bold; }
-    .small   { font-size: 8pt; }
-    .divider {
+    .center { text-align: center; }
+    .right { text-align: right; }
+    .left { text-align: left; }
+    .bold { font-weight: bold; }
+    .small { font-size: 7pt; }
+    .divider-dash {
       border: none;
       border-top: 1px dashed #000;
-      margin: 4px 0;
+      margin: 3px 0;
+    }
+    .divider-solid {
+      border: none;
+      border-top: 1px solid #000;
+      margin: 3px 0;
+    }
+    .title-main {
+      font-size: 14pt;
+      font-weight: bold;
+      letter-spacing: 2px;
+    }
+    .subtitle {
+      font-size: 8pt;
+      margin-top: -2px;
     }
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 9pt;
+      font-size: 8pt;
+      margin: 3px 0;
     }
-    table td { padding: 1px 0; vertical-align: top; }
+    table td { 
+      padding: 2px 0; 
+      vertical-align: top; 
+    }
+    .item-cant {
+      width: 15%;
+      text-align: left;
+    }
+    .item-desc {
+      width: 55%;
+      text-align: left;
+      word-break: break-word;
+    }
+    .item-price {
+      width: 30%;
+      text-align: right;
+    }
     .info-row {
       display: flex;
       justify-content: space-between;
-      font-size: 9pt;
-      margin: 2px 0;
-    }
-    .total-row {
-      display: flex;
-      justify-content: space-between;
-      font-weight: bold;
-      font-size: 11pt;
-      margin: 4px 0;
-    }
-    .sig-section {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 18mm; /* espacio para firma a mano */
-    }
-    .sig-box {
-      width: 46%;
-      text-align: center;
-      border-top: 1px solid #000;
-      padding-top: 3px;
+      margin: 3px 0;
       font-size: 8pt;
     }
-    .sig-box .sig-name { font-weight: bold; font-size: 9pt; }
-    .sig-space { height: 12mm; } /* espacio en blanco para firma */
-    @media print {
-      body { width: 72mm; }
+    .total-box {
+      display: flex;
+      justify-content: space-between;
+      margin: 5px 0;
+      padding: 3px 0;
+      font-size: 11pt;
+      font-weight: bold;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
+    }
+    .signature-area {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 15mm;
+      gap: 8mm;
+    }
+    .signature-box {
+      flex: 1;
+      text-align: center;
+    }
+    .signature-line {
+      border-top: 1px solid #000;
+      margin: 8mm 0 2mm 0;
+      padding-top: 2mm;
+    }
+    .signature-name {
+      font-weight: bold;
+      font-size: 8pt;
+      margin-bottom: 2px;
+    }
+    .signature-role {
+      font-size: 7pt;
+      color: #333;
+    }
+    .payment-note {
+      background: #f0f0f0;
+      padding: 2mm;
+      margin: 3mm 0;
+      font-size: 7pt;
+      text-align: center;
+      font-weight: bold;
+    }
+    .thanks {
+      margin: 5px 0;
+      font-size: 8pt;
+    }
+    hr {
+      margin: 2px 0;
     }
   </style>
 </head>
 <body>
-  <!-- ENCABEZADO -->
-  <div class="center bold" style="font-size:12pt;letter-spacing:1px">COMEDOR TTA S.A.</div>
-  <div class="center small">Vale de Comedor</div>
-  <hr class="divider"/>
 
-  <!-- DATOS -->
-  <div class="info-row"><span>Ticket #:</span><span>${ticketId}</span></div>
-  <div class="info-row"><span>Fecha:</span><span>${formatDateTime(sale.date)}</span></div>
-  <div class="info-row"><span>Cliente:</span><span>${escapeHTML(sale.clientName)}</span></div>
-  <div class="info-row"><span>Pago:</span><span>${payLabel}</span></div>
-  <hr class="divider"/>
+  <!-- HEADER -->
+  <div class="center">
+    <div class="title-main">COMEDOR TTA</div>
+    <div class="subtitle bold">Vale de Comedor</div>
+    <div class="small">--- Descuento Directo por Nómina ---</div>
+  </div>
+  <hr class="divider-dash"/>
 
-  <!-- ITEMS -->
+  <!-- DATOS DEL TICKET -->
+  <div class="info-row">
+    <span>Ticket #:</span>
+    <span class="bold">${ticketId}</span>
+  </div>
+  <div class="info-row">
+    <span>Fecha:</span>
+    <span>${formatDateTime(sale.date)}</span>
+  </div>
+  <div class="info-row">
+    <span>Cliente:</span>
+    <span class="bold">${escapeHTML(sale.clientName)}</span>
+  </div>
+  <div class="info-row">
+    <span>Vendedor:</span>
+    <span>${escapeHTML(vendorName)}</span>
+  </div>
+  <div class="info-row">
+    <span>Tipo Pago:</span>
+    <span class="bold">${payLabel}</span>
+  </div>
+  <hr class="divider-dash"/>
+
+  <!-- TABLA DE PRODUCTOS -->
   <table>
     <thead>
-      <tr>
-        <td class="bold">Producto</td>
-        <td class="bold right">SubTotal</td>
+      <tr class="bold">
+        <td class="item-cant">Cant</td>
+        <td class="item-desc">Producto</td>
+        <td class="item-price">Subtotal</td>
       </tr>
     </thead>
-    <tbody>${itemsHTML}</tbody>
+    <tbody>
+      ${itemsHTML}
+    </tbody>
   </table>
-  <hr class="divider"/>
+  <hr class="divider-dash"/>
 
   <!-- TOTAL -->
-  <div class="total-row">
-    <span>TOTAL</span>
+  <div class="total-box">
+    <span>TOTAL A PAGAR</span>
     <span>${formatCurrency(sale.total)}</span>
   </div>
-  <hr class="divider"/>
 
-  <!-- PIE -->
-  <div class="center small" style="margin:4px 0">¡Gracias por su consumo!</div>
-  <hr class="divider"/>
+  <!-- NOTA PARA PAGO POR NÓMINA -->
+  <div class="payment-note">
+    ⚠️ Este vale será descontado de su nómina ⚠️<br/>
+    Su firma es su autorización de descuento
+  </div>
+  <hr class="divider-solid"/>
 
-  <!-- FIRMAS -->
-  <div class="sig-section">
-    <div class="sig-box">
-      <div class="sig-space"></div>
-      <div class="sig-name">${escapeHTML(vendorName)}</div>
-      <div>Vendedor</div>
+  <!-- MENSAJE DE GRACIAS -->
+  <div class="center thanks">
+    ¡Gracias por su preferencia!
+  </div>
+  <hr class="divider-dash"/>
+
+  <!-- ÁREA DE FIRMAS (UNA AL LADO DE LA OTRA) -->
+  <div class="signature-area">
+    <!-- FIRMA VENDEDOR -->
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <div class="signature-name">${escapeHTML(vendorName)}</div>
+      <div class="signature-role">VENDEDOR</div>
     </div>
-    <div class="sig-box">
-      <div class="sig-space"></div>
-      <div class="sig-name">${escapeHTML(sale.clientName)}</div>
-      <div>Cliente</div>
+    
+    <!-- FIRMA CLIENTE -->
+    <div class="signature-box">
+      <div class="signature-line"></div>
+      <div class="signature-name">${escapeHTML(sale.clientName)}</div>
+      <div class="signature-role">CLIENTE</div>
+      <div class="small" style="margin-top:2mm;">(Autorizo descuento)</div>
     </div>
   </div>
-</body>
-</html>`);
 
-  printWin.document.close();
+  <!-- LÍNEA DE CORTE RECOMENDADA -->
+  <div class="center small" style="margin-top: 5mm;">
+    - - - - - - - - - - - - - - - - - - - - -
+  </div>
+
+</body>
+</html>
+`);
+
+printWin.document.close();
   printWin.focus();
   setTimeout(() => { printWin.print(); printWin.close(); }, 400);
 }

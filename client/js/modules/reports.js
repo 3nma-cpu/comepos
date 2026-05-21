@@ -173,6 +173,14 @@ function reportPurchasesPeriod(area, purchases, providers) {
       <div class="form-group"><label>Desde</label><input type="date" class="form-control" id="rppFrom" value="${formatDateInput(d30)}" /></div>
       <div class="form-group"><label>Hasta</label><input type="date" class="form-control" id="rppTo" value="${todayStr()}" /></div>
       <div class="form-group">
+        <label>Propósito</label>
+        <select class="form-control" id="rppPurpose">
+          <option value="todos">Todos</option>
+          <option value="venta">Para Venta</option>
+          <option value="interno">Uso Interno</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Tipo de Filtro</label>
         <select class="form-control" id="rppFilterType">
           <option value="">Sin filtro adicional</option>
@@ -221,12 +229,27 @@ function reportPurchasesPeriod(area, purchases, providers) {
     function apply() {
         const from       = document.getElementById('rppFrom').value;
         const to         = document.getElementById('rppTo').value;
+        const purpose    = document.getElementById('rppPurpose').value;
         const filterType = document.getElementById('rppFilterType').value;
         const provId     = document.getElementById('rppProv')?.value    || '';
         const tipo       = document.getElementById('rppTipo')?.value    || '';
         const factura    = (document.getElementById('rppFactura')?.value || '').toLowerCase().trim();
 
-        const filtered = purchases.filter(p => {
+        const filtered = purchases.map(p => {
+            const itemsMatching = p.items.filter(i => {
+                if (purpose === 'venta') return i.forResale !== false;
+                if (purpose === 'interno') return i.forResale === false;
+                return true;
+            });
+            if (itemsMatching.length === 0) return null;
+            const filteredTotal = itemsMatching.reduce((s, x) => s + x.cost * x.quantity, 0);
+            return {
+                ...p,
+                items: itemsMatching,
+                total: filteredTotal
+            };
+        }).filter(p => p !== null && p.total > 0)
+        .filter(p => {
             const d = toLocalYMD(p.date);
             if (d < from || d > to) return false;
             if (filterType === 'proveedor' && provId && p.providerId !== provId) return false;
@@ -240,29 +263,29 @@ function reportPurchasesPeriod(area, purchases, providers) {
         const totalCredito = filtered.filter(p => p.paymentMethod === 'CREDITO').reduce((s, x) => s + x.total, 0);
 
         document.getElementById('rppKpis').innerHTML = `
-      <div class="kpi-card"><div class="kpi-icon yellow"><i data-lucide="package"></i></div><div class="kpi-content"><div class="kpi-label">Total Compras</div><div class="kpi-value">${filtered.length}</div></div></div>
-      <div class="kpi-card"><div class="kpi-icon danger"><i data-lucide="trending-down"></i></div><div class="kpi-content"><div class="kpi-label">Gastos Totales</div><div class="kpi-value">${formatCurrency(totalCost)}</div></div></div>
-      <div class="kpi-card"><div class="kpi-icon green"><i data-lucide="banknote"></i></div><div class="kpi-content"><div class="kpi-label">Contado</div><div class="kpi-value">${formatCurrency(totalContado)}</div></div></div>
-      <div class="kpi-card"><div class="kpi-icon purple"><i data-lucide="clock"></i></div><div class="kpi-content"><div class="kpi-label">Crédito</div><div class="kpi-value">${formatCurrency(totalCredito)}</div></div></div>`;
+      <div class="kpi-card"><div class="kpi-icon yellow"><i data-lucide="package"></i></div><div class="kpi-content"><div class="kpi-label">Total Transacciones</div><div class="kpi-value">${filtered.length}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon danger"><i data-lucide="trending-down"></i></div><div class="kpi-content"><div class="kpi-label">Gastos Totales Filtrados</div><div class="kpi-value">${formatCurrency(totalCost)}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon green"><i data-lucide="banknote"></i></div><div class="kpi-content"><div class="kpi-label">Contado (Filtrado)</div><div class="kpi-value">${formatCurrency(totalContado)}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon purple"><i data-lucide="clock"></i></div><div class="kpi-content"><div class="kpi-label">Crédito (Filtrado)</div><div class="kpi-value">${formatCurrency(totalCredito)}</div></div></div>`;
         if (window.lucide) lucide.createIcons();
 
         document.getElementById('rppTable').innerHTML = filtered.length === 0
           ? '<div class="empty-state"><p>No se encontraron compras con los filtros aplicados.</p></div>'
-          : `<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Factura</th><th>Pago</th><th>Productos</th><th>Total</th></tr></thead>
+          : `<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Factura</th><th>Pago</th><th>Productos</th><th>Total Segmentado</th></tr></thead>
           <tbody>${filtered.slice(0, 100).map(p => `<tr>
             <td>${formatDate(p.date)}</td>
             <td><strong>${p.providerName}</strong></td>
             <td><code>${p.invoiceNumber || '---'}</code></td>
             <td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td>
-            <td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td>
+            <td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity}) ${i.forResale !== false ? '<span style="color:#2ecc71;font-weight:600;font-size:.7rem">(Venta)</span>' : '<span style="color:#e67e22;font-weight:600;font-size:.7rem">(Uso Interno)</span>'}`).join(', ')}</td>
             <td><strong>${formatCurrency(p.total)}</strong></td>
           </tr>`).join('')}</tbody></table>`;
 
         document.getElementById('rppExport').onclick = () => {
             exportExcel(
-                ['Fecha', 'Proveedor', 'Factura', 'Tipo Pago', 'Productos', 'Total'],
+                ['Fecha', 'Proveedor', 'Factura', 'Tipo Pago', 'Productos', 'Total segmentado'],
                 filtered.map(p => [formatDate(p.date), p.providerName, p.invoiceNumber || '', p.paymentMethod, p.items.map(i => `${i.name} (x${i.quantity})`).join(', '), p.total]),
-                'reporte_compras.xlsx'
+                'reporte_compras_segmentado.xlsx'
             );
             showToastLocal('Excel exportado');
         };

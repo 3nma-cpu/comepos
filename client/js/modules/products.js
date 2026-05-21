@@ -149,6 +149,15 @@ function showProductModal(product = null) {
             <input type="number" class="form-control" id="mpStock" value="${p.stock}" required min="${isEdit ? p.stock : 0}" step="any" />
             ${isEdit ? `<small style="color:var(--text-muted)">El stock no puede ser menor a ${p.stock} desde esta pantalla.</small>` : ''}
         </div>
+        <div class="form-group">
+            <label class="checkbox-container" style="font-size:0.9rem">
+                <input type="checkbox" id="mpForResale" ${p.forResale !== false ? 'checked' : ''} />
+                <span class="checkmark"></span> Para Venta (Comercialización)
+            </label>
+            <small style="color:var(--text-muted);display:block;margin-top:0.2rem">
+                Si se desmarca, las compras de este producto no sumarán stock por defecto.
+            </small>
+        </div>
     </form>`;
 
     const footer = `
@@ -193,6 +202,7 @@ function showProductModal(product = null) {
             unit: document.getElementById('mpUnit').value,
             cost: parseFloat(document.getElementById('mpCost').value) || 0,
             price: parseFloat(document.getElementById('mpPrice').value) || 0,
+            forResale: document.getElementById('mpForResale').checked,
         };
         data.stock = parseFloat(document.getElementById('mpStock').value) || 0;
 

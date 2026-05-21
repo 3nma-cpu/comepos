@@ -66,7 +66,7 @@ async function renderPurchasesList() {
             <td><code style="color:var(--primary-light)">${escapeHTML(p.invoiceNumber || '---')}</code></td>
             <td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td>
             <td style="color:var(--text-secondary);font-size:.82rem">
-              ${p.items.map(i => `<div>${i.name} (x${i.quantity}) a ${formatCurrency(i.cost)}/u</div>`).join('')}
+              ${p.items.map(i => `<div>${i.name} (x${i.quantity}) a ${formatCurrency(i.cost)}/u ${i.forResale !== false ? '<span style="color:#2ecc71;font-weight:600;font-size:.7rem">(Venta)</span>' : '<span style="color:#e67e22;font-weight:600;font-size:.7rem">(Uso Interno)</span>'}</div>`).join('')}
             </td>
             <td><strong style="color:var(--primary-light)">${formatCurrency(p.total)}</strong></td>
             <td><button class="btn btn-ghost btn-sm btn-icon" data-del="${p.id}"><i data-lucide="trash-2"></i></button></td>
@@ -156,6 +156,12 @@ function renderNewPurchaseView(providers, products) {
             ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
           </select>
         </div>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:8px">
+          <label class="checkbox-container" style="font-size:0.75rem; margin:0; display:flex; align-items:center; gap:4px">
+            <input type="checkbox" id="npForResale" checked />
+            <span class="checkmark"></span> Para Venta
+          </label>
+        </div>
         <div style="flex:0.8">
           <label style="font-size:0.75rem">Cantidad</label>
           <input type="number" class="form-control" id="npQty" value="1" min="0.01" step="any" />
@@ -168,7 +174,7 @@ function renderNewPurchaseView(providers, products) {
           <label style="font-size:0.75rem;font-weight:700">Total</label>
           <input type="number" class="form-control" id="npTotal" value="0" min="0" step="any" style="background:var(--bg-input);font-weight:700;color:var(--primary-light)" />
         </div>
-        <div style="flex:1">
+        <div style="flex:1" id="npPriceGroup">
           <label style="font-size:0.75rem">Precio Venta</label>
           <input type="number" class="form-control" id="npPrice" value="0" min="0" step="any" />
         </div>
@@ -184,6 +190,7 @@ function renderNewPurchaseView(providers, products) {
             <tr>
               <th>Código</th>
               <th>Descripción</th>
+              <th style="text-align:center">Propósito</th>
               <th style="text-align:center">Cant.</th>
               <th style="text-align:right">Costo Unit.</th>
               <th style="text-align:right">Costo Total</th>
@@ -215,7 +222,22 @@ function renderNewPurchaseView(providers, products) {
     const costInp = document.getElementById('npCost');
     const totalInp = document.getElementById('npTotal');
     const priceInp = document.getElementById('npPrice');
+    const forResaleInp = document.getElementById('npForResale');
     const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+
+    function togglePriceInput() {
+        if (forResaleInp.checked) {
+            priceInp.disabled = false;
+            priceInp.style.opacity = '1';
+            priceInp.style.background = 'var(--bg-input)';
+        } else {
+            priceInp.disabled = true;
+            priceInp.style.opacity = '0.5';
+            priceInp.style.background = 'rgba(0,0,0,0.1)';
+            priceInp.value = '0';
+        }
+    }
+    forResaleInp.addEventListener('change', togglePriceInput);
 
     function resetEntryBar() {
         barcodeInp.value = '';
@@ -224,6 +246,8 @@ function renderNewPurchaseView(providers, products) {
         costInp.value = '0';
         totalInp.value = '0';
         priceInp.value = '0';
+        forResaleInp.checked = true;
+        togglePriceInput();
         barcodeInp.focus();
     }
 
@@ -232,7 +256,7 @@ function renderNewPurchaseView(providers, products) {
         const q = parseFloat(qtyInp.value) || 0;
         const c = parseFloat(costInp.value) || 0;
         totalInp.value = Math.round(q * c);
-        if (c > 0) priceInp.value = Math.round(c * (1 + markup / 100));
+        if (c > 0 && forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
     }
 
     function calcFromTotal() {
@@ -241,7 +265,7 @@ function renderNewPurchaseView(providers, products) {
         if (q > 0) {
             const c = t / q;
             costInp.value = c % 1 === 0 ? c : c.toFixed(2);
-            priceInp.value = Math.round(c * (1 + markup / 100));
+            if (forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
         }
     }
 
@@ -258,6 +282,8 @@ function renderNewPurchaseView(providers, products) {
             prodSel.value = prod.id;
             costInp.value = prod.cost;
             priceInp.value = prod.price;
+            forResaleInp.checked = prod.forResale !== false;
+            togglePriceInput();
             calcFromUnit();
             qtyInp.focus();
             qtyInp.select();
@@ -287,6 +313,8 @@ function renderNewPurchaseView(providers, products) {
             barcodeInp.value = prod.barcode || '';
             costInp.value = prod.cost;
             priceInp.value = prod.price;
+            forResaleInp.checked = prod.forResale !== false;
+            togglePriceInput();
             calcFromUnit();
             qtyInp.focus();
             qtyInp.select();
@@ -299,7 +327,7 @@ function renderNewPurchaseView(providers, products) {
     function renderItemsGrid() {
         const tbody = document.getElementById('npItemsBody');
         if (items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="color:var(--text-muted)">No hay productos agregados</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color:var(--text-muted)">No hay productos agregados</td></tr>';
         } else {
             tbody.innerHTML = items.map((it, i) => {
                 const prod = products.find(p => p.id === it.productId);
@@ -307,10 +335,11 @@ function renderNewPurchaseView(providers, products) {
                 <tr>
                   <td><code>${escapeHTML(prod?.barcode || '---')}</code></td>
                   <td><strong>${escapeHTML(prod?.name || 'Desconocido')}</strong></td>
+                  <td style="text-align:center"><span class="badge ${it.forResale ? 'badge-success' : 'badge-warning'}">${it.forResale ? 'Venta' : 'Uso Interno'}</span></td>
                   <td style="text-align:center">${it.quantity}</td>
                   <td style="text-align:right">${formatCurrency(it.cost)}</td>
                   <td style="text-align:right;font-weight:700">${formatCurrency(it.cost * it.quantity)}</td>
-                  <td style="text-align:right;color:var(--primary-light)">${formatCurrency(it.price)}</td>
+                  <td style="text-align:right;color:var(--primary-light)">${it.forResale ? formatCurrency(it.price) : '<span style="color:var(--text-muted)">-</span>'}</td>
                   <td style="text-align:center"><button class="btn btn-ghost btn-icon btn-sm text-danger" data-remove="${i}"><i data-lucide="trash-2"></i></button></td>
                 </tr>`;
             }).join('');
@@ -343,6 +372,7 @@ function renderNewPurchaseView(providers, products) {
         const q = parseFloat(qtyInp.value) || 0;
         const c = parseFloat(costInp.value) || 0;
         const p = parseFloat(priceInp.value) || 0;
+        const isForResale = forResaleInp.checked;
 
         if (!prodId) return import('../utils.js').then(m => m.showToast('Seleccione un producto', 'warning'));
         if (q <= 0) return import('../utils.js').then(m => m.showToast('Cantidad inválida', 'warning'));
@@ -352,8 +382,9 @@ function renderNewPurchaseView(providers, products) {
             existing.quantity += q;
             existing.cost = c;
             existing.price = p;
+            existing.forResale = isForResale;
         } else {
-            items.unshift({ productId: prodId, quantity: q, cost: c, price: p }); // Insertar arriba
+            items.unshift({ productId: prodId, quantity: q, cost: c, price: p, forResale: isForResale }); // Insertar arriba
         }
         
         renderItemsGrid();
@@ -437,7 +468,7 @@ function renderNewPurchaseView(providers, products) {
 
         const data = {
             providerId: document.getElementById('mPurchProv').value,
-            items: items.map(it => ({ productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price })),
+            items: items.map(it => ({ productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price, forResale: it.forResale })),
             paymentMethod: document.getElementById('mPurchPayment').value,
             dueDate: document.getElementById('mPurchDueDate').value || null,
             noInvoice: document.getElementById('mPurchNoInvoice').checked,

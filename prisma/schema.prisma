@@ -85,6 +85,7 @@ model Product {
   stock     Float           @default(0)
   emoji     String          @default("plate")
   active    Boolean         @default(true)
+  forResale Boolean         @default(true)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   saleItems     SaleItem[]
@@ -159,6 +160,7 @@ model PurchaseItem {
   productId  String
   quantity   Float
   unitCost   Float
+  forResale  Boolean  @default(true)
   purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   product  Product  @relation(fields: [productId], references: [id])
 }

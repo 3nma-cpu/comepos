@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
       t2: p.t2,
       invoiceNumber: p.invoiceNumber,
       items: p.items.map(i => ({
-        productId: i.productId, name: i.product.name, cost: i.unitCost, quantity: i.quantity
+        productId: i.productId, name: i.product.name, cost: i.unitCost, quantity: i.quantity, forResale: i.forResale
       }))
     })));
   } catch (err) {
@@ -79,22 +79,26 @@ router.post('/', async (req, res) => {
             create: items.map(it => ({
               productId: it.productId,
               quantity: parseFloat(it.quantity) || 0,
-              unitCost: it.cost !== undefined ? parseFloat(it.cost) : (prodMap[it.productId]?.cost || 0)
+              unitCost: it.cost !== undefined ? parseFloat(it.cost) : (prodMap[it.productId]?.cost || 0),
+              forResale: it.forResale !== undefined ? !!it.forResale : true
             }))
           }
         },
         include: { provider: true, items: { include: { product: true } } }
       });
 
-      // Update stock and cost
+      // Update stock and cost dynamically based on item.forResale
       for (const item of items) {
+        const isForResale = item.forResale !== undefined ? !!item.forResale : true;
         const newCost = item.cost !== undefined ? parseFloat(item.cost) : (prodMap[item.productId]?.cost || 0);
         const qty = parseFloat(item.quantity) || 0;
         const updateData = {
-          stock: { increment: qty },
           cost: newCost
         };
-        if (item.price !== undefined) updateData.price = parseFloat(item.price);
+        if (isForResale) {
+          updateData.stock = { increment: qty };
+          if (item.price !== undefined) updateData.price = parseFloat(item.price);
+        }
         await tx.product.update({
           where: { id: item.productId },
           data: updateData
@@ -111,7 +115,7 @@ router.post('/', async (req, res) => {
       date: purchase.createdAt.toISOString(),
       paymentMethod: purchase.paymentMethod,
       invoiceNumber: purchase.invoiceNumber,
-      items: purchase.items.map(i => ({ productId: i.productId, name: i.product.name, cost: i.unitCost, quantity: i.quantity }))
+      items: purchase.items.map(i => ({ productId: i.productId, name: i.product.name, cost: i.unitCost, quantity: i.quantity, forResale: i.forResale }))
     });
   } catch (err) {
     console.error('Purchase error:', err);

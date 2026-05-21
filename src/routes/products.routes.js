@@ -24,7 +24,8 @@ function productToJSON(p) {
     cost: p.cost,
     stock: p.stock,
     emoji: p.emoji,
-    active: p.active
+    active: p.active,
+    forResale: p.forResale
   };
 }
 
@@ -52,7 +53,7 @@ router.get('/all', requirePermission('purchases'), async (req, res) => {
 // POST /api/products
 router.post('/', requirePermission('purchases'), async (req, res) => {
   try {
-    const { barcode, name, category, unit, price, cost, stock, emoji } = req.body;
+    const { barcode, name, category, unit, price, cost, stock, emoji, forResale } = req.body;
     if (!name || price === undefined) return res.status(400).json({ error: 'Nombre y precio son obligatorios' });
     
     let finalBarcode = barcode || null;
@@ -78,7 +79,8 @@ router.post('/', requirePermission('purchases'), async (req, res) => {
         price: parseFloat(price) || 0,
         cost: parseFloat(cost) || 0,
         stock: parseFloat(stock) || 0,
-        emoji: emoji || '🍽️'
+        emoji: emoji || '🍽️',
+        forResale: forResale !== undefined ? !!forResale : true
       }
     });
     res.status(201).json(productToJSON(product));
@@ -91,7 +93,7 @@ router.post('/', requirePermission('purchases'), async (req, res) => {
 // PUT /api/products/:id
 router.put('/:id', requirePermission('purchases'), async (req, res) => {
   try {
-    const { barcode, name, category, unit, price, cost, stock, emoji, active } = req.body;
+    const { barcode, name, category, unit, price, cost, stock, emoji, active, forResale } = req.body;
     const data = {};
 
     if (barcode !== undefined) {
@@ -116,6 +118,7 @@ router.put('/:id', requirePermission('purchases'), async (req, res) => {
     if (unit !== undefined && UNIT_VALUES.includes(unit)) data.unit = unit;
     if (price !== undefined) data.price = parseFloat(price);
     if (cost !== undefined) data.cost = parseFloat(cost);
+    if (forResale !== undefined) data.forResale = !!forResale;
     
     if (stock !== undefined) {
       const parsedStock = parseFloat(stock);
