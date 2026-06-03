@@ -17,7 +17,9 @@ export async function renderSales() {
   container.innerHTML = '<div class="fade-in"><div class="empty-state"><p>Cargando POS...</p></div></div>';
 
   try {
-    const [products, clients] = await Promise.all([api.get('/products'), api.get('/clients')]);
+    const [allFetchedProducts, clients] = await Promise.all([api.get('/products'), api.get('/clients')]);
+    // Filtrar productos que no son para venta (uso interno)
+    const products = allFetchedProducts.filter(p => p.forResale !== false);
     allProducts = products;
     allClients = clients;
     const categories = ['Todos', ...PRODUCT_CATEGORIES];

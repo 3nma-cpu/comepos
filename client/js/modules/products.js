@@ -63,7 +63,7 @@ function renderProductList(container, products) {
             const stockBadge = p.stock > 10 ? 'badge-success' : p.stock > 0 ? 'badge-warning' : 'badge-danger';
             return `
             <tr>
-                <td><strong>${escapeHTML(p.name)}</strong></td>
+                <td><strong>${escapeHTML(p.name)}</strong>${p.forResale === false ? ' <span class="badge badge-warning" style="font-size:.65rem;margin-left:.35rem">Uso Interno</span>' : ''}</td>
                 <td><code>${escapeHTML(p.barcode || '---')}</code></td>
                 <td><span class="badge badge-info">${p.category}</span></td>
                 <td><span class="badge badge-secondary">${unit}</span></td>
