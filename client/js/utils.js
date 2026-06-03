@@ -86,7 +86,13 @@ export function createModal(title, bodyHTML, footerHTML = '') {
         btn.onclick = () => closeModal(overlay);
     });
 
-    overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay); });
+    overlay.addEventListener('click', e => {
+        if (e.target === overlay) {
+            if (confirm('¿Está seguro de que desea cerrar esta ventana?')) {
+                closeModal(overlay);
+            }
+        }
+    });
     if (window.lucide) lucide.createIcons();
     return overlay;
 }
