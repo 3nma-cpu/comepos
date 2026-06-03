@@ -6,8 +6,8 @@ import { api } from '../api.js';
 import { generateId, showToast, createModal, closeModal, escapeHTML, formatCurrency, formatDate } from '../utils.js';
 
 export function renderPurchases() {
-    const container = document.getElementById('module-content');
-    container.innerHTML = `
+  const container = document.getElementById('module-content');
+  container.innerHTML = `
     <div class="fade-in">
       <div class="category-tabs" id="purchaseTabs">
         <div class="category-tab active" data-tab="purchases">Compras</div>
@@ -16,42 +16,42 @@ export function renderPurchases() {
       <div id="purchaseTabContent"></div>
     </div>`;
 
-    if (window.lucide) lucide.createIcons();
-    let currentTab = 'purchases';
+  if (window.lucide) lucide.createIcons();
+  let currentTab = 'purchases';
 
-    async function showTab(tab) {
-        currentTab = tab;
-        document.querySelectorAll('#purchaseTabs .category-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-        
-        const content = document.getElementById('purchaseTabContent');
-        content.innerHTML = '<div class="empty-state"><p>Cargando...</p></div>';
+  async function showTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('#purchaseTabs .category-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
 
-        try {
-            if (tab === 'purchases') await renderPurchasesList();
-            else await renderProvidersList();
-        } catch (e) {
-            content.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
-        }
+    const content = document.getElementById('purchaseTabContent');
+    content.innerHTML = '<div class="empty-state"><p>Cargando...</p></div>';
+
+    try {
+      if (tab === 'purchases') await renderPurchasesList();
+      else await renderProvidersList();
+    } catch (e) {
+      content.innerHTML = `<div class="empty-state"><p>Error: ${e.message}</p></div>`;
     }
+  }
 
-    document.getElementById('purchaseTabs').addEventListener('click', e => {
-        const tab = e.target.closest('.category-tab');
-        if (tab) showTab(tab.dataset.tab);
-    });
+  document.getElementById('purchaseTabs').addEventListener('click', e => {
+    const tab = e.target.closest('.category-tab');
+    if (tab) showTab(tab.dataset.tab);
+  });
 
-    showTab('purchases');
+  showTab('purchases');
 }
 
 async function renderPurchasesList() {
-    const content = document.getElementById('purchaseTabContent');
-    const purchases = await api.get('/purchases');
-    purchases.sort((a, b) => new Date(b.date) - new Date(a.date));
+  const content = document.getElementById('purchaseTabContent');
+  const purchases = await api.get('/purchases');
+  purchases.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-    content.innerHTML = `
+  content.innerHTML = `
     <div class="filters-bar">
       <div style="display:flex;align-items:center;gap:.5rem">
         <label style="font-size:.85rem;color:var(--text-secondary)">% Margen de Ganancia:</label>
-        <input type="number" class="form-control" id="globalMarkup" value="${localStorage.getItem('purchMarkup') || 30}" style="width:80px" />
+        <input type="number" class="form-control" id="globalMarkup" value="${localStorage.getItem('purchMarkup') || 40}" style="width:80px" />
       </div>
       <div style="flex:1"></div>
       <button class="btn btn-primary" id="btnAddPurchase"><i data-lucide="plus"></i>Nueva Compra</button>
@@ -73,37 +73,37 @@ async function renderPurchasesList() {
           </tr>`).join('')}</tbody>
       </table>
     </div>`;
-    if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 
-    document.getElementById('btnAddPurchase')?.addEventListener('click', async () => {
+  document.getElementById('btnAddPurchase')?.addEventListener('click', async () => {
+    try {
+      const [providers, products] = await Promise.all([api.get('/providers'), api.get('/products')]);
+      renderNewPurchaseView(providers, products);
+    } catch (e) { showToast(e.message, 'error'); }
+  });
+
+  document.getElementById('globalMarkup')?.addEventListener('input', e => {
+    localStorage.setItem('purchMarkup', e.target.value);
+  });
+
+  content.querySelectorAll('[data-del]').forEach(btn => {
+    btn.onclick = async () => {
+      if (confirm('¿Eliminar compra?')) {
         try {
-            const [providers, products] = await Promise.all([api.get('/providers'), api.get('/products')]);
-            renderNewPurchaseView(providers, products);
+          await api.delete(`/purchases/${btn.dataset.del}`);
+          showToast('Compra eliminada');
+          renderPurchasesList();
         } catch (e) { showToast(e.message, 'error'); }
-    });
-
-    document.getElementById('globalMarkup')?.addEventListener('input', e => {
-        localStorage.setItem('purchMarkup', e.target.value);
-    });
-    
-    content.querySelectorAll('[data-del]').forEach(btn => {
-        btn.onclick = async () => { 
-            if (confirm('¿Eliminar compra?')) { 
-                try {
-                    await api.delete(`/purchases/${btn.dataset.del}`);
-                    showToast('Compra eliminada');
-                    renderPurchasesList();
-                } catch (e) { showToast(e.message, 'error'); }
-            } 
-        };
-    });
+      }
+    };
+  });
 }
 
 function renderNewPurchaseView(providers, products) {
-    const content = document.getElementById('module-content');
-    let items = [];
+  const content = document.getElementById('module-content');
+  let items = [];
 
-    content.innerHTML = `
+  content.innerHTML = `
     <div class="fade-in" style="padding-bottom:80px">
       <div style="display:flex;align-items:center;margin-bottom:1rem;gap:1rem">
         <button class="btn btn-ghost" id="npBackBtn"><i data-lucide="arrow-left"></i> Volver</button>
@@ -211,127 +211,127 @@ function renderNewPurchaseView(providers, products) {
       </div>
     </div>`;
 
-    if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 
-    // Eventos UI
-    document.getElementById('npBackBtn').onclick = renderPurchases;
+  // Eventos UI
+  document.getElementById('npBackBtn').onclick = renderPurchases;
 
-    const barcodeInp = document.getElementById('npBarcode');
-    const prodSel = document.getElementById('npProduct');
-    const qtyInp = document.getElementById('npQty');
-    const costInp = document.getElementById('npCost');
-    const totalInp = document.getElementById('npTotal');
-    const priceInp = document.getElementById('npPrice');
-    const forResaleInp = document.getElementById('npForResale');
-    const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+  const barcodeInp = document.getElementById('npBarcode');
+  const prodSel = document.getElementById('npProduct');
+  const qtyInp = document.getElementById('npQty');
+  const costInp = document.getElementById('npCost');
+  const totalInp = document.getElementById('npTotal');
+  const priceInp = document.getElementById('npPrice');
+  const forResaleInp = document.getElementById('npForResale');
+  const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
 
-    function togglePriceInput() {
-        if (forResaleInp.checked) {
-            priceInp.disabled = false;
-            priceInp.style.opacity = '1';
-            priceInp.style.background = 'var(--bg-input)';
-        } else {
-            priceInp.disabled = true;
-            priceInp.style.opacity = '0.5';
-            priceInp.style.background = 'rgba(0,0,0,0.1)';
-            priceInp.value = '0';
-        }
+  function togglePriceInput() {
+    if (forResaleInp.checked) {
+      priceInp.disabled = false;
+      priceInp.style.opacity = '1';
+      priceInp.style.background = 'var(--bg-input)';
+    } else {
+      priceInp.disabled = true;
+      priceInp.style.opacity = '0.5';
+      priceInp.style.background = 'rgba(0,0,0,0.1)';
+      priceInp.value = '0';
     }
-    forResaleInp.addEventListener('change', togglePriceInput);
+  }
+  forResaleInp.addEventListener('change', togglePriceInput);
 
-    function resetEntryBar() {
-        barcodeInp.value = '';
+  function resetEntryBar() {
+    barcodeInp.value = '';
+    prodSel.value = '';
+    qtyInp.value = '1';
+    costInp.value = '0';
+    totalInp.value = '0';
+    priceInp.value = '0';
+    forResaleInp.checked = true;
+    togglePriceInput();
+    barcodeInp.focus();
+  }
+
+  // Matemáticas bidireccionales
+  function calcFromUnit() {
+    const q = parseFloat(qtyInp.value) || 0;
+    const c = parseFloat(costInp.value) || 0;
+    totalInp.value = Math.round(q * c);
+    if (c > 0 && forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
+  }
+
+  function calcFromTotal() {
+    const t = parseFloat(totalInp.value) || 0;
+    const q = parseFloat(qtyInp.value) || 0;
+    if (q > 0) {
+      const c = t / q;
+      costInp.value = c % 1 === 0 ? c : c.toFixed(2);
+      if (forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
+    }
+  }
+
+  qtyInp.addEventListener('input', calcFromUnit);
+  costInp.addEventListener('input', calcFromUnit);
+  totalInp.addEventListener('input', calcFromTotal);
+
+  // Escáner de Código de Barras
+  function checkBarcode() {
+    const code = barcodeInp.value.trim();
+    if (!code) return false;
+    const prod = products.find(p => p.barcode === code);
+    if (prod) {
+      prodSel.value = prod.id;
+      costInp.value = prod.cost;
+      priceInp.value = prod.price;
+      forResaleInp.checked = prod.forResale !== false;
+      togglePriceInput();
+      calcFromUnit();
+      qtyInp.focus();
+      qtyInp.select();
+      return true;
+    }
+    return false;
+  }
+
+  barcodeInp.addEventListener('input', () => {
+    checkBarcode();
+  });
+
+  barcodeInp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!checkBarcode() && barcodeInp.value.trim() !== '') {
+        import('../utils.js').then(m => m.showToast('Producto no encontrado', 'warning'));
         prodSel.value = '';
-        qtyInp.value = '1';
-        costInp.value = '0';
-        totalInp.value = '0';
-        priceInp.value = '0';
-        forResaleInp.checked = true;
-        togglePriceInput();
-        barcodeInp.focus();
+      }
     }
+  });
 
-    // Matemáticas bidireccionales
-    function calcFromUnit() {
-        const q = parseFloat(qtyInp.value) || 0;
-        const c = parseFloat(costInp.value) || 0;
-        totalInp.value = Math.round(q * c);
-        if (c > 0 && forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
+  // Selector manual de producto
+  prodSel.addEventListener('change', () => {
+    const prod = products.find(p => p.id === prodSel.value);
+    if (prod) {
+      barcodeInp.value = prod.barcode || '';
+      costInp.value = prod.cost;
+      priceInp.value = prod.price;
+      forResaleInp.checked = prod.forResale !== false;
+      togglePriceInput();
+      calcFromUnit();
+      qtyInp.focus();
+      qtyInp.select();
+    } else {
+      resetEntryBar();
     }
+  });
 
-    function calcFromTotal() {
-        const t = parseFloat(totalInp.value) || 0;
-        const q = parseFloat(qtyInp.value) || 0;
-        if (q > 0) {
-            const c = t / q;
-            costInp.value = c % 1 === 0 ? c : c.toFixed(2);
-            if (forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
-        }
-    }
-
-    qtyInp.addEventListener('input', calcFromUnit);
-    costInp.addEventListener('input', calcFromUnit);
-    totalInp.addEventListener('input', calcFromTotal);
-
-    // Escáner de Código de Barras
-    function checkBarcode() {
-        const code = barcodeInp.value.trim();
-        if (!code) return false;
-        const prod = products.find(p => p.barcode === code);
-        if (prod) {
-            prodSel.value = prod.id;
-            costInp.value = prod.cost;
-            priceInp.value = prod.price;
-            forResaleInp.checked = prod.forResale !== false;
-            togglePriceInput();
-            calcFromUnit();
-            qtyInp.focus();
-            qtyInp.select();
-            return true;
-        }
-        return false;
-    }
-
-    barcodeInp.addEventListener('input', () => {
-        checkBarcode();
-    });
-
-    barcodeInp.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (!checkBarcode() && barcodeInp.value.trim() !== '') {
-                import('../utils.js').then(m => m.showToast('Producto no encontrado', 'warning'));
-                prodSel.value = '';
-            }
-        }
-    });
-
-    // Selector manual de producto
-    prodSel.addEventListener('change', () => {
-        const prod = products.find(p => p.id === prodSel.value);
-        if (prod) {
-            barcodeInp.value = prod.barcode || '';
-            costInp.value = prod.cost;
-            priceInp.value = prod.price;
-            forResaleInp.checked = prod.forResale !== false;
-            togglePriceInput();
-            calcFromUnit();
-            qtyInp.focus();
-            qtyInp.select();
-        } else {
-            resetEntryBar();
-        }
-    });
-
-    // Agregar a la grilla
-    function renderItemsGrid() {
-        const tbody = document.getElementById('npItemsBody');
-        if (items.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color:var(--text-muted)">No hay productos agregados</td></tr>';
-        } else {
-            tbody.innerHTML = items.map((it, i) => {
-                const prod = products.find(p => p.id === it.productId);
-                return `
+  // Agregar a la grilla
+  function renderItemsGrid() {
+    const tbody = document.getElementById('npItemsBody');
+    if (items.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="color:var(--text-muted)">No hay productos agregados</td></tr>';
+    } else {
+      tbody.innerHTML = items.map((it, i) => {
+        const prod = products.find(p => p.id === it.productId);
+        return `
                 <tr>
                   <td><code>${escapeHTML(prod?.barcode || '---')}</code></td>
                   <td><strong>${escapeHTML(prod?.name || 'Desconocido')}</strong></td>
@@ -342,160 +342,160 @@ function renderNewPurchaseView(providers, products) {
                   <td style="text-align:right;color:var(--primary-light)">${it.forResale ? formatCurrency(it.price) : '<span style="color:var(--text-muted)">-</span>'}</td>
                   <td style="text-align:center"><button class="btn btn-ghost btn-icon btn-sm text-danger" data-remove="${i}"><i data-lucide="trash-2"></i></button></td>
                 </tr>`;
-            }).join('');
-            if (window.lucide) lucide.createIcons();
+      }).join('');
+      if (window.lucide) lucide.createIcons();
 
-            tbody.querySelectorAll('[data-remove]').forEach(btn => {
-                btn.onclick = () => { items.splice(parseInt(btn.dataset.remove), 1); renderItemsGrid(); };
-            });
-        }
-        
-        const total = items.reduce((s, it) => s + it.cost * it.quantity, 0);
-        document.getElementById('mPurchGrandTotal').textContent = formatCurrency(total);
+      tbody.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.onclick = () => { items.splice(parseInt(btn.dataset.remove), 1); renderItemsGrid(); };
+      });
     }
 
-    document.getElementById('npAddBtn').onclick = () => {
-        // Validación de cabecera
-        const provId = document.getElementById('mPurchProv').value;
-        const noInv = document.getElementById('mPurchNoInvoice').checked;
-        const timb = document.getElementById('mPurchTimb').value.trim();
-        const t1 = document.getElementById('mPurchT1').value.trim();
-        const t2 = document.getElementById('mPurchT2').value.trim();
-        const fact = document.getElementById('mPurchFact').value.trim();
+    const total = items.reduce((s, it) => s + it.cost * it.quantity, 0);
+    document.getElementById('mPurchGrandTotal').textContent = formatCurrency(total);
+  }
 
-        if (!provId) return import('../utils.js').then(m => m.showToast('Seleccione un proveedor primero', 'warning'));
-        if (!noInv && (!timb || !t1 || !t2 || !fact)) {
-            return import('../utils.js').then(m => m.showToast('Complete los datos de la factura (Timbrado, T1, T2, Factura) o marque "Sin factura"', 'warning'));
-        }
+  document.getElementById('npAddBtn').onclick = () => {
+    // Validación de cabecera
+    const provId = document.getElementById('mPurchProv').value;
+    const noInv = document.getElementById('mPurchNoInvoice').checked;
+    const timb = document.getElementById('mPurchTimb').value.trim();
+    const t1 = document.getElementById('mPurchT1').value.trim();
+    const t2 = document.getElementById('mPurchT2').value.trim();
+    const fact = document.getElementById('mPurchFact').value.trim();
 
-        const prodId = prodSel.value;
-        const q = parseFloat(qtyInp.value) || 0;
-        const c = parseFloat(costInp.value) || 0;
-        const p = parseFloat(priceInp.value) || 0;
-        const isForResale = forResaleInp.checked;
+    if (!provId) return import('../utils.js').then(m => m.showToast('Seleccione un proveedor primero', 'warning'));
+    if (!noInv && (!timb || !t1 || !t2 || !fact)) {
+      return import('../utils.js').then(m => m.showToast('Complete los datos de la factura (Timbrado, T1, T2, Factura) o marque "Sin factura"', 'warning'));
+    }
 
-        if (!prodId) return import('../utils.js').then(m => m.showToast('Seleccione un producto', 'warning'));
-        if (q <= 0) return import('../utils.js').then(m => m.showToast('Cantidad inválida', 'warning'));
+    const prodId = prodSel.value;
+    const q = parseFloat(qtyInp.value) || 0;
+    const c = parseFloat(costInp.value) || 0;
+    const p = parseFloat(priceInp.value) || 0;
+    const isForResale = forResaleInp.checked;
 
-        const existing = items.find(it => it.productId === prodId);
-        if (existing) {
-            existing.quantity += q;
-            existing.cost = c;
-            existing.price = p;
-            existing.forResale = isForResale;
-        } else {
-            items.unshift({ productId: prodId, quantity: q, cost: c, price: p, forResale: isForResale }); // Insertar arriba
-        }
-        
-        renderItemsGrid();
-        resetEntryBar();
+    if (!prodId) return import('../utils.js').then(m => m.showToast('Seleccione un producto', 'warning'));
+    if (q <= 0) return import('../utils.js').then(m => m.showToast('Cantidad inválida', 'warning'));
+
+    const existing = items.find(it => it.productId === prodId);
+    if (existing) {
+      existing.quantity += q;
+      existing.cost = c;
+      existing.price = p;
+      existing.forResale = isForResale;
+    } else {
+      items.unshift({ productId: prodId, quantity: q, cost: c, price: p, forResale: isForResale }); // Insertar arriba
+    }
+
+    renderItemsGrid();
+    resetEntryBar();
+  };
+
+  // Prevent form submission on enter in any entry bar input
+  document.querySelector('.purchase-entry-bar').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.id !== 'npBarcode') {
+      e.preventDefault();
+      document.getElementById('npAddBtn').click();
+    }
+  });
+
+  // Toggle Due Date
+  const paySel = document.getElementById('mPurchPayment');
+  paySel.onchange = () => {
+    document.getElementById('mPurchDueGroup').style.display = paySel.value === 'CREDITO' ? 'block' : 'none';
+  };
+
+  // Sin factura logic
+  const noInvCheck = document.getElementById('mPurchNoInvoice');
+  noInvCheck.onchange = () => {
+    if (noInvCheck.checked) {
+      const now = new Date();
+      const dateStr = now.getDate().toString().padStart(2, '0') + (now.getMonth() + 1).toString().padStart(2, '0') + now.getFullYear();
+      document.getElementById('mPurchTimb').value = dateStr;
+      document.getElementById('mPurchT1').value = '001';
+      document.getElementById('mPurchT2').value = '001';
+      document.getElementById('mPurchFact').value = Date.now().toString().slice(-7);
+    } else {
+      document.getElementById('mPurchTimb').value = '';
+      document.getElementById('mPurchT1').value = '';
+      document.getElementById('mPurchT2').value = '';
+      document.getElementById('mPurchFact').value = '';
+    }
+  };
+
+  // Recover functionality
+  document.getElementById('btnRecoverPurch').onclick = async () => {
+    const fact = document.getElementById('mPurchFact').value;
+    if (!fact) return import('../utils.js').then(m => m.showToast('Ingrese un número de factura para buscar', 'info'));
+
+    try {
+      const purchases = await api.get('/purchases');
+      const found = purchases.find(p => p.invoiceNumber === fact);
+      if (found) {
+        document.getElementById('mPurchTimb').value = found.timbrado || '';
+        document.getElementById('mPurchT1').value = found.t1 || '';
+        document.getElementById('mPurchT2').value = found.t2 || '';
+        document.getElementById('mPurchProv').value = found.providerId;
+        document.getElementById('mPurchPayment').value = found.paymentMethod;
+        paySel.onchange();
+        import('../utils.js').then(m => m.showToast('Datos recuperados'));
+      } else {
+        import('../utils.js').then(m => m.showToast('No se encontró ninguna factura con ese número', 'warning'));
+      }
+    } catch (e) { import('../utils.js').then(m => m.showToast(e.message, 'error')); }
+  };
+
+  // Guardar compra
+  const btnSave = document.getElementById('btnSavePurch');
+  btnSave.onclick = async () => {
+    if (items.length === 0) return import('../utils.js').then(m => m.showToast('Agregue al menos un producto', 'error'));
+
+    const provId = document.getElementById('mPurchProv').value;
+    const noInv = document.getElementById('mPurchNoInvoice').checked;
+    const timb = document.getElementById('mPurchTimb').value.trim();
+    const t1 = document.getElementById('mPurchT1').value.trim();
+    const t2 = document.getElementById('mPurchT2').value.trim();
+    const fact = document.getElementById('mPurchFact').value.trim();
+
+    if (!provId) return import('../utils.js').then(m => m.showToast('Seleccione un proveedor', 'warning'));
+    if (!noInv && (!timb || !t1 || !t2 || !fact)) {
+      return import('../utils.js').then(m => m.showToast('Complete los datos de la factura (Timbrado, T1, T2, Factura)', 'warning'));
+    }
+
+    btnSave.disabled = true;
+    btnSave.innerHTML = '<i data-lucide="loader"></i> Registrando...';
+    if (window.lucide) lucide.createIcons();
+
+    const data = {
+      providerId: document.getElementById('mPurchProv').value,
+      items: items.map(it => ({ productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price, forResale: it.forResale })),
+      paymentMethod: document.getElementById('mPurchPayment').value,
+      dueDate: document.getElementById('mPurchDueDate').value || null,
+      noInvoice: document.getElementById('mPurchNoInvoice').checked,
+      timbrado: document.getElementById('mPurchTimb').value,
+      t1: document.getElementById('mPurchT1').value,
+      t2: document.getElementById('mPurchT2').value,
+      invoiceNumber: document.getElementById('mPurchFact').value
     };
 
-    // Prevent form submission on enter in any entry bar input
-    document.querySelector('.purchase-entry-bar').addEventListener('keydown', e => {
-        if (e.key === 'Enter' && e.target.id !== 'npBarcode') {
-            e.preventDefault();
-            document.getElementById('npAddBtn').click();
-        }
-    });
-
-    // Toggle Due Date
-    const paySel = document.getElementById('mPurchPayment');
-    paySel.onchange = () => {
-        document.getElementById('mPurchDueGroup').style.display = paySel.value === 'CREDITO' ? 'block' : 'none';
-    };
-
-    // Sin factura logic
-    const noInvCheck = document.getElementById('mPurchNoInvoice');
-    noInvCheck.onchange = () => {
-        if (noInvCheck.checked) {
-            const now = new Date();
-            const dateStr = now.getDate().toString().padStart(2, '0') + (now.getMonth() + 1).toString().padStart(2, '0') + now.getFullYear();
-            document.getElementById('mPurchTimb').value = dateStr;
-            document.getElementById('mPurchT1').value = '001';
-            document.getElementById('mPurchT2').value = '001';
-            document.getElementById('mPurchFact').value = Date.now().toString().slice(-7);
-        } else {
-            document.getElementById('mPurchTimb').value = '';
-            document.getElementById('mPurchT1').value = '';
-            document.getElementById('mPurchT2').value = '';
-            document.getElementById('mPurchFact').value = '';
-        }
-    };
-
-    // Recover functionality
-    document.getElementById('btnRecoverPurch').onclick = async () => {
-        const fact = document.getElementById('mPurchFact').value;
-        if (!fact) return import('../utils.js').then(m => m.showToast('Ingrese un número de factura para buscar', 'info'));
-        
-        try {
-            const purchases = await api.get('/purchases');
-            const found = purchases.find(p => p.invoiceNumber === fact);
-            if (found) {
-                document.getElementById('mPurchTimb').value = found.timbrado || '';
-                document.getElementById('mPurchT1').value = found.t1 || '';
-                document.getElementById('mPurchT2').value = found.t2 || '';
-                document.getElementById('mPurchProv').value = found.providerId;
-                document.getElementById('mPurchPayment').value = found.paymentMethod;
-                paySel.onchange();
-                import('../utils.js').then(m => m.showToast('Datos recuperados'));
-            } else {
-                import('../utils.js').then(m => m.showToast('No se encontró ninguna factura con ese número', 'warning'));
-            }
-        } catch (e) { import('../utils.js').then(m => m.showToast(e.message, 'error')); }
-    };
-
-    // Guardar compra
-    const btnSave = document.getElementById('btnSavePurch');
-    btnSave.onclick = async () => {
-        if (items.length === 0) return import('../utils.js').then(m => m.showToast('Agregue al menos un producto', 'error'));
-        
-        const provId = document.getElementById('mPurchProv').value;
-        const noInv = document.getElementById('mPurchNoInvoice').checked;
-        const timb = document.getElementById('mPurchTimb').value.trim();
-        const t1 = document.getElementById('mPurchT1').value.trim();
-        const t2 = document.getElementById('mPurchT2').value.trim();
-        const fact = document.getElementById('mPurchFact').value.trim();
-
-        if (!provId) return import('../utils.js').then(m => m.showToast('Seleccione un proveedor', 'warning'));
-        if (!noInv && (!timb || !t1 || !t2 || !fact)) {
-            return import('../utils.js').then(m => m.showToast('Complete los datos de la factura (Timbrado, T1, T2, Factura)', 'warning'));
-        }
-
-        btnSave.disabled = true;
-        btnSave.innerHTML = '<i data-lucide="loader"></i> Registrando...';
-        if (window.lucide) lucide.createIcons();
-
-        const data = {
-            providerId: document.getElementById('mPurchProv').value,
-            items: items.map(it => ({ productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price, forResale: it.forResale })),
-            paymentMethod: document.getElementById('mPurchPayment').value,
-            dueDate: document.getElementById('mPurchDueDate').value || null,
-            noInvoice: document.getElementById('mPurchNoInvoice').checked,
-            timbrado: document.getElementById('mPurchTimb').value,
-            t1: document.getElementById('mPurchT1').value,
-            t2: document.getElementById('mPurchT2').value,
-            invoiceNumber: document.getElementById('mPurchFact').value
-        };
-
-        try {
-            await api.post('/purchases', data);
-            import('../utils.js').then(m => m.showToast('Compra registrada y stock actualizado'));
-            renderPurchases(); // Volver al listado
-        } catch (e) {
-            import('../utils.js').then(m => m.showToast(e.message, 'error'));
-            btnSave.disabled = false;
-            btnSave.innerHTML = '<i data-lucide="save"></i> Registrar Compra';
-            if (window.lucide) lucide.createIcons();
-        }
-    };
+    try {
+      await api.post('/purchases', data);
+      import('../utils.js').then(m => m.showToast('Compra registrada y stock actualizado'));
+      renderPurchases(); // Volver al listado
+    } catch (e) {
+      import('../utils.js').then(m => m.showToast(e.message, 'error'));
+      btnSave.disabled = false;
+      btnSave.innerHTML = '<i data-lucide="save"></i> Registrar Compra';
+      if (window.lucide) lucide.createIcons();
+    }
+  };
 }
 
 async function renderProvidersList() {
-    const content = document.getElementById('purchaseTabContent');
-    const providers = await api.get('/providers');
+  const content = document.getElementById('purchaseTabContent');
+  const providers = await api.get('/providers');
 
-    content.innerHTML = `
+  content.innerHTML = `
     <div class="filters-bar"><div style="flex:1"></div><button class="btn btn-primary" id="btnAddProv"><i data-lucide="plus"></i>Nuevo Proveedor</button></div>
     <div class="table-container">
       <table>
@@ -513,67 +513,67 @@ async function renderProvidersList() {
           </tr>`).join('')}</tbody>
       </table>
     </div>`;
-    if (window.lucide) lucide.createIcons();
+  if (window.lucide) lucide.createIcons();
 
-    document.getElementById('btnAddProv')?.addEventListener('click', () => openProviderModal(null));
-    content.querySelectorAll('[data-edit-prov]').forEach(btn => {
-        btn.onclick = () => { const p = providers.find(x => x.id === btn.dataset.editProv); if (p) openProviderModal(p); };
-    });
-    content.querySelectorAll('[data-del-prov]').forEach(btn => {
-        btn.onclick = async () => { 
-            if (confirm('¿Eliminar proveedor?')) { 
-                try {
-                    await api.delete(`/providers/${btn.dataset.delProv}`);
-                    showToast('Proveedor eliminado');
-                    renderProvidersList();
-                } catch (e) { showToast(e.message, 'error'); }
-            } 
-        };
-    });
+  document.getElementById('btnAddProv')?.addEventListener('click', () => openProviderModal(null));
+  content.querySelectorAll('[data-edit-prov]').forEach(btn => {
+    btn.onclick = () => { const p = providers.find(x => x.id === btn.dataset.editProv); if (p) openProviderModal(p); };
+  });
+  content.querySelectorAll('[data-del-prov]').forEach(btn => {
+    btn.onclick = async () => {
+      if (confirm('¿Eliminar proveedor?')) {
+        try {
+          await api.delete(`/providers/${btn.dataset.delProv}`);
+          showToast('Proveedor eliminado');
+          renderProvidersList();
+        } catch (e) { showToast(e.message, 'error'); }
+      }
+    };
+  });
 }
 
 function openProviderModal(provider) {
-    const isEdit = !!provider;
-    const p = provider || {};
-    const body = `
+  const isEdit = !!provider;
+  const p = provider || {};
+  const body = `
     <div class="form-group"><label>Nombre</label><input type="text" class="form-control" id="mProvName" value="${isEdit ? escapeHTML(p.name) : ''}" required /></div>
     <div class="form-row">
       <div class="form-group"><label>RUC</label><input type="text" class="form-control" id="mProvRuc" value="${isEdit ? escapeHTML(p.ruc || '') : ''}" /></div>
       <div class="form-group"><label>Teléfono</label><input type="text" class="form-control" id="mProvPhone" value="${isEdit ? escapeHTML(p.phone || '') : ''}" /></div>
     </div>
     <div class="form-group"><label>Email</label><input type="email" class="form-control" id="mProvEmail" value="${isEdit ? escapeHTML(p.email || '') : ''}" /></div>`;
-    const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveProv">${isEdit ? 'Guardar' : 'Crear'}</button>`;
-    const overlay = createModal(isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor', body, footer);
+  const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveProv">${isEdit ? 'Guardar' : 'Crear'}</button>`;
+  const overlay = createModal(isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor', body, footer);
 
-    const btnSave = document.getElementById('btnSaveProv');
-    btnSave.onclick = async () => {
-        const data = { 
-            name: document.getElementById('mProvName').value.trim(), 
-            ruc: document.getElementById('mProvRuc').value.trim(), 
-            phone: document.getElementById('mProvPhone').value.trim(), 
-            email: document.getElementById('mProvEmail').value.trim() 
-        };
-        if (!data.name) return showToast('Ingrese el nombre', 'error');
-        
-        btnSave.disabled = true;
-        btnSave.innerHTML = '<i data-lucide="loader"></i> Guardando...';
-        if (window.lucide) lucide.createIcons();
-
-        try {
-            if (isEdit) { 
-                await api.put(`/providers/${provider.id}`, data); 
-                showToast('Proveedor actualizado'); 
-            } else { 
-                await api.post('/providers', data); 
-                showToast('Proveedor creado'); 
-            }
-            closeModal(overlay);
-            renderProvidersList();
-        } catch (e) {
-            showToast(e.message, 'error');
-            btnSave.disabled = false;
-            btnSave.innerHTML = isEdit ? 'Guardar' : 'Crear';
-            if (window.lucide) lucide.createIcons();
-        }
+  const btnSave = document.getElementById('btnSaveProv');
+  btnSave.onclick = async () => {
+    const data = {
+      name: document.getElementById('mProvName').value.trim(),
+      ruc: document.getElementById('mProvRuc').value.trim(),
+      phone: document.getElementById('mProvPhone').value.trim(),
+      email: document.getElementById('mProvEmail').value.trim()
     };
+    if (!data.name) return showToast('Ingrese el nombre', 'error');
+
+    btnSave.disabled = true;
+    btnSave.innerHTML = '<i data-lucide="loader"></i> Guardando...';
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      if (isEdit) {
+        await api.put(`/providers/${provider.id}`, data);
+        showToast('Proveedor actualizado');
+      } else {
+        await api.post('/providers', data);
+        showToast('Proveedor creado');
+      }
+      closeModal(overlay);
+      renderProvidersList();
+    } catch (e) {
+      showToast(e.message, 'error');
+      btnSave.disabled = false;
+      btnSave.innerHTML = isEdit ? 'Guardar' : 'Crear';
+      if (window.lucide) lucide.createIcons();
+    }
+  };
 }
