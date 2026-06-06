@@ -44,7 +44,7 @@ router.get('/', async (req, res) => {
       date: s.createdAt.toISOString(),
       userId: s.userId,
       items: s.items.map(i => ({
-        productId: i.productId, name: i.product?.name || '', price: i.unitPrice, quantity: i.quantity
+        productId: i.productId, name: i.product?.name || '', price: i.unitPrice, quantity: i.quantity, unit: i.product?.unit || 'UNI'
       }))
     })));
   } catch (err) {
@@ -134,7 +134,7 @@ router.post('/', async (req, res) => {
       paymentMethod: PAY_REVERSE[sale.paymentMethod] || sale.paymentMethod,
       date: sale.createdAt.toISOString(),
       items: sale.items.map(i => ({
-        productId: i.productId, name: i.product?.name || '', price: i.unitPrice, quantity: i.quantity
+        productId: i.productId, name: i.product?.name || '', price: i.unitPrice, quantity: i.quantity, unit: i.product?.unit || 'UNI'
       }))
     });
   } catch (err) {

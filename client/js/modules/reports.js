@@ -3,7 +3,8 @@
 // ============================================
 
 import { api } from '../api.js';
-import { formatCurrency, formatDate, formatDateInput, todayStr, toLocalYMD, exportExcel, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
+import { formatCurrency, formatDate, formatDateTime, formatDateInput, todayStr, toLocalYMD, exportExcel, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
+import { showTicket } from './sales.js';
 
 let activeChart = null;
 
@@ -388,13 +389,12 @@ function reportClientConsumption(area, sales) {
         const clientMap = {};
         filtered.forEach(s => {
             if (!clientMap[s.clientId]) {
-                clientMap[s.clientId] = { id: s.clientId, name: s.clientName, category: s.clientCategory, count: 0, total: 0, days: {} };
+                clientMap[s.clientId] = { id: s.clientId, name: s.clientName, category: s.clientCategory, count: 0, total: 0, sales: [] };
             }
             const c = clientMap[s.clientId];
-            const d = toLocalYMD(s.date);
             c.count++;
             c.total += s.total;
-            c.days[d] = (c.days[d] || 0) + s.total;
+            c.sales.push(s);
         });
 
         const sorted = Object.values(clientMap).sort((a, b) => b.total - a.total);
@@ -419,7 +419,8 @@ function reportClientConsumption(area, sales) {
         document.querySelectorAll('[data-detail]').forEach(btn => {
             btn.onclick = () => {
                 const client = clientMap[btn.dataset.detail];
-                const sortedDays = Object.keys(client.days).sort().reverse();
+                const sortedSales = [...client.sales].sort((a, b) => new Date(b.date) - new Date(a.date));
+                const payLabels = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', nomina: 'VALE DE COMEDOR' };
                 document.getElementById('rccDetail').innerHTML = `
                 <div class="card fade-in">
                   <div class="card-header">
@@ -428,19 +429,39 @@ function reportClientConsumption(area, sales) {
                   </div>
                   <div class="table-container" style="border:none">
                     <table>
-                      <thead><tr><th>Fecha</th><th>Total Diario</th></tr></thead>
+                      <thead><tr><th>Fecha y Hora</th><th>Método Pago</th><th>Productos</th><th style="text-align:right">Total</th><th style="text-align:center">Acción</th></tr></thead>
                       <tbody>
-                        ${sortedDays.map(d => `<tr><td>${formatDate(d)}</td><td><strong>${formatCurrency(client.days[d])}</strong></td></tr>`).join('')}
+                        ${sortedSales.map(sale => `
+                          <tr>
+                            <td>${formatDateTime(sale.date)}</td>
+                            <td><span class="badge ${sale.paymentMethod === 'nomina' ? 'badge-purple' : 'badge-success'}">${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></td>
+                            <td style="font-size:.8rem;color:var(--text-secondary)">${sale.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td>
+                            <td style="text-align:right"><strong>${formatCurrency(sale.total)}</strong></td>
+                            <td style="text-align:center"><button class="btn btn-sm btn-ghost btn-reprint" data-sale-id="${sale.id}"><i data-lucide="printer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Ticket</button></td>
+                          </tr>`).join('')}
                       </tbody>
                       <tfoot>
                         <tr style="background:rgba(99,102,241,0.1);font-weight:700">
-                          <td>TOTAL GENERAL</td>
-                          <td>${formatCurrency(client.total)}</td>
+                          <td colspan="3">TOTAL GENERAL</td>
+                          <td style="text-align:right">${formatCurrency(client.total)}</td>
+                          <td></td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
                 </div>`;
+                if (window.lucide) lucide.createIcons();
+
+                document.getElementById('rccDetail').querySelectorAll('.btn-reprint').forEach(reprintBtn => {
+                    reprintBtn.onclick = () => {
+                        const saleId = reprintBtn.dataset.saleId;
+                        const sale = client.sales.find(s => s.id === saleId);
+                        if (sale) {
+                            showTicket(sale);
+                        }
+                    };
+                });
+
                 window.scrollTo({ top: document.getElementById('rccDetail').offsetTop - 100, behavior: 'smooth' });
             };
         });
