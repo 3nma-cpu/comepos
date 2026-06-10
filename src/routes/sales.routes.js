@@ -89,7 +89,7 @@ router.post('/', async (req, res) => {
       if (prod.stock < item.quantity) return res.status(400).json({ error: `Stock insuficiente para ${prod.name}. Disponible: ${prod.stock}` });
     }
 
-    const total = normalizedItems.reduce((sum, it) => sum + (prodMap[it.productId]?.price || 0) * it.quantity, 0);
+    const total = Math.round(normalizedItems.reduce((sum, it) => sum + (prodMap[it.productId]?.price || 0) * it.quantity, 0));
 
     const sale = await prisma.$transaction(async (tx) => {
       const s = await tx.sale.create({
@@ -122,7 +122,7 @@ router.post('/', async (req, res) => {
       }
 
       return s;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
     res.status(201).json({
       id: sale.id,

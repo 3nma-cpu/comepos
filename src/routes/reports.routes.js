@@ -62,7 +62,15 @@ router.get('/sales-period', async (req, res) => {
 // GET /api/reports/sales-category
 router.get('/sales-category', async (req, res) => {
   try {
-    const sales = await prisma.sale.findMany({ include: { client: true } });
+    const { from, to } = req.query;
+    const where = {};
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from);
+      if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999Z');
+    }
+
+    const sales = await prisma.sale.findMany({ where, include: { client: true } });
     const catMap = {};
     sales.forEach(s => {
       const cat = CAT_REVERSE[s.client.category] || s.client.category;
@@ -81,7 +89,15 @@ router.get('/sales-category', async (req, res) => {
 // GET /api/reports/top-products
 router.get('/top-products', async (req, res) => {
   try {
-    const items = await prisma.saleItem.findMany({ include: { product: true } });
+    const { from, to } = req.query;
+    const where = {};
+    if (from || to) {
+      where.sale = {};
+      if (from) where.sale.createdAt = { ...where.sale.createdAt, gte: new Date(from) };
+      if (to) where.sale.createdAt = { ...where.sale.createdAt, lte: new Date(to + 'T23:59:59.999Z') };
+    }
+
+    const items = await prisma.saleItem.findMany({ where, include: { product: true } });
     const prodMap = {};
     items.forEach(i => {
       if (!prodMap[i.productId]) prodMap[i.productId] = { name: i.product.name, qty: 0, revenue: 0 };

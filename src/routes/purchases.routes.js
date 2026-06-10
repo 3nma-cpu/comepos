@@ -41,11 +41,20 @@ router.post('/', async (req, res) => {
   try {
     const { 
       providerId, items, paymentMethod, dueDate, 
-      noInvoice, timbrado, t1, t2, invoiceNumber 
+      noInvoice, timbrado, t1, t2, invoiceNumber, date 
     } = req.body;
 
     if (!providerId || !items?.length) {
       return res.status(400).json({ error: 'Proveedor y productos son obligatorios' });
+    }
+
+    let createdAt = undefined;
+    if (date) {
+      const parsedDate = new Date(date);
+      if (parsedDate > new Date()) {
+        return res.status(400).json({ error: 'No se pueden registrar compras en el futuro' });
+      }
+      createdAt = parsedDate;
     }
 
     // Get product info for costs
@@ -55,11 +64,11 @@ router.post('/', async (req, res) => {
     products.forEach(p => prodMap[p.id] = p);
 
     // Calculate total
-    const total = items.reduce((sum, it) => {
+    const total = Math.round(items.reduce((sum, it) => {
         const itemCost = it.cost !== undefined ? parseFloat(it.cost) : (prodMap[it.productId]?.cost || 0);
         const itemQty = parseFloat(it.quantity) || 0;
         return sum + itemCost * itemQty;
-    }, 0);
+    }, 0));
 
     const purchase = await prisma.$transaction(async (tx) => {
       // Create purchase
@@ -75,6 +84,7 @@ router.post('/', async (req, res) => {
           t1: t1 || null,
           t2: t2 || null,
           invoiceNumber: invoiceNumber || null,
+          createdAt,
           items: {
             create: items.map(it => ({
               productId: it.productId,
@@ -106,7 +116,7 @@ router.post('/', async (req, res) => {
       }
 
       return purch;
-    });
+    }, { maxWait: 10000, timeout: 30000 });
 
     res.status(201).json({
       id: purchase.id,

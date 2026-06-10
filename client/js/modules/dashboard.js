@@ -3,7 +3,7 @@
 // ============================================
 
 import { api } from '../api.js';
-import { formatCurrency, formatDateTime } from '../utils.js';
+import { formatCurrency, formatDateTime, todayStr } from '../utils.js';
 
 let charts = [];
 
@@ -12,46 +12,58 @@ function destroyCharts() {
     charts = [];
 }
 
-export async function renderDashboard() {
+export async function renderDashboard(selectedDate) {
     destroyCharts();
     const container = document.getElementById('module-content');
+
+    if (!selectedDate) {
+        selectedDate = todayStr();
+    }
 
     // Loading state
     container.innerHTML = '<div class="fade-in"><div class="empty-state"><p>Cargando dashboard...</p></div></div>';
 
     try {
-        const today = new Date().toISOString().split('T')[0];
-        
-        // 7 days ago
-        const date7 = new Date();
+        // Calculate 7 days ago based on selectedDate
+        const parts = selectedDate.split('-');
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+
+        const date7 = new Date(year, month, day);
         date7.setDate(date7.getDate() - 6);
-        const from7d = date7.toISOString().split('T')[0];
+        const from7d = `${date7.getFullYear()}-${String(date7.getMonth() + 1).padStart(2, '0')}-${String(date7.getDate()).padStart(2, '0')}`;
 
         // Fetch data
         const [todayReport, weekReport, catReport, topProducts, recentSales] = await Promise.all([
-            api.get(`/reports/sales-period?from=${today}&to=${today}`),
-            api.get(`/reports/sales-period?from=${from7d}&to=${today}`),
-            api.get('/reports/sales-category'),
-            api.get('/reports/top-products'),
-            api.get('/sales?limit=8')
+            api.get(`/reports/sales-period?from=${selectedDate}&to=${selectedDate}`),
+            api.get(`/reports/sales-period?from=${from7d}&to=${selectedDate}`),
+            api.get(`/reports/sales-category?from=${from7d}&to=${selectedDate}`),
+            api.get(`/reports/top-products?from=${from7d}&to=${selectedDate}`),
+            api.get(`/sales?to=${selectedDate}&limit=8`)
         ]);
 
         const todayClients = new Set(todayReport.sales.map(s => s.clientName)).size;
 
         container.innerHTML = `
         <div class="fade-in">
+          <div class="filters-bar" style="display:flex; justify-content:flex-end; align-items:center; gap:0.5rem; margin-bottom:1rem; padding:0.5rem 1rem; background:var(--bg-secondary); border-radius:var(--radius-md)">
+            <label style="font-size:0.9rem; color:var(--text-secondary); font-weight:500">Fecha de Análisis:</label>
+            <input type="date" class="form-control" id="dbAnalysisDate" value="${selectedDate}" max="${todayStr()}" style="width:160px" />
+          </div>
+
           <div class="kpi-grid">
             <div class="kpi-card">
               <div class="kpi-icon blue"><i data-lucide="shopping-bag"></i></div>
               <div class="kpi-content">
-                <div class="kpi-label">Ventas Hoy</div>
+                <div class="kpi-label">Ventas del Día</div>
                 <div class="kpi-value">${todayReport.totalSales}</div>
               </div>
             </div>
             <div class="kpi-card">
               <div class="kpi-icon green"><i data-lucide="trending-up"></i></div>
               <div class="kpi-content">
-                <div class="kpi-label">Ingresos Hoy</div>
+                <div class="kpi-label">Ingresos del Día</div>
                 <div class="kpi-value">${formatCurrency(todayReport.totalRevenue)}</div>
               </div>
             </div>
@@ -100,25 +112,42 @@ export async function renderDashboard() {
         </div>`;
 
         if (window.lucide) lucide.createIcons();
-        renderCharts(weekReport.daily, catReport.categories);
+        renderCharts(weekReport.daily, catReport.categories, selectedDate);
         renderRecentSales(recentSales);
         renderTopProducts(topProducts.products);
+
+        // Bind events
+        const dateInput = document.getElementById('dbAnalysisDate');
+        if (dateInput) {
+            dateInput.addEventListener('change', (e) => {
+                renderDashboard(e.target.value);
+            });
+        }
 
     } catch (err) {
         container.innerHTML = `<div class="empty-state"><p>Error al cargar dashboard: ${err.message}</p></div>`;
     }
 }
 
-function renderCharts(daily, categories) {
-    // Fill missing days for the last 7 days
+function renderCharts(daily, categories, selectedDate) {
+    // Fill missing days for the last 7 days ending on selectedDate
     const labels = [];
     const dataMap = {};
     daily.forEach(d => dataMap[d.date] = d.total);
     
+    if (!selectedDate) {
+        selectedDate = todayStr();
+    }
+    const parts = selectedDate.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+
     const data = [];
     for (let i = 6; i >= 0; i--) {
-        const d = new Date(); d.setDate(d.getDate() - i);
-        const key = d.toISOString().split('T')[0];
+        const d = new Date(year, month, day);
+        d.setDate(d.getDate() - i);
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         labels.push(dayNames[d.getDay()]);
         data.push(dataMap[key] || 0);

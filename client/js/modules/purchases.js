@@ -3,7 +3,7 @@
 // ============================================
 
 import { api } from '../api.js';
-import { generateId, showToast, createModal, closeModal, escapeHTML, formatCurrency, formatDate } from '../utils.js';
+import { generateId, showToast, createModal, closeModal, escapeHTML, formatCurrency, formatDate, todayStr } from '../utils.js';
 
 export function renderPurchases() {
   const container = document.getElementById('module-content');
@@ -115,6 +115,10 @@ function renderNewPurchaseView(providers, products) {
         <div class="form-group" style="flex:1">
           <label>Proveedor</label>
           <select class="form-control" id="mPurchProv">${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
+        </div>
+        <div class="form-group" style="width:140px">
+          <label>Fecha Compra</label>
+          <input type="date" class="form-control" id="mPurchDate" value="${todayStr()}" max="${todayStr()}" />
         </div>
         <div class="form-group" style="width:120px">
           <label>Forma de Pago</label>
@@ -468,6 +472,7 @@ function renderNewPurchaseView(providers, products) {
 
     const data = {
       providerId: document.getElementById('mPurchProv').value,
+      date: document.getElementById('mPurchDate').value || null,
       items: items.map(it => ({ productId: it.productId, quantity: it.quantity, cost: it.cost, price: it.price, forResale: it.forResale })),
       paymentMethod: document.getElementById('mPurchPayment').value,
       dueDate: document.getElementById('mPurchDueDate').value || null,
