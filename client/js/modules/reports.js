@@ -283,9 +283,21 @@ function reportPurchasesPeriod(area, purchases, providers) {
           </tr>`).join('')}</tbody></table>`;
 
         document.getElementById('rppExport').onclick = () => {
+            const rows = [];
+            filtered.forEach(p => {
+                p.items.forEach(i => {
+                    rows.push([
+                        p.invoiceNumber || '',
+                        i.name,
+                        i.quantity,
+                        i.cost,
+                        Math.round(i.cost * i.quantity)
+                    ]);
+                });
+            });
             exportExcel(
-                ['Fecha', 'Proveedor', 'Factura', 'Tipo Pago', 'Productos', 'Total segmentado'],
-                filtered.map(p => [formatDate(p.date), p.providerName, p.invoiceNumber || '', p.paymentMethod, p.items.map(i => `${i.name} (x${i.quantity})`).join(', '), p.total]),
+                ['Nº Factura', 'Producto', 'Cantidad', 'Precio Unitario', 'Total'],
+                rows,
                 'reporte_compras_segmentado.xlsx'
             );
             showToastLocal('Excel exportado');

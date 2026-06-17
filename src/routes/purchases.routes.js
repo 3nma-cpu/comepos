@@ -133,12 +133,144 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT /api/purchases/:id
+router.put('/:id', async (req, res) => {
+  try {
+    const { providerId, items, paymentMethod, dueDate, noInvoice, timbrado, t1, t2, invoiceNumber, date } = req.body;
+
+    if (!providerId || !items?.length) {
+      return res.status(400).json({ error: 'Proveedor y productos son obligatorios' });
+    }
+
+    const existing = await prisma.purchase.findUnique({
+      where: { id: req.params.id },
+      include: { items: true }
+    });
+    if (!existing) return res.status(404).json({ error: 'Compra no encontrada' });
+
+    let createdAt = undefined;
+    if (date) {
+      const parsedDate = new Date(date);
+      if (parsedDate > new Date()) {
+        return res.status(400).json({ error: 'No se pueden registrar compras en el futuro' });
+      }
+      createdAt = parsedDate;
+    }
+
+    // Get product info for costs
+    const productIds = items.map(i => i.productId);
+    const products = await prisma.product.findMany({ where: { id: { in: productIds } } });
+    const prodMap = {};
+    products.forEach(p => prodMap[p.id] = p);
+
+    // Calculate new total
+    const total = Math.round(items.reduce((sum, it) => {
+      const itemCost = it.cost !== undefined ? parseFloat(it.cost) : (prodMap[it.productId]?.cost || 0);
+      const itemQty = parseFloat(it.quantity) || 0;
+      return sum + itemCost * itemQty;
+    }, 0));
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1. Revert stock from old items
+      for (const oldItem of existing.items) {
+        if (oldItem.forResale) {
+          await tx.product.update({
+            where: { id: oldItem.productId },
+            data: { stock: { decrement: oldItem.quantity } }
+          });
+        }
+      }
+
+      // 2. Delete old items
+      await tx.purchaseItem.deleteMany({ where: { purchaseId: req.params.id } });
+
+      // 3. Update purchase and create new items
+      const purch = await tx.purchase.update({
+        where: { id: req.params.id },
+        data: {
+          providerId,
+          total,
+          paymentMethod: paymentMethod === 'CREDITO' ? 'CREDITO' : 'CONTADO',
+          dueDate: dueDate ? new Date(dueDate) : null,
+          noInvoice: !!noInvoice,
+          timbrado: timbrado || null,
+          t1: t1 || null,
+          t2: t2 || null,
+          invoiceNumber: invoiceNumber || null,
+          ...(createdAt ? { createdAt } : {}),
+          items: {
+            create: items.map(it => ({
+              productId: it.productId,
+              quantity: parseFloat(it.quantity) || 0,
+              unitCost: it.cost !== undefined ? parseFloat(it.cost) : (prodMap[it.productId]?.cost || 0),
+              forResale: it.forResale !== undefined ? !!it.forResale : true
+            }))
+          }
+        },
+        include: { provider: true, items: { include: { product: true } } }
+      });
+
+      // 4. Apply stock from new items
+      for (const item of items) {
+        const isForResale = item.forResale !== undefined ? !!item.forResale : true;
+        const newCost = item.cost !== undefined ? parseFloat(item.cost) : (prodMap[item.productId]?.cost || 0);
+        const qty = parseFloat(item.quantity) || 0;
+        const updateData = { cost: newCost };
+        if (isForResale) {
+          updateData.stock = { increment: qty };
+          if (item.price !== undefined) updateData.price = parseFloat(item.price);
+        }
+        await tx.product.update({
+          where: { id: item.productId },
+          data: updateData
+        });
+      }
+
+      return purch;
+    }, { maxWait: 10000, timeout: 30000 });
+
+    res.json({
+      id: updated.id,
+      providerName: updated.provider.name,
+      total: updated.total,
+      date: updated.createdAt.toISOString(),
+      paymentMethod: updated.paymentMethod,
+      invoiceNumber: updated.invoiceNumber,
+      items: updated.items.map(i => ({ productId: i.productId, name: i.product.name, cost: i.unitCost, quantity: i.quantity, forResale: i.forResale }))
+    });
+  } catch (err) {
+    console.error('Purchase update error:', err);
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Compra no encontrada' });
+    res.status(500).json({ error: 'Error al actualizar compra' });
+  }
+});
+
 // DELETE /api/purchases/:id
 router.delete('/:id', async (req, res) => {
   try {
-    await prisma.purchase.delete({ where: { id: req.params.id } });
-    res.json({ message: 'Compra eliminada' });
+    // 1. Get the purchase with its items
+    const purchase = await prisma.purchase.findUnique({
+      where: { id: req.params.id },
+      include: { items: true }
+    });
+    if (!purchase) return res.status(404).json({ error: 'Compra no encontrada' });
+
+    // 2. Atomic transaction: restore stock then delete
+    await prisma.$transaction(async (tx) => {
+      for (const item of purchase.items) {
+        if (item.forResale) {
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } }
+          });
+        }
+      }
+      await tx.purchase.delete({ where: { id: req.params.id } });
+    });
+
+    res.json({ message: 'Compra eliminada y stock restaurado' });
   } catch (err) {
+    console.error('Purchase delete error:', err);
     if (err.code === 'P2025') return res.status(404).json({ error: 'Compra no encontrada' });
     res.status(500).json({ error: 'Error al eliminar compra' });
   }
