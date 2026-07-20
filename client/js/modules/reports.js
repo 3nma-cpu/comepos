@@ -143,12 +143,10 @@ function reportSalesPeriod(area, sales) {
         }).join('');
 
         document.getElementById('rpTable').innerHTML = `
-        <div style="overflow-x:auto">
-            <table style="min-width:max-content">
-                <thead><tr>${headers}</tr></thead>
-                <tbody>${rows}</tbody>
-            </table>
-        </div>`;
+        <table class="table-pivot" style="min-width:max-content;width:100%">
+            <thead><tr>${headers}</tr></thead>
+            <tbody>${rows}</tbody>
+        </table>`;
 
         document.getElementById('rpExport').onclick = () => {
             const exportData = sortedClients.map(([name, data]) => {

@@ -744,13 +744,50 @@ select.form-control option {
 /* Tables */
 .table-container {
     overflow-x: auto;
+    overflow-y: visible;
+    max-width: 100%;
     border-radius: var(--radius-lg);
-    border: 1px solid var(--border)
+    border: 1px solid var(--border);
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+}
+
+/* Visible, custom gradient horizontal scrollbar for tables */
+.table-container::-webkit-scrollbar {
+    height: 10px;
+    width: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: rgba(15, 15, 30, 0.6);
+    border-radius: 5px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, var(--primary), var(--accent));
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(90deg, var(--primary-light), var(--accent-light));
 }
 
 table {
     width: 100%;
-    border-collapse: collapse
+    border-collapse: collapse;
+}
+
+.table-container table.table-wide,
+.table-container table.table-pivot {
+    min-width: max-content;
+}
+
+.table-container table.table-wide th,
+.table-container table.table-wide td,
+.table-container table.table-pivot th,
+.table-container table.table-pivot td {
+    white-space: nowrap;
 }
 
 thead {
