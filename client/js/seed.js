@@ -19,7 +19,9 @@ export function seedData() {
     const users = [
         { id: 'usr-1', username: 'admin', password: 'admin123', name: 'Carlos Benítez', email: 'admin@comepos.com', roleId: 'role-admin', active: true },
         { id: 'usr-2', username: 'cajero', password: 'cajero123', name: 'María González', email: 'cajero@comepos.com', roleId: 'role-cajero', active: true },
-        { id: 'usr-3', username: 'almacen', password: 'almacen123', name: 'José Aquino', email: 'almacen@comepos.com', roleId: 'role-almacen', active: true }
+        { id: 'usr-3', username: 'almacen', password: 'almacen123', name: 'José Aquino', email: 'almacen@comepos.com', roleId: 'role-almacen', active: true },
+        { id: 'usr-4', username: 'supervisor', password: 'super123', name: 'Lucía Fernández', email: 'lucia.fernandez@comepos.com', roleId: 'role-supervisor', active: true },
+        { id: 'usr-5', username: 'cajero2', password: 'cajero123', name: 'Esteban Ramírez', email: 'esteban.ramirez@comepos.com', roleId: 'role-cajero', active: true }
     ];
     setCollection('users', users);
 

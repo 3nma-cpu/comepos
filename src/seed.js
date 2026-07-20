@@ -49,10 +49,13 @@ async function seed() {
   const passAdmin = await bcrypt.hash('admin123', 10);
   const passCajero = await bcrypt.hash('cajero123', 10);
   const passAlmacen = await bcrypt.hash('almacen123', 10);
+  const passSupervisor = await bcrypt.hash('super123', 10);
 
   const userAdmin = await prisma.user.create({ data: { username: 'admin', password: passAdmin, name: 'Carlos Benítez', email: 'admin@comepos.com', roleId: adminRole.id } });
   const userCajero = await prisma.user.create({ data: { username: 'cajero', password: passCajero, name: 'María González', email: 'cajero@comepos.com', roleId: cajeroRole.id } });
   const userAlmacen = await prisma.user.create({ data: { username: 'almacen', password: passAlmacen, name: 'José Aquino', email: 'almacen@comepos.com', roleId: almacenRole.id } });
+  const userSupervisor = await prisma.user.create({ data: { username: 'supervisor', password: passSupervisor, name: 'Lucía Fernández', email: 'lucia.fernandez@comepos.com', roleId: supervisorRole.id } });
+  const userCajero2 = await prisma.user.create({ data: { username: 'cajero2', password: passCajero, name: 'Esteban Ramírez', email: 'esteban.ramirez@comepos.com', roleId: cajeroRole.id } });
   console.log('✅ Usuarios creados');
 
   // Clients
