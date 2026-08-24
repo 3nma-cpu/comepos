@@ -170,81 +170,100 @@ function renderEditPurchaseView(purchase, providers, products) {
   const dateVal = `${purchDate.getFullYear()}-${String(purchDate.getMonth() + 1).padStart(2, '0')}-${String(purchDate.getDate()).padStart(2, '0')}`;
 
   content.innerHTML = `
-    <div class="fade-in" style="padding-bottom:80px">
+    <div class="fade-in purchase-form-container" style="padding-bottom:60px">
       <div style="display:flex;align-items:center;margin-bottom:1rem;gap:1rem">
         <button class="btn btn-ghost" id="epBackBtn"><i data-lucide="arrow-left"></i> Volver</button>
-        <h2 style="margin:0;font-size:1.5rem">Editar Compra</h2>
+        <h2 style="margin:0;font-size:1.3rem">Editar Compra</h2>
       </div>
 
       <!-- Datos de la Factura -->
-      <div class="form-row" style="background:var(--bg-secondary);padding:1rem;border-radius:var(--radius-md);margin-bottom:1rem">
-        <div class="form-group" style="flex:1">
-          <label>Proveedor</label>
-          <select class="form-control" id="ePurchProv">${providers.map(p => `<option value="${p.id}" ${p.id === purchase.providerId ? 'selected' : ''}>${p.name}</option>`).join('')}</select>
-        </div>
-        <div class="form-group" style="width:140px">
-          <label>Fecha Compra</label>
-          <input type="date" class="form-control" id="ePurchDate" value="${dateVal}" max="${todayStr()}" />
-        </div>
-        <div class="form-group" style="width:120px">
-          <label>Forma de Pago</label>
-          <select class="form-control" id="ePurchPayment">
-            <option value="CONTADO" ${purchase.paymentMethod !== 'CREDITO' ? 'selected' : ''}>Contado</option>
-            <option value="CREDITO" ${purchase.paymentMethod === 'CREDITO' ? 'selected' : ''}>Crédito</option>
-          </select>
-        </div>
-        <div class="form-group" id="ePurchDueGroup" style="display:${purchase.paymentMethod === 'CREDITO' ? 'block' : 'none'};width:150px">
-          <label>Fecha a Pagar</label>
-          <input type="date" class="form-control" id="ePurchDueDate" value="${purchase.dueDate ? purchase.dueDate.substring(0, 10) : ''}" />
-        </div>
+      <div class="purchase-card">
+        <div class="purchase-card-title"><i data-lucide="file-text" style="width:14px;height:14px"></i> Datos de Factura y Proveedor</div>
         
-        <div style="flex:2; display:grid; grid-template-columns:1fr 1fr 1fr 1.5fr; gap:.5rem">
-          <div class="form-group"><label style="font-size:.7rem">Timbrado</label><input type="text" class="form-control" id="ePurchTimb" value="${purchase.timbrado || ''}" placeholder="00000000" /></div>
-          <div class="form-group"><label style="font-size:.7rem">T1</label><input type="text" class="form-control" id="ePurchT1" value="${purchase.t1 || ''}" placeholder="001" /></div>
-          <div class="form-group"><label style="font-size:.7rem">T2</label><input type="text" class="form-control" id="ePurchT2" value="${purchase.t2 || ''}" placeholder="001" /></div>
-          <div class="form-group"><label style="font-size:.7rem">Factura</label><input type="text" class="form-control" id="ePurchFact" value="${purchase.invoiceNumber || ''}" placeholder="0000000" /></div>
+        <div class="purchase-invoice-grid">
+          <div class="form-group" style="margin-bottom:0">
+            <label>Proveedor</label>
+            <select class="form-control" id="ePurchProv">${providers.map(p => `<option value="${p.id}" ${p.id === purchase.providerId ? 'selected' : ''}>${p.name}</option>`).join('')}</select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Fecha Compra</label>
+            <input type="date" class="form-control" id="ePurchDate" value="${dateVal}" max="${todayStr()}" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Forma de Pago</label>
+            <select class="form-control" id="ePurchPayment">
+              <option value="CONTADO" ${purchase.paymentMethod !== 'CREDITO' ? 'selected' : ''}>Contado</option>
+              <option value="CREDITO" ${purchase.paymentMethod === 'CREDITO' ? 'selected' : ''}>Crédito</option>
+            </select>
+          </div>
+          <div class="form-group" id="ePurchDueGroup" style="display:${purchase.paymentMethod === 'CREDITO' ? 'block' : 'none'};margin-bottom:0">
+            <label>Fecha a Pagar</label>
+            <input type="date" class="form-control" id="ePurchDueDate" value="${purchase.dueDate ? purchase.dueDate.substring(0, 10) : ''}" />
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:.5rem;flex-direction:column;justify-content:center">
-          <label class="checkbox-container" style="margin:0;font-size:.8rem">
-            <input type="checkbox" id="ePurchNoInvoice" ${purchase.noInvoice ? 'checked' : ''} />
-            <span class="checkmark"></span> Sin factura
-          </label>
+
+        <div class="purchase-invoice-numbers">
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:.72rem">Timbrado</label>
+            <input type="text" class="form-control" id="ePurchTimb" value="${purchase.timbrado || ''}" placeholder="00000000" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:.72rem">T1</label>
+            <input type="text" class="form-control" id="ePurchT1" value="${purchase.t1 || ''}" placeholder="001" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:.72rem">T2</label>
+            <input type="text" class="form-control" id="ePurchT2" value="${purchase.t2 || ''}" placeholder="001" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:.72rem">Factura</label>
+            <input type="text" class="form-control" id="ePurchFact" value="${purchase.invoiceNumber || ''}" placeholder="0000000" />
+          </div>
+          <div style="display:flex;align-items:center;height:100%;padding-bottom:4px">
+            <label class="purchase-checkbox-label">
+              <input type="checkbox" id="ePurchNoInvoice" ${purchase.noInvoice ? 'checked' : ''} />
+              <span>Sin factura</span>
+            </label>
+          </div>
         </div>
       </div>
 
       <!-- Barra de Entrada de Productos -->
-      <div class="purchase-entry-bar" style="display:flex; gap:0.5rem; align-items:flex-end; background:var(--bg-secondary); padding:1rem; border-radius:var(--radius-md); margin-bottom:1rem; border-left:4px solid var(--primary)">
-        <div style="flex:2">
-          <label style="font-size:0.75rem">Descripción del Producto</label>
-          <select class="form-control" id="epProduct">
-            <option value="">Seleccione...</option>
-            ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-          </select>
-        </div>
-        <div style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:8px">
-          <label class="checkbox-container" style="font-size:0.75rem; margin:0; display:flex; align-items:center; gap:4px">
-            <input type="checkbox" id="epForResale" checked />
-            <span class="checkmark"></span> Para Venta
-          </label>
-        </div>
-        <div style="flex:0.8">
-          <label style="font-size:0.75rem">Cantidad</label>
-          <input type="number" class="form-control" id="epQty" value="1" min="0.01" step="any" />
-        </div>
-        <div style="flex:1">
-          <label style="font-size:0.75rem">Pre. Unit. Compra</label>
-          <input type="number" class="form-control" id="epCost" value="0" min="0" step="any" />
-        </div>
-        <div style="flex:1">
-          <label style="font-size:0.75rem;font-weight:700">Total</label>
-          <input type="number" class="form-control" id="epTotal" value="0" min="0" step="any" style="background:var(--bg-input);font-weight:700;color:var(--primary-light)" />
-        </div>
-        <div style="flex:1" id="epPriceGroup">
-          <label style="font-size:0.75rem">Precio Venta</label>
-          <input type="number" class="form-control" id="epPrice" value="0" min="0" step="any" />
-        </div>
-        <div>
-          <button class="btn btn-primary" id="epAddBtn" style="height:38px"><i data-lucide="plus"></i></button>
+      <div class="purchase-card">
+        <div class="purchase-card-title"><i data-lucide="package-plus" style="width:14px;height:14px"></i> Cargar Ítems</div>
+        <div class="purchase-entry-grid">
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Descripción</label>
+            <select class="form-control" id="epProduct">
+              <option value="">Seleccione...</option>
+              ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;height:100%;padding-bottom:4px">
+            <label class="purchase-checkbox-label">
+              <input type="checkbox" id="epForResale" checked />
+              <span>Para Venta</span>
+            </label>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Cantidad</label>
+            <input type="number" class="form-control" id="epQty" value="1" min="0.01" step="any" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Costo Unit.</label>
+            <input type="number" class="form-control" id="epCost" value="0" min="0" step="any" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem;font-weight:700">Total</label>
+            <input type="number" class="form-control" id="epTotal" value="0" min="0" step="any" style="background:var(--bg-input);font-weight:700;color:var(--text)" />
+          </div>
+          <div class="form-group" id="epPriceGroup" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Precio Venta</label>
+            <input type="number" class="form-control" id="epPrice" value="0" min="0" step="any" />
+          </div>
+          <div>
+            <button class="btn btn-primary" id="epAddBtn" style="height:34px;width:38px;padding:0;justify-content:center"><i data-lucide="plus"></i></button>
+          </div>
         </div>
       </div>
 
@@ -268,9 +287,9 @@ function renderEditPurchaseView(purchase, providers, products) {
       </div>
 
       <!-- Footer Fijo -->
-      <div style="position:sticky;bottom:0;background:var(--bg-secondary);padding:1rem;margin-top:2rem;border-top:1px solid var(--border);border-radius:var(--radius-md);display:flex;justify-content:space-between;align-items:center;z-index:10;box-shadow:0 -4px 10px rgba(0,0,0,0.1)">
-        <div style="font-size:1.5rem;font-weight:700">Total Factura: <span id="ePurchGrandTotal" style="color:var(--primary-light)">₲ 0</span></div>
-        <button class="btn btn-primary" id="btnUpdatePurch" style="font-size:1.1rem;padding:0.75rem 2rem"><i data-lucide="save"></i> Guardar Cambios</button>
+      <div class="purchase-footer-bar">
+        <div style="font-size:1.3rem;font-weight:700">Total Factura: <span id="ePurchGrandTotal" style="color:var(--text)">₲ 0</span></div>
+        <button class="btn btn-primary" id="btnUpdatePurch"><i data-lucide="save"></i> Guardar Cambios</button>
       </div>
     </div>`;
 
@@ -471,86 +490,107 @@ function renderNewPurchaseView(providers, products) {
   let items = [];
 
   content.innerHTML = `
-    <div class="fade-in" style="padding-bottom:80px">
+    <div class="fade-in purchase-form-container" style="padding-bottom:60px">
       <div style="display:flex;align-items:center;margin-bottom:1rem;gap:1rem">
         <button class="btn btn-ghost" id="npBackBtn"><i data-lucide="arrow-left"></i> Volver</button>
-        <h2 style="margin:0;font-size:1.5rem">Nueva Compra</h2>
+        <h2 style="margin:0;font-size:1.3rem">Nueva Compra</h2>
       </div>
 
       <!-- Datos de la Factura -->
-      <div class="form-row" style="background:var(--bg-secondary);padding:1rem;border-radius:var(--radius-md);margin-bottom:1rem">
-        <div class="form-group" style="flex:1">
-          <label>Proveedor</label>
-          <select class="form-control" id="mPurchProv">${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
-        </div>
-        <div class="form-group" style="width:140px">
-          <label>Fecha Compra</label>
-          <input type="date" class="form-control" id="mPurchDate" value="${todayStr()}" max="${todayStr()}" />
-        </div>
-        <div class="form-group" style="width:120px">
-          <label>Forma de Pago</label>
-          <select class="form-control" id="mPurchPayment">
-            <option value="CONTADO">Contado</option>
-            <option value="CREDITO">Crédito</option>
-          </select>
-        </div>
-        <div class="form-group" id="mPurchDueGroup" style="display:none;width:150px">
-          <label>Fecha a Pagar</label>
-          <input type="date" class="form-control" id="mPurchDueDate" />
-        </div>
+      <div class="purchase-card">
+        <div class="purchase-card-title"><i data-lucide="file-text" style="width:14px;height:14px"></i> Datos de Factura y Proveedor</div>
         
-        <div style="flex:2; display:grid; grid-template-columns:1fr 1fr 1fr 1.5fr; gap:.5rem">
-          <div class="form-group"><label style="font-size:.7rem">Timbrado</label><input type="text" class="form-control" id="mPurchTimb" placeholder="00000000" /></div>
-          <div class="form-group"><label style="font-size:.7rem">T1</label><input type="text" class="form-control" id="mPurchT1" placeholder="001" /></div>
-          <div class="form-group"><label style="font-size:.7rem">T2</label><input type="text" class="form-control" id="mPurchT2" placeholder="001" /></div>
-          <div class="form-group"><label style="font-size:.7rem">Factura</label><input type="text" class="form-control" id="mPurchFact" placeholder="0000000" /></div>
+        <div class="purchase-invoice-grid">
+          <div class="form-group" style="margin-bottom:0">
+            <label>Proveedor</label>
+            <select class="form-control" id="mPurchProv">${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}</select>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Fecha Compra</label>
+            <input type="date" class="form-control" id="mPurchDate" value="${todayStr()}" max="${todayStr()}" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Forma de Pago</label>
+            <select class="form-control" id="mPurchPayment">
+              <option value="CONTADO">Contado</option>
+              <option value="CREDITO">Crédito</option>
+            </select>
+          </div>
+          <div class="form-group" id="mPurchDueGroup" style="display:none;margin-bottom:0">
+            <label>Fecha a Pagar</label>
+            <input type="date" class="form-control" id="mPurchDueDate" />
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:.5rem;flex-direction:column;justify-content:center">
-          <label class="checkbox-container" style="margin:0;font-size:.8rem">
-            <input type="checkbox" id="mPurchNoInvoice" />
-            <span class="checkmark"></span> Sin factura
-          </label>
-          <button class="btn btn-secondary btn-sm" id="btnRecoverPurch" style="background:#555;color:white;border:none;width:100%">Recuperar</button>
+
+        <div class="purchase-invoice-numbers">
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:.72rem">Timbrado</label>
+            <input type="text" class="form-control" id="mPurchTimb" placeholder="00000000" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:.72rem">T1</label>
+            <input type="text" class="form-control" id="mPurchT1" placeholder="001" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:.72rem">T2</label>
+            <input type="text" class="form-control" id="mPurchT2" placeholder="001" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:.72rem">Factura</label>
+            <input type="text" class="form-control" id="mPurchFact" placeholder="0000000" />
+          </div>
+          <div style="display:flex;align-items:center;height:100%;padding-bottom:4px">
+            <label class="purchase-checkbox-label">
+              <input type="checkbox" id="mPurchNoInvoice" />
+              <span>Sin factura</span>
+            </label>
+          </div>
+          <div style="display:flex;align-items:center;height:100%">
+            <button class="btn btn-secondary btn-sm" id="btnRecoverPurch" style="height:32px">Recuperar</button>
+          </div>
         </div>
       </div>
 
       <!-- Barra de Entrada de Productos -->
-      <div class="purchase-entry-bar" style="display:flex; gap:0.5rem; align-items:flex-end; background:var(--bg-secondary); padding:1rem; border-radius:var(--radius-md); margin-bottom:1rem; border-left:4px solid var(--primary)">
-        <div style="flex:1.5">
-          <label style="font-size:0.75rem">Código de Barra</label>
-          <input type="text" class="form-control" id="npBarcode" placeholder="Escanear o tipear..." autofocus />
-        </div>
-        <div style="flex:2">
-          <label style="font-size:0.75rem">Descripción del Producto</label>
-          <select class="form-control" id="npProduct">
-            <option value="">Seleccione o escanee...</option>
-            ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
-          </select>
-        </div>
-        <div style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; padding-bottom:8px">
-          <label class="checkbox-container" style="font-size:0.75rem; margin:0; display:flex; align-items:center; gap:4px">
-            <input type="checkbox" id="npForResale" checked />
-            <span class="checkmark"></span> Para Venta
-          </label>
-        </div>
-        <div style="flex:0.8">
-          <label style="font-size:0.75rem">Cantidad</label>
-          <input type="number" class="form-control" id="npQty" value="1" min="0.01" step="any" />
-        </div>
-        <div style="flex:1">
-          <label style="font-size:0.75rem">Pre. Unit. Compra</label>
-          <input type="number" class="form-control" id="npCost" value="0" min="0" step="any" />
-        </div>
-        <div style="flex:1">
-          <label style="font-size:0.75rem;font-weight:700">Total</label>
-          <input type="number" class="form-control" id="npTotal" value="0" min="0" step="any" style="background:var(--bg-input);font-weight:700;color:var(--primary-light)" />
-        </div>
-        <div style="flex:1" id="npPriceGroup">
-          <label style="font-size:0.75rem">Precio Venta</label>
-          <input type="number" class="form-control" id="npPrice" value="0" min="0" step="any" />
-        </div>
-        <div>
-          <button class="btn btn-primary" id="npAddBtn" style="height:38px"><i data-lucide="plus"></i></button>
+      <div class="purchase-card">
+        <div class="purchase-card-title"><i data-lucide="package-plus" style="width:14px;height:14px"></i> Cargar Ítems</div>
+        <div class="purchase-entry-grid">
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Cód. Barra</label>
+            <input type="text" class="form-control" id="npBarcode" placeholder="Escanear..." autofocus />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Descripción del Producto</label>
+            <select class="form-control" id="npProduct">
+              <option value="">Seleccione o escanee...</option>
+              ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;height:100%;padding-bottom:4px">
+            <label class="purchase-checkbox-label">
+              <input type="checkbox" id="npForResale" checked />
+              <span>Para Venta</span>
+            </label>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Cant.</label>
+            <input type="number" class="form-control" id="npQty" value="1" min="0.01" step="any" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Costo Unit.</label>
+            <input type="number" class="form-control" id="npCost" value="0" min="0" step="any" />
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label style="font-size:0.75rem;font-weight:700">Total</label>
+            <input type="number" class="form-control" id="npTotal" value="0" min="0" step="any" style="background:var(--bg-input);font-weight:700;color:var(--text)" />
+          </div>
+          <div class="form-group" id="npPriceGroup" style="margin-bottom:0">
+            <label style="font-size:0.75rem">Precio Venta</label>
+            <input type="number" class="form-control" id="npPrice" value="0" min="0" step="any" />
+          </div>
+          <div>
+            <button class="btn btn-primary" id="npAddBtn" style="height:34px;width:38px;padding:0;justify-content:center"><i data-lucide="plus"></i></button>
+          </div>
         </div>
       </div>
 
@@ -570,15 +610,15 @@ function renderNewPurchaseView(providers, products) {
             </tr>
           </thead>
           <tbody id="npItemsBody">
-            <tr><td colspan="7" class="text-center" style="color:var(--text-muted)">No hay productos agregados</td></tr>
+            <tr><td colspan="8" class="text-center" style="color:var(--text-muted)">No hay productos agregados</td></tr>
           </tbody>
         </table>
       </div>
 
       <!-- Footer Fijo -->
-      <div style="position:sticky;bottom:0;background:var(--bg-secondary);padding:1rem;margin-top:2rem;border-top:1px solid var(--border);border-radius:var(--radius-md);display:flex;justify-content:space-between;align-items:center;z-index:10;box-shadow:0 -4px 10px rgba(0,0,0,0.1)">
-        <div style="font-size:1.5rem;font-weight:700">Total Factura: <span id="mPurchGrandTotal" style="color:var(--primary-light)">₲ 0</span></div>
-        <button class="btn btn-primary" id="btnSavePurch" style="font-size:1.1rem;padding:0.75rem 2rem"><i data-lucide="save"></i> Registrar Compra</button>
+      <div class="purchase-footer-bar">
+        <div style="font-size:1.3rem;font-weight:700">Total Factura: <span id="mPurchGrandTotal" style="color:var(--text)">₲ 0</span></div>
+        <button class="btn btn-primary" id="btnSavePurch"><i data-lucide="save"></i> Registrar Compra</button>
       </div>
     </div>`;
 

@@ -1166,6 +1166,92 @@ tbody tr:last-child td {
     border-bottom: none;
 }
 
+/* Purchase Module Compact Layout */
+.purchase-form-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.purchase-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1rem 1.25rem;
+    margin-bottom: 1rem;
+}
+
+.purchase-card-title {
+    font-size: .8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    margin-bottom: .75rem;
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.purchase-invoice-grid {
+    display: grid;
+    grid-template-columns: minmax(200px, 2fr) 140px 130px 140px;
+    gap: .75rem;
+    align-items: flex-end;
+    margin-bottom: .75rem;
+}
+
+.purchase-invoice-numbers {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1.5fr auto auto;
+    gap: .5rem;
+    align-items: flex-end;
+    background: var(--bg-input);
+    padding: .65rem .85rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.purchase-entry-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr 100px 90px 110px 110px 110px 42px;
+    gap: .5rem;
+    align-items: flex-end;
+}
+
+.purchase-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    cursor: pointer;
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--text);
+    user-select: none;
+    padding: .45rem 0;
+}
+
+.purchase-checkbox-label input[type="checkbox"] {
+    accent-color: #333333;
+    width: 15px;
+    height: 15px;
+}
+
+.purchase-footer-bar {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-header);
+    backdrop-filter: blur(12px);
+    padding: .85rem 1.25rem;
+    margin-top: 1.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 20;
+    box-shadow: var(--shadow);
+}
+
 /* Category Tabs */
 .category-tabs {
     display: flex;
