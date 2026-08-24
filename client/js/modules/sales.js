@@ -45,7 +45,7 @@ export async function renderSales() {
                     <i data-lucide="user"></i>
                     <input type="text" class="form-control" id="posClientSearch" placeholder="Buscar cliente..." />
                   </div>
-                  <div id="posClientResults" style="display:none;position:absolute;z-index:10;background:rgba(25,25,50,.98);border:1px solid var(--border);border-radius:var(--radius);max-height:180px;overflow-y:auto;width:calc(100% - 2.5rem);margin-top:.25rem"></div>
+                  <div id="posClientResults" style="display:none;position:absolute;z-index:10;background:rgba(20,20,20,.98);border:1px solid var(--border);border-radius:var(--radius);max-height:180px;overflow-y:auto;width:calc(100% - 2.5rem);margin-top:.25rem"></div>
                   <div id="posSelectedClient" style="margin-top:.5rem"></div>
                 </div>
               </div>
@@ -121,7 +121,7 @@ export async function renderSales() {
 function selectClient(client) {
   selectedClient = client;
   const el = document.getElementById('posSelectedClient');
-  el.innerHTML = `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:rgba(99,102,241,.1);border-radius:var(--radius);font-size:.85rem">
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:rgba(128,128,128,.08);border-radius:var(--radius);font-size:.85rem">
     <i data-lucide="user" style="width:14px;height:14px"></i>
     <strong>${escapeHTML(client.name)}</strong> <span class="badge badge-primary" style="font-size:.7rem">${client.category}</span>
     <button class="btn btn-ghost btn-icon" style="margin-left:auto;padding:2px" id="btnRemoveClient"><i data-lucide="x" style="width:14px;height:14px"></i></button>

@@ -162,8 +162,8 @@ function renderCharts(daily, categories, selectedDate) {
                 datasets: [{
                     label: 'Ventas (₲)',
                     data,
-                    backgroundColor: 'rgba(99,102,241,0.6)',
-                    borderColor: '#6366f1',
+                    backgroundColor: 'rgba(100,100,100,0.5)',
+                    borderColor: '#555555',
                     borderWidth: 1,
                     borderRadius: 6
                 }]
@@ -172,8 +172,8 @@ function renderCharts(daily, categories, selectedDate) {
                 responsive: true, maintainAspectRatio: false,
                 plugins: { legend: { display: false } },
                 scales: {
-                    x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', callback: v => '₲' + (v / 1000).toFixed(0) + 'k' } }
+                    x: { grid: { display: false }, ticks: { color: '#888888' } },
+                    y: { grid: { color: 'rgba(128,128,128,0.1)' }, ticks: { color: '#888888', callback: v => '₲' + (v / 1000).toFixed(0) + 'k' } }
                 }
             }
         });
@@ -183,7 +183,7 @@ function renderCharts(daily, categories, selectedDate) {
     // Category pie
     const catLabels = categories.map(c => c.category);
     const catData = categories.map(c => c.amount);
-    const catColors = ['#6366f1', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899', '#14b8a6'];
+    const catColors = ['#333333', '#555555', '#777777', '#999999', '#bbbbbb', '#444444', '#666666', '#888888'];
 
     const ctx2 = document.getElementById('chartCategory');
     if (ctx2) {
@@ -195,7 +195,7 @@ function renderCharts(daily, categories, selectedDate) {
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8', padding: 12, font: { size: 11 } } } }
+                plugins: { legend: { position: 'bottom', labels: { color: '#888888', padding: 12, font: { size: 11 } } } }
             }
         });
         charts.push(c2);

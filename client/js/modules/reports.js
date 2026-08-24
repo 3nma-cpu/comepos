@@ -135,11 +135,11 @@ function reportSalesPeriod(area, sales) {
             return;
         }
 
-        const headers = `<th>Nombre del Cliente</th><th>Categoría</th>` + uniqueDates.map(d => `<th style="text-align:right">${formatDate(d)}</th>`).join('') + `<th style="text-align:right;background:rgba(99,102,241,0.1)">Total General</th>`;
+        const headers = `<th>Nombre del Cliente</th><th>Categoría</th>` + uniqueDates.map(d => `<th style="text-align:right">${formatDate(d)}</th>`).join('') + `<th style="text-align:right;background:rgba(128,128,128,0.08)">Total General</th>`;
         
         const rows = sortedClients.map(([name, data]) => {
             const cols = uniqueDates.map(d => `<td style="text-align:right">${data[d] ? formatCurrency(data[d]) : '<span style="color:var(--text-muted)">-</span>'}</td>`).join('');
-            return `<tr><td><strong>${name}</strong></td><td><span class="badge badge-primary">${data.category}</span></td>${cols}<td style="text-align:right;background:rgba(99,102,241,0.05)"><strong>${formatCurrency(data.total)}</strong></td></tr>`;
+            return `<tr><td><strong>${name}</strong></td><td><span class="badge badge-primary">${data.category}</span></td>${cols}<td style="text-align:right;background:rgba(128,128,128,0.04)"><strong>${formatCurrency(data.total)}</strong></td></tr>`;
         }).join('');
 
         document.getElementById('rpTable').innerHTML = `
@@ -276,7 +276,7 @@ function reportPurchasesPeriod(area, purchases, providers) {
             <td><strong>${p.providerName}</strong></td>
             <td><code>${p.invoiceNumber || '---'}</code></td>
             <td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td>
-            <td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity}) ${i.forResale !== false ? '<span style="color:#2ecc71;font-weight:600;font-size:.7rem">(Venta)</span>' : '<span style="color:#e67e22;font-weight:600;font-size:.7rem">(Uso Interno)</span>'}`).join(', ')}</td>
+            <td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity}) ${i.forResale !== false ? '<span style="color:#2d8a4e;font-weight:600;font-size:.7rem">(Venta)</span>' : '<span style="color:#b8860b;font-weight:600;font-size:.7rem">(Uso Interno)</span>'}`).join(', ')}</td>
             <td><strong>${formatCurrency(p.total)}</strong></td>
           </tr>`).join('')}</tbody></table>`;
 
@@ -451,7 +451,7 @@ function reportClientConsumption(area, sales) {
                           </tr>`).join('')}
                       </tbody>
                       <tfoot>
-                        <tr style="background:rgba(99,102,241,0.1);font-weight:700">
+                        <tr style="background:rgba(128,128,128,0.08);font-weight:700">
                           <td colspan="3">TOTAL GENERAL</td>
                           <td style="text-align:right">${formatCurrency(client.total)}</td>
                           <td></td>

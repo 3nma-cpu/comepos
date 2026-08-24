@@ -144,7 +144,7 @@ function openViewPurchaseModal(purchase) {
           </tr>`).join('')}
         </tbody>
         <tfoot>
-          <tr style="background:rgba(99,102,241,0.1);font-weight:700">
+          <tr style="background:rgba(128,128,128,0.08);font-weight:700">
             <td colspan="3">TOTAL</td>
             <td style="text-align:right">${formatCurrency(itemsTotal)}</td>
             <td></td>
@@ -510,7 +510,7 @@ function renderNewPurchaseView(providers, products) {
             <input type="checkbox" id="mPurchNoInvoice" />
             <span class="checkmark"></span> Sin factura
           </label>
-          <button class="btn btn-secondary btn-sm" id="btnRecoverPurch" style="background:#f39c12;color:white;border:none;width:100%">Recuperar</button>
+          <button class="btn btn-secondary btn-sm" id="btnRecoverPurch" style="background:#555;color:white;border:none;width:100%">Recuperar</button>
         </div>
       </div>
 
