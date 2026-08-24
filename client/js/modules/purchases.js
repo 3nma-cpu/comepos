@@ -424,7 +424,7 @@ function renderEditPurchaseView(purchase, providers, products) {
   };
 
   // Enter to add in entry bar
-  document.querySelector('.purchase-entry-bar').addEventListener('keydown', e => {
+  document.querySelector('.purchase-entry-grid')?.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
       document.getElementById('epAddBtn').click();
@@ -803,7 +803,7 @@ function renderNewPurchaseView(providers, products) {
   };
 
   // Prevent form submission on enter in any entry bar input
-  document.querySelector('.purchase-entry-bar').addEventListener('keydown', e => {
+  document.querySelector('.purchase-entry-grid')?.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.id !== 'npBarcode') {
       e.preventDefault();
       document.getElementById('npAddBtn').click();
