@@ -45,7 +45,7 @@ export async function renderSales() {
                     <i data-lucide="user"></i>
                     <input type="text" class="form-control" id="posClientSearch" placeholder="Buscar cliente..." />
                   </div>
-                  <div id="posClientResults" style="display:none;position:absolute;z-index:10;background:rgba(20,20,20,.98);border:1px solid var(--border);border-radius:var(--radius);max-height:180px;overflow-y:auto;width:calc(100% - 2.5rem);margin-top:.25rem"></div>
+                  <div id="posClientResults" class="pos-client-dropdown"></div>
                   <div id="posSelectedClient" style="margin-top:.5rem"></div>
                 </div>
               </div>
@@ -95,8 +95,7 @@ export async function renderSales() {
       if (filteredClients.length === 0) { clientResults.style.display = 'none'; return; }
       clientResults.style.display = 'block';
       clientResults.innerHTML = filteredClients.slice(0, 6).map(c => `
-          <div style="padding:.5rem .75rem;cursor:pointer;border-bottom:1px solid var(--border);font-size:.85rem;transition:background .15s" 
-               onmouseover="this.style.background='var(--bg-card-hover)'" onmouseout="this.style.background='transparent'" data-client-id="${c.id}">
+          <div class="pos-client-option" data-client-id="${c.id}">
             <strong>${escapeHTML(c.name)}</strong> <span style="color:var(--text-muted)">— ${c.cedula || ''} — ${c.category}</span>
           </div>`).join('');
       clientResults.querySelectorAll('[data-client-id]').forEach(el => {
@@ -121,7 +120,7 @@ export async function renderSales() {
 function selectClient(client) {
   selectedClient = client;
   const el = document.getElementById('posSelectedClient');
-  el.innerHTML = `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:rgba(128,128,128,.08);border-radius:var(--radius);font-size:.85rem">
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .6rem;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius);font-size:.85rem;color:var(--text)">
     <i data-lucide="user" style="width:14px;height:14px"></i>
     <strong>${escapeHTML(client.name)}</strong> <span class="badge badge-primary" style="font-size:.7rem">${client.category}</span>
     <button class="btn btn-ghost btn-icon" style="margin-left:auto;padding:2px" id="btnRemoveClient"><i data-lucide="x" style="width:14px;height:14px"></i></button>
@@ -193,7 +192,7 @@ function updateCartUI() {
       <div class="cart-item-qty">
         <button data-qty-minus="${i}">−</button>
         <input type="number" value="${item.quantity}" min="${step}" max="${item.maxStock}" step="${step}"
-          style="width:60px;text-align:center;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text-primary);padding:2px 4px;font-size:.85rem"
+          style="width:60px;text-align:center;border:1px solid var(--border);border-radius:4px;background:var(--bg-input);color:var(--text);padding:2px 4px;font-size:.85rem"
           data-qty-input="${i}" />
         <button data-qty-plus="${i}">+</button>
       </div>
