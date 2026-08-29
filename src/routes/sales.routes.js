@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../config/db.js';
-import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { authMiddleware, requirePermission, validateUUID } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -15,6 +15,8 @@ const CAT_REVERSE = {
   'PRACTICANTE': 'Practicante', 'CONTRATISTA': 'Contratista'
 };
 
+const MAX_LIMIT = 500;
+
 // GET /api/sales
 router.get('/', async (req, res) => {
   try {
@@ -26,11 +28,18 @@ router.get('/', async (req, res) => {
       if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999Z');
     }
 
+    // Acotar el límite para prevenir extracción masiva de datos
+    let take = undefined;
+    if (limit !== undefined) {
+      const parsed = parseInt(limit, 10);
+      take = (!isNaN(parsed) && parsed > 0) ? Math.min(parsed, MAX_LIMIT) : MAX_LIMIT;
+    }
+
     const sales = await prisma.sale.findMany({
       where,
       include: { client: true, items: { include: { product: true } }, user: true },
       orderBy: { createdAt: 'desc' },
-      take: limit ? parseInt(limit) : undefined
+      take
     });
 
     res.json(sales.map(s => ({

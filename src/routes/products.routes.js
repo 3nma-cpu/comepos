@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../config/db.js';
-import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { authMiddleware, requirePermission, validateUUID } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -36,7 +36,7 @@ router.get('/', async (req, res) => {
     res.json(products.map(productToJSON));
   } catch (err) {
     console.error('Error fetching products:', err);
-    res.status(500).json({ error: 'Error al obtener productos', detail: err.message });
+    res.status(500).json({ error: 'Error al obtener productos' });
   }
 });
 
@@ -86,12 +86,13 @@ router.post('/', requirePermission('purchases'), async (req, res) => {
     res.status(201).json(productToJSON(product));
   } catch (err) {
     console.error('Error creating product:', err);
-    res.status(500).json({ error: 'Error al crear producto', detail: err.message });
+    // No exponer el mensaje interno de Prisma al cliente
+    res.status(500).json({ error: 'Error al crear producto' });
   }
 });
 
 // PUT /api/products/:id
-router.put('/:id', requirePermission('purchases'), async (req, res) => {
+router.put('/:id', validateUUID, requirePermission('purchases'), async (req, res) => {
   try {
     const { barcode, name, category, unit, price, cost, stock, emoji, active, forResale } = req.body;
     const data = {};
@@ -140,7 +141,7 @@ router.put('/:id', requirePermission('purchases'), async (req, res) => {
 });
 
 // DELETE /api/products/:id
-router.delete('/:id', requirePermission('purchases'), async (req, res) => {
+router.delete('/:id', validateUUID, requirePermission('purchases'), async (req, res) => {
   try {
     await prisma.product.update({ where: { id: req.params.id }, data: { active: false } });
     res.json({ message: 'Producto desactivado' });

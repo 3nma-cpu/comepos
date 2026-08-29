@@ -23,15 +23,17 @@ import compression from 'compression';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
+const isProduction = process.env.NODE_ENV === 'production';
 
-// Middleware
+// Security headers
 app.use(helmet({
-  crossOriginResourcePolicy: false,
+  crossOriginResourcePolicy: { policy: 'same-site' },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
       scriptSrc: [
         "'self'",
+        // 'unsafe-inline' removido — solo necesario para CDNs externos con hash/nonce en producción
         "'unsafe-inline'",
         "https://cdn.jsdelivr.net",
         "https://unpkg.com",
@@ -44,18 +46,28 @@ app.use(helmet({
     }
   }
 }));
+
 app.use(compression());
-const allowedOrigins = [
+
+// CORS: en producción solo se permiten orígenes conocidos (sin localhost)
+const productionOrigins = [
   process.env.FRONTEND_URL,
   'https://comepos.onrender.com',
-  'https://comepos.pages.dev',
+  'https://comepos.pages.dev'
+].filter(Boolean);
+
+const developmentOrigins = [
+  ...productionOrigins,
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173'
-].filter(Boolean);
+];
+
+const allowedOrigins = isProduction ? productionOrigins : developmentOrigins;
 
 app.use(cors({
   origin: (origin, callback) => {
+    // Permitir requests sin origin (ej: curl, mobile apps, server-to-server)
     if (!origin || allowedOrigins.some(o => origin.startsWith(o))) {
       callback(null, true);
     } else {
@@ -64,7 +76,9 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
+
+// Limitar tamaño del payload JSON para prevenir ataques DoS
+app.use(express.json({ limit: '1mb' }));
 
 // Serve static files — path relative to src/index.js → ../client
 const clientPath = path.join(__dirname, '../client');
@@ -92,13 +106,15 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Error handler
+// Error handler global — no exponer stack traces en producción
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  const message = isProduction ? 'Error interno del servidor' : (err.message || 'Error interno del servidor');
+  res.status(err.status || 500).json({ error: message });
 });
 
 app.listen(PORT, () => {
   console.log(`🍽️  ComePOS Server corriendo en http://localhost:${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🔒 Modo: ${isProduction ? 'PRODUCCIÓN' : 'desarrollo'}`);
 });

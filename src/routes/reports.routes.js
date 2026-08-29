@@ -13,16 +13,37 @@ const CAT_REVERSE = {
 };
 const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TARJETA': 'tarjeta', 'NOMINA': 'nomina' };
 
+/**
+ * Parsea y valida un string de fecha para uso en queries.
+ * Devuelve un objeto Date o null si el valor es inválido.
+ */
+function parseSafeDate(value) {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Construye el objeto where.createdAt con fechas validadas.
+ * Retorna null si ninguna fecha es válida.
+ */
+function buildDateFilter(from, to) {
+  const fromDate = parseSafeDate(from);
+  const toDate = parseSafeDate(to);
+  if (!fromDate && !toDate) return null;
+
+  const filter = {};
+  if (fromDate) filter.gte = fromDate;
+  if (toDate) filter.lte = new Date(toDate.toISOString().split('T')[0] + 'T23:59:59.999Z');
+  return filter;
+}
+
 // GET /api/reports/sales-period?from=&to=
 router.get('/sales-period', async (req, res) => {
   try {
     const { from, to } = req.query;
-    const where = {};
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from);
-      if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999Z');
-    }
+    const dateFilter = buildDateFilter(from, to);
+    const where = dateFilter ? { createdAt: dateFilter } : {};
 
     const sales = await prisma.sale.findMany({
       where,
@@ -63,12 +84,8 @@ router.get('/sales-period', async (req, res) => {
 router.get('/sales-category', async (req, res) => {
   try {
     const { from, to } = req.query;
-    const where = {};
-    if (from || to) {
-      where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from);
-      if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999Z');
-    }
+    const dateFilter = buildDateFilter(from, to);
+    const where = dateFilter ? { createdAt: dateFilter } : {};
 
     const sales = await prisma.sale.findMany({ where, include: { client: true } });
     const catMap = {};
@@ -91,10 +108,9 @@ router.get('/top-products', async (req, res) => {
   try {
     const { from, to } = req.query;
     const where = {};
-    if (from || to) {
-      where.sale = {};
-      if (from) where.sale.createdAt = { ...where.sale.createdAt, gte: new Date(from) };
-      if (to) where.sale.createdAt = { ...where.sale.createdAt, lte: new Date(to + 'T23:59:59.999Z') };
+    const dateFilter = buildDateFilter(from, to);
+    if (dateFilter) {
+      where.sale = { createdAt: dateFilter };
     }
 
     const items = await prisma.saleItem.findMany({ where, include: { product: true } });

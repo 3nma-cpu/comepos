@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../config/db.js';
-import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { authMiddleware, requirePermission, validateUUID } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -134,7 +134,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/purchases/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateUUID, async (req, res) => {
   try {
     const { providerId, items, paymentMethod, dueDate, noInvoice, timbrado, t1, t2, invoiceNumber, date } = req.body;
 
@@ -246,7 +246,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/purchases/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validateUUID, async (req, res) => {
   try {
     // 1. Get the purchase with its items
     const purchase = await prisma.purchase.findUnique({

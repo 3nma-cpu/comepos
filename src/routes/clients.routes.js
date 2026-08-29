@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../config/db.js';
-import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { authMiddleware, requirePermission, validateUUID } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -13,6 +13,8 @@ const CATEGORY_MAP = {
 };
 const CATEGORY_REVERSE = Object.fromEntries(Object.entries(CATEGORY_MAP).map(([k, v]) => [v, k]));
 
+const MAX_SEARCH_LENGTH = 100;
+
 function clientToJSON(c) {
   return { id: c.id, name: c.name, cedula: c.cedula, department: c.department, position: c.position, category: CATEGORY_REVERSE[c.category] || c.category, email: c.email, phone: c.phone };
 }
@@ -20,10 +22,12 @@ function clientToJSON(c) {
 // GET /api/clients
 router.get('/', async (req, res) => {
   try {
-    const { search, category } = req.query;
+    let { search, category } = req.query;
     const where = {};
     if (category && CATEGORY_MAP[category]) where.category = CATEGORY_MAP[category];
     if (search) {
+      // Sanitizar: truncar para evitar queries excesivamente largas
+      search = String(search).slice(0, MAX_SEARCH_LENGTH);
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
         { cedula: { contains: search } }
@@ -37,7 +41,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /api/clients/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', validateUUID, async (req, res) => {
   try {
     const client = await prisma.client.findUnique({ where: { id: req.params.id } });
     if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
@@ -48,7 +52,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // GET /api/clients/:id/history
-router.get('/:id/history', async (req, res) => {
+router.get('/:id/history', validateUUID, async (req, res) => {
   try {
     const sales = await prisma.sale.findMany({
       where: { clientId: req.params.id },
@@ -87,7 +91,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/clients/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateUUID, async (req, res) => {
   try {
     const { name, cedula, department, position, category, email, phone } = req.body;
     const data = {};
@@ -108,7 +112,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/clients/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', validateUUID, async (req, res) => {
   try {
     await prisma.client.delete({ where: { id: req.params.id } });
     res.json({ message: 'Cliente eliminado' });

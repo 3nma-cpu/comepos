@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/db.js';
-import { authMiddleware, requirePermission } from '../middleware/auth.js';
+import { authMiddleware, requirePermission, validateUUID } from '../middleware/auth.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -43,9 +43,21 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/users/:id
-router.put('/:id', async (req, res) => {
+router.put('/:id', validateUUID, async (req, res) => {
   try {
     const { name, username, email, password, roleId, active } = req.body;
+    const targetId = req.params.id;
+
+    // Prevenir auto-escalación: un usuario no puede cambiar su propio rol ni desactivarse
+    if (targetId === req.user.id) {
+      if (roleId !== undefined) {
+        return res.status(403).json({ error: 'No podés cambiar tu propio rol' });
+      }
+      if (active === false || active === 'false') {
+        return res.status(403).json({ error: 'No podés desactivar tu propia cuenta' });
+      }
+    }
+
     const data = {};
     if (name !== undefined) data.name = name;
     if (username !== undefined) data.username = username;
@@ -55,7 +67,7 @@ router.put('/:id', async (req, res) => {
     if (password) data.password = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.update({
-      where: { id: req.params.id },
+      where: { id: targetId },
       data,
       include: { role: true }
     });
@@ -67,11 +79,21 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/users/:id
-router.delete('/:id', async (req, res) => {
+// DELETE /api/users/:id — Soft delete para preservar integridad del historial
+router.delete('/:id', validateUUID, async (req, res) => {
   try {
-    await prisma.user.delete({ where: { id: req.params.id } });
-    res.json({ message: 'Usuario eliminado' });
+    const targetId = req.params.id;
+
+    // Prevenir auto-eliminación
+    if (targetId === req.user.id) {
+      return res.status(403).json({ error: 'No podés eliminar tu propia cuenta' });
+    }
+
+    await prisma.user.update({
+      where: { id: targetId },
+      data: { active: false }
+    });
+    res.json({ message: 'Usuario desactivado' });
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
     res.status(500).json({ error: 'Error al eliminar usuario' });

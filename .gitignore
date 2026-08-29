@@ -22,3 +22,4 @@ yarn-error.log*
 .idea/
 
 insert_users.js
+insert_clients.js

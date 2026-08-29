@@ -2,12 +2,13 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/db.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, JWT_ISSUER, JWT_AUDIENCE } from '../middleware/auth.js';
+import { loginRateLimiter } from '../middleware/rateLimiter.js';
 
 const router = Router();
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+router.post('/login', loginRateLimiter, async (req, res) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
@@ -19,6 +20,7 @@ router.post('/login', async (req, res) => {
       include: { role: { include: { permissions: true } } }
     });
 
+    // Mensaje genérico para evitar user enumeration
     if (!user || !user.active) {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
     }
@@ -32,7 +34,11 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       { id: user.id, username: user.username, name: user.name, roleId: user.roleId, roleName: user.role.name, permissions },
       process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+        issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE
+      }
     );
 
     res.json({
