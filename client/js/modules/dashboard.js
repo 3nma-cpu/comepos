@@ -94,7 +94,7 @@ export async function renderDashboard(selectedDate) {
             </div>
           </div>
 
-          <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1rem">
+          <div class="dashboard-bottom-grid">
             <div class="card">
               <div class="card-header"><h3 class="card-title">Ventas Recientes</h3></div>
               <div class="table-container" style="border:none">

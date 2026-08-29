@@ -27,7 +27,7 @@ export async function renderRoles() {
             <div style="flex:1"></div>
             <button class="btn btn-primary" id="btnAddRole"><i data-lucide="plus"></i>Nuevo Rol</button>
           </div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:1rem" id="rolesGrid"></div>
+          <div class="roles-grid" id="rolesGrid"></div>
         </div>`;
 
         if (window.lucide) lucide.createIcons();
