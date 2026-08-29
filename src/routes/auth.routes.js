@@ -66,16 +66,30 @@ router.get('/me', authMiddleware, async (req, res) => {
       where: { id: req.user.id },
       include: { role: { include: { permissions: true } } }
     });
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (!user || !user.active) return res.status(404).json({ error: 'Usuario no encontrado o inactivo' });
+
+    const permissions = user.role.permissions.map(p => p.module);
+    const token = jwt.sign(
+      { id: user.id, username: user.username, name: user.name, roleId: user.roleId, roleName: user.role.name, permissions },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: process.env.JWT_EXPIRES_IN || '24h',
+        issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE
+      }
+    );
 
     res.json({
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      email: user.email,
-      roleId: user.roleId,
-      roleName: user.role.name,
-      permissions: user.role.permissions.map(p => p.module)
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        email: user.email,
+        roleId: user.roleId,
+        roleName: user.role.name,
+        permissions
+      }
     });
   } catch (err) {
     res.status(500).json({ error: 'Error interno del servidor' });

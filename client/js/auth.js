@@ -21,6 +21,22 @@ export function getCurrentUser() {
   return api.getCurrentUser();
 }
 
+export async function refreshCurrentUser() {
+  try {
+    const user = getCurrentUser();
+    if (!user || !user.token) return null;
+    const res = await api.get('/auth/me');
+    if (res && res.user && res.token) {
+      const sessionData = { ...res.user, token: res.token };
+      localStorage.setItem('comepos_session', JSON.stringify(sessionData));
+      return sessionData;
+    }
+  } catch (err) {
+    console.warn('Could not refresh session:', err);
+  }
+  return getCurrentUser();
+}
+
 export function hasPermission(module) {
   const user = getCurrentUser();
   if (!user) return false;

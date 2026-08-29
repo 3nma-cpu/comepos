@@ -116,6 +116,10 @@ function openRoleModal(role, roles) {
             }
             closeModal(overlay);
             renderRoles();
+            // Sync user profile if current role changed
+            import('../auth.js').then(async ({ refreshCurrentUser }) => {
+                await refreshCurrentUser();
+            });
         } catch (err) {
             showToast(err.message, 'error');
         }

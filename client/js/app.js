@@ -2,7 +2,7 @@
 // App — Main entry point
 // ============================================
 
-import { getCurrentUser, renderLoginScreen, logout, hasPermission } from './auth.js';
+import { getCurrentUser, refreshCurrentUser, renderLoginScreen, logout, hasPermission } from './auth.js';
 import { registerRoute, initRouter, navigate } from './router.js';
 import { renderDashboard } from './modules/dashboard.js';
 import { renderUsers } from './modules/users.js';
@@ -228,13 +228,20 @@ window.addEventListener('comepos:session-expired', () => {
 });
 
 // Boot
-function boot() {
+async function boot() {
     initTheme();
     stopInactivityWatcher();
-    const user = getCurrentUser();
+    let user = getCurrentUser();
     if (!user) {
         renderLoginScreen(onLogin);
     } else {
+        // Sync permissions from backend so role/permission updates reflect immediately
+        try {
+            const freshUser = await refreshCurrentUser();
+            if (freshUser) user = freshUser;
+        } catch (e) {
+            console.warn('Could not sync user profile:', e);
+        }
         renderApp(user);
     }
 }
