@@ -22,13 +22,13 @@ async function seed() {
   const adminRole = await prisma.role.create({
     data: {
       name: 'Administrador', description: 'Acceso completo al sistema', protected: true,
-      permissions: { create: ['dashboard', 'users', 'roles', 'clients', 'products', 'purchases', 'sales', 'reports'].map(m => ({ module: m })) }
+      permissions: { create: ['dashboard', 'users', 'roles', 'clients', 'products', 'purchases', 'cashregister', 'sales', 'reports'].map(m => ({ module: m })) }
     }
   });
   const cajeroRole = await prisma.role.create({
     data: {
-      name: 'Cajero', description: 'Gestión de ventas y clientes', protected: true,
-      permissions: { create: ['dashboard', 'clients', 'sales'].map(m => ({ module: m })) }
+      name: 'Cajero', description: 'Gestión de ventas, caja y clientes', protected: true,
+      permissions: { create: ['dashboard', 'clients', 'cashregister', 'sales'].map(m => ({ module: m })) }
     }
   });
   const almacenRole = await prisma.role.create({
@@ -40,7 +40,7 @@ async function seed() {
   const supervisorRole = await prisma.role.create({
     data: {
       name: 'Supervisor', description: 'Acceso a reportes y supervisión', protected: true,
-      permissions: { create: ['dashboard', 'clients', 'sales', 'reports'].map(m => ({ module: m })) }
+      permissions: { create: ['dashboard', 'clients', 'cashregister', 'sales', 'reports'].map(m => ({ module: m })) }
     }
   });
   console.log('✅ Roles creados');

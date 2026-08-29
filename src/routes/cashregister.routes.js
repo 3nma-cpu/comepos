@@ -4,7 +4,7 @@ import { authMiddleware, requirePermission, validateUUID } from '../middleware/a
 
 const router = Router();
 router.use(authMiddleware);
-router.use(requirePermission('sales'));
+router.use(requirePermission('cashregister', 'sales'));
 
 // GET /api/cashregister/active — Get all currently open cash registers
 router.get('/active', async (req, res) => {

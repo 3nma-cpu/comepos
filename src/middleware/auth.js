@@ -40,14 +40,16 @@ export function authMiddleware(req, res, next) {
 
 /**
  * Middleware que verifica que el usuario tenga permiso para un módulo específico.
+ * Soporta uno o múltiples módulos (basta con tener acceso a al menos uno).
  */
-export function requirePermission(module) {
+export function requirePermission(...modules) {
   return (req, res, next) => {
     if (!req.user || !req.user.permissions) {
       return res.status(403).json({ error: 'Sin permisos' });
     }
-    if (!req.user.permissions.includes(module)) {
-      return res.status(403).json({ error: `Sin acceso al módulo: ${module}` });
+    const hasPermission = modules.some(m => req.user.permissions.includes(m));
+    if (!hasPermission) {
+      return res.status(403).json({ error: `Sin acceso al módulo: ${modules.join('/')}` });
     }
     next();
   };

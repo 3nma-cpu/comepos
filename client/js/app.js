@@ -32,7 +32,7 @@ const NAV_ITEMS = [
     {
         section: 'Operaciones', items: [
             { route: 'purchases', label: 'Compras', icon: 'package', perm: 'purchases' },
-            { route: 'cashregister', label: 'Caja', icon: 'landmark', perm: 'sales' },
+            { route: 'cashregister', label: 'Caja', icon: 'landmark', perm: 'cashregister' },
             { route: 'sales', label: 'Punto de Venta', icon: 'shopping-cart', perm: 'sales' }
         ]
     },

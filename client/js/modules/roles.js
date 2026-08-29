@@ -12,6 +12,7 @@ const ALL_PERMISSIONS = [
     { id: 'clients', label: 'Clientes' },
     { id: 'products', label: 'Productos' },
     { id: 'purchases', label: 'Compras' },
+    { id: 'cashregister', label: 'Caja' },
     { id: 'sales', label: 'Ventas' },
     { id: 'reports', label: 'Reportes' }
 ];
