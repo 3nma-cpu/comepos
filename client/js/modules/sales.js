@@ -361,7 +361,7 @@ function processSale() {
 export function showTicket(sale) {
   const payLabels = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', nomina: 'VALE DE COMEDOR' };
   const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
-  const vendorName = user.name || 'Vendedor';
+  const vendorName = sale.userName || user.name || 'Cajero';
 
   const ticketId = sale.id.slice(-6).toUpperCase();
 
@@ -379,6 +379,7 @@ export function showTicket(sale) {
       <div class="ticket-line"><span>Fecha:</span><span>${formatDateTime(sale.date)}</span></div>
       <div class="ticket-line"><span>Cliente:</span><span>${escapeHTML(sale.clientName)}</span></div>
       <div class="ticket-line"><span>Pago:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
+      <div class="ticket-line"><span>Cajero:</span><span>${escapeHTML(vendorName)}</span></div>
       <div class="ticket-divider"></div>
 
       <!-- Items -->
@@ -400,23 +401,13 @@ export function showTicket(sale) {
 
       <!-- Mensaje -->
       <div style="text-align:center;font-size:.68rem;color:#555;margin:6px 0">¡Gracias por su consumo!</div>
-      <div class="ticket-divider" style="margin-bottom:20px"></div>
+      <div class="ticket-divider" style="margin-bottom:10px"></div>
 
-      <!-- Firmas -->
-      <div style="display:flex;justify-content:space-between;font-family:'Courier New',Courier,monospace;font-size:.72rem;margin-top:8px">
-        <!-- Vendedor (izquierda) -->
-        <div style="text-align:center;width:45%">
-          <div style="border-top:1px solid #333;padding-top:4px;margin-top:30px">
-            <div style="font-weight:700">${escapeHTML(vendorName)}</div>
-            <div style="color:#555;font-size:.65rem">Vendedor</div>
-          </div>
-        </div>
-        <!-- Cliente (derecha) -->
-        <div style="text-align:center;width:45%">
-          <div style="border-top:1px solid #333;padding-top:4px;margin-top:30px">
-            <div style="font-weight:700">${escapeHTML(sale.clientName)}</div>
-            <div style="color:#555;font-size:.65rem">Cliente</div>
-          </div>
+      <!-- Firma exclusiva del cliente (centrada y destacada) -->
+      <div style="text-align:center;margin:15px auto 10px auto;width:80%;font-family:'Courier New',Courier,monospace">
+        <div style="border-top:2px solid #333;padding-top:6px;margin-top:35px">
+          <div style="font-weight:700;font-size:.85rem">${escapeHTML(sale.clientName)}</div>
+          <div style="font-size:.72rem;font-weight:700;letter-spacing:1px;color:#333;margin-top:2px">FIRMA DEL CLIENTE</div>
         </div>
       </div>
     </div>`;
@@ -596,12 +587,12 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
     <span class="bold">${escapeHTML(sale.clientName)}</span>
   </div>
   <div class="info-row">
-    <span>Vendedor:</span>
-    <span>${escapeHTML(vendorName)}</span>
+    <span>Pago:</span>
+    <span class="bold">${payLabel}</span>
   </div>
   <div class="info-row">
-    <span>Tipo Pago:</span>
-    <span class="bold">${payLabel}</span>
+    <span>Cajero:</span>
+    <span class="bold">${escapeHTML(vendorName)}</span>
   </div>
   <hr class="divider-dash"/>
 
@@ -639,26 +630,16 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
   </div>
   <hr class="divider-dash"/>
 
-  <!-- ÁREA DE FIRMAS (UNA AL LADO DE LA OTRA) -->
-  <div class="signature-area">
-    <!-- FIRMA VENDEDOR -->
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">${escapeHTML(vendorName)}</div>
-      <div class="signature-role">VENDEDOR</div>
-    </div>
-    
-    <!-- FIRMA CLIENTE -->
-    <div class="signature-box">
-      <div class="signature-line"></div>
-      <div class="signature-name">${escapeHTML(sale.clientName)}</div>
-      <div class="signature-role">CLIENTE</div>
-      <div class="small" style="margin-top:2mm;">(Autorizo descuento)</div>
+  <!-- ÁREA DE FIRMA (EXCLUSIVA PARA EL CLIENTE - CENTRADA Y DESTACADA) -->
+  <div style="text-align:center; margin:8mm auto 4mm auto; width:80%;">
+    <div style="border-top:2px solid #000; padding-top:2mm; margin-top:12mm;">
+      <div style="font-weight:bold; font-size:10pt;">${escapeHTML(sale.clientName)}</div>
+      <div style="font-size:8pt; font-weight:bold; letter-spacing:1px; margin-top:1mm;">FIRMA DEL CLIENTE</div>
     </div>
   </div>
 
   <!-- LÍNEA DE CORTE RECOMENDADA -->
-  <div class="center small" style="margin-top: 5mm;">
+  <div class="center small" style="margin-top: 4mm;">
     - - - - - - - - - - - - - - - - - - - - -
   </div>
 
