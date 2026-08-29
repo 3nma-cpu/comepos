@@ -220,7 +220,10 @@ function renderHistoryTable(registers) {
             <td><span class="badge ${r.status === 'OPEN' ? 'badge-success' : 'badge-secondary'}">${r.status === 'OPEN' ? 'Abierta' : 'Cerrada'}</span></td>
             <td>
                 <button class="btn btn-ghost btn-sm btn-icon" data-detail="${r.id}" title="Ver detalle"><i data-lucide="eye"></i></button>
-                ${r.status === 'CLOSED' ? `<button class="btn btn-ghost btn-sm btn-icon" data-print="${r.id}" title="Imprimir reporte"><i data-lucide="printer"></i></button>` : ''}
+                ${r.status === 'CLOSED' ? `
+                    <button class="btn btn-ghost btn-sm btn-icon" data-print="${r.id}" title="Imprimir reporte"><i data-lucide="printer"></i></button>
+                    <button class="btn btn-ghost btn-sm btn-icon" data-reopen="${r.id}" title="Reabrir caja"><i data-lucide="rotate-ccw"></i></button>
+                ` : ''}
             </td>
         </tr>`;
     }).join('');
@@ -233,6 +236,52 @@ function renderHistoryTable(registers) {
     tbody.querySelectorAll('[data-print]').forEach(btn => {
         btn.onclick = () => printRegisterReport(btn.dataset.print);
     });
+    tbody.querySelectorAll('[data-reopen]').forEach(btn => {
+        btn.onclick = () => confirmReopenRegister(btn.dataset.reopen);
+    });
+}
+
+// ============================================
+// Reopen Cash Register Modal
+// ============================================
+function confirmReopenRegister(registerId, parentOverlay = null) {
+    const body = `
+    <div style="text-align:center;margin-bottom:1.5rem">
+        <div style="width:56px;height:56px;border-radius:50%;background:rgba(245,158,11,.12);display:flex;align-items:center;justify-content:center;margin:0 auto .75rem">
+            <i data-lucide="rotate-ccw" style="width:28px;height:28px;color:var(--warning)"></i>
+        </div>
+        <h3 style="font-size:1.1rem;margin-bottom:.5rem">¿Reabrir esta caja?</h3>
+        <p style="color:var(--text-secondary);font-size:.88rem">
+            La caja volverá a estar en estado <strong>ABIERTA</strong>. Podrá seguir registrando ventas en ella.
+        </p>
+    </div>`;
+
+    const footer = `
+    <button class="btn btn-secondary modal-close">Cancelar</button>
+    <button class="btn btn-warning" id="btnConfirmReopen"><i data-lucide="rotate-ccw"></i> Confirmar Reapertura</button>`;
+
+    const overlay = createModal('Reapertura de Caja', body, footer);
+    if (window.lucide) lucide.createIcons();
+
+    document.getElementById('btnConfirmReopen').onclick = async () => {
+        const btn = document.getElementById('btnConfirmReopen');
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader"></i> Reabriendo...';
+        if (window.lucide) lucide.createIcons();
+
+        try {
+            await api.post(`/cashregister/${registerId}/reopen`);
+            showToast('¡Caja reabierta correctamente!');
+            closeModal(overlay);
+            if (parentOverlay) closeModal(parentOverlay);
+            renderCashRegister();
+        } catch (err) {
+            showToast(err.message, 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i data-lucide="rotate-ccw"></i> Confirmar Reapertura';
+            if (window.lucide) lucide.createIcons();
+        }
+    };
 }
 
 // ============================================
@@ -520,11 +569,19 @@ async function showRegisterDetail(registerId) {
         </div>`;
 
         const footer = `
-        ${d.status === 'CLOSED' ? `<button class="btn btn-ghost" id="btnExportCash"><i data-lucide="download"></i> Exportar Excel</button>` : ''}
+        ${d.status === 'CLOSED' ? `
+            <button class="btn btn-warning" id="btnReopenDetailCash"><i data-lucide="rotate-ccw"></i> Reabrir Caja</button>
+            <button class="btn btn-ghost" id="btnExportCash"><i data-lucide="download"></i> Exportar Excel</button>
+        ` : ''}
         <button class="btn btn-primary modal-close">Cerrar</button>`;
 
         const overlay = createModal(`Detalle de Caja — ${formatDateTime(d.openedAt)}`, body, footer);
         if (window.lucide) lucide.createIcons();
+
+        const btnReopen = document.getElementById('btnReopenDetailCash');
+        if (btnReopen) {
+            btnReopen.onclick = () => confirmReopenRegister(registerId, overlay);
+        }
 
         const btnExport = document.getElementById('btnExportCash');
         if (btnExport) {

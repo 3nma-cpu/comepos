@@ -260,4 +260,49 @@ router.post('/:id/close', validateUUID, async (req, res) => {
   }
 });
 
+// POST /api/cashregister/:id/reopen — Reopen a closed cash register
+router.post('/:id/reopen', validateUUID, async (req, res) => {
+  try {
+    const register = await prisma.cashRegister.findUnique({
+      where: { id: req.params.id }
+    });
+
+    if (!register) return res.status(404).json({ error: 'Caja no encontrada' });
+    if (register.status === 'OPEN') return res.status(400).json({ error: 'La caja ya se encuentra abierta' });
+
+    // Check if the user attempting to reopen already has an open register
+    const existingOpen = await prisma.cashRegister.findFirst({
+      where: { openedById: req.user.id, status: 'OPEN' }
+    });
+    if (existingOpen && existingOpen.id !== register.id) {
+      return res.status(409).json({ error: 'Ya tenés otra caja abierta. Cerrala antes de reabrir esta.' });
+    }
+
+    const updated = await prisma.cashRegister.update({
+      where: { id: req.params.id },
+      data: {
+        status: 'OPEN',
+        closedById: null,
+        closedAt: null,
+        finalAmount: null
+      },
+      include: {
+        openedBy: { select: { id: true, name: true } }
+      }
+    });
+
+    res.json({
+      id: updated.id,
+      openedById: updated.openedById,
+      openedByName: updated.openedBy.name,
+      openedAt: updated.openedAt.toISOString(),
+      initialAmount: updated.initialAmount,
+      status: updated.status
+    });
+  } catch (err) {
+    console.error('Error reopening register:', err);
+    res.status(500).json({ error: 'Error al reabrir caja' });
+  }
+});
+
 export default router;
