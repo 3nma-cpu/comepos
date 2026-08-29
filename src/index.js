@@ -17,6 +17,7 @@ import providersRoutes from './routes/providers.routes.js';
 import purchasesRoutes from './routes/purchases.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
+import cashregisterRoutes from './routes/cashregister.routes.js';
 
 import helmet from 'helmet';
 import compression from 'compression';
@@ -99,6 +100,7 @@ app.use('/api/products', productsRoutes);
 app.use('/api/providers', providersRoutes);
 app.use('/api/purchases', purchasesRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/cashregister', cashregisterRoutes);
 app.use('/api/reports', reportsRoutes);
 
 // Health check

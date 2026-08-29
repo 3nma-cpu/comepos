@@ -4,6 +4,7 @@
 
 import { api } from '../api.js';
 import { generateId, showToast, createModal, closeModal, formatCurrency, formatDateTime, escapeHTML, PRODUCT_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
+import { openCashRegisterFromPOS } from './cashregister.js';
 
 let cart = [];
 let selectedClient = null;
@@ -17,6 +18,26 @@ export async function renderSales() {
   container.innerHTML = '<div class="fade-in"><div class="empty-state"><p>Cargando POS...</p></div></div>';
 
   try {
+    // Verificar caja abierta antes de cargar POS
+    const activeData = await api.get('/cashregister/active');
+    if (!activeData.mine) {
+      // No hay caja abierta — mostrar modal para abrir
+      const opened = await openCashRegisterFromPOS();
+      if (!opened) {
+        container.innerHTML = `
+          <div class="fade-in" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center">
+            <div style="width:64px;height:64px;border-radius:50%;background:rgba(245,158,11,.12);display:flex;align-items:center;justify-content:center;margin-bottom:1rem">
+              <i data-lucide="lock" style="width:32px;height:32px;color:var(--warning)"></i>
+            </div>
+            <h3 style="margin-bottom:.5rem">Caja No Abierta</h3>
+            <p style="color:var(--text-secondary);margin-bottom:1.5rem">Debe abrir una caja para poder registrar ventas.</p>
+            <button class="btn btn-primary" id="btnRetryOpen"><i data-lucide="lock-open"></i> Abrir Caja</button>
+          </div>`;
+        if (window.lucide) lucide.createIcons();
+        document.getElementById('btnRetryOpen')?.addEventListener('click', () => renderSales());
+        return;
+      }
+    }
     const [allFetchedProducts, clients] = await Promise.all([api.get('/products'), api.get('/clients')]);
     // Filtrar productos que no son para venta (uso interno)
     const products = allFetchedProducts.filter(p => p.forResale !== false);
@@ -64,6 +85,17 @@ export async function renderSales() {
           </div>
         </div>`;
     if (window.lucide) lucide.createIcons();
+
+    // Cash register status indicator
+    const activeCheck = await api.get('/cashregister/active');
+    if (activeCheck.mine) {
+      const statusEl = document.createElement('div');
+      statusEl.className = 'cash-register-indicator';
+      statusEl.innerHTML = `<i data-lucide="landmark" style="width:14px;height:14px"></i> Caja abierta desde ${formatDateTime(activeCheck.mine.openedAt)}`;
+      const posProducts = container.querySelector('.pos-products');
+      if (posProducts) posProducts.insertBefore(statusEl, posProducts.firstChild);
+      if (window.lucide) lucide.createIcons();
+    }
 
 
     renderProductGrid(products, 'Todos', '');

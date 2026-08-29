@@ -39,6 +39,8 @@ model User {
   role      Role       @relation(fields: [roleId], references: [id])
   sales     Sale[]
   purchases Purchase[]
+  cashRegistersOpened CashRegister[] @relation("CashRegisterOpenedBy")
+  cashRegistersClosed CashRegister[] @relation("CashRegisterClosedBy")
 }
 
 enum EmployeeCategory {
@@ -110,15 +112,38 @@ enum PaymentMethod {
 }
 
 model Sale {
-  id            String        @id @default(cuid())
-  clientId      String
-  userId        String
-  total         Int
-  paymentMethod PaymentMethod
-  createdAt     DateTime      @default(now())
-  client Client     @relation(fields: [clientId], references: [id])
-  user   User       @relation(fields: [userId], references: [id])
-  items  SaleItem[]
+  id             String        @id @default(cuid())
+  clientId       String
+  userId         String
+  cashRegisterId String?
+  total          Int
+  paymentMethod  PaymentMethod
+  createdAt      DateTime      @default(now())
+  client       Client        @relation(fields: [clientId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  cashRegister CashRegister? @relation(fields: [cashRegisterId], references: [id])
+  items        SaleItem[]
+}
+
+enum CashRegisterStatus {
+  OPEN
+  CLOSED
+}
+
+model CashRegister {
+  id            String             @id @default(cuid())
+  openedById    String
+  closedById    String?
+  openedAt      DateTime           @default(now())
+  closedAt      DateTime?
+  initialAmount Int                @default(0)
+  finalAmount   Int?
+  closingNotes  String?
+  status        CashRegisterStatus @default(OPEN)
+
+  openedBy User  @relation("CashRegisterOpenedBy", fields: [openedById], references: [id])
+  closedBy User? @relation("CashRegisterClosedBy", fields: [closedById], references: [id])
+  sales    Sale[]
 }
 
 model SaleItem {

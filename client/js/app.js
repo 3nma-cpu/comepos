@@ -12,6 +12,7 @@ import { renderPurchases } from './modules/purchases.js';
 import { renderProducts } from './modules/products.js';
 import { renderSales } from './modules/sales.js';
 import { renderReports } from './modules/reports.js';
+import { renderCashRegister } from './modules/cashregister.js';
 
 // Navigation items
 const NAV_ITEMS = [
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
     {
         section: 'Operaciones', items: [
             { route: 'purchases', label: 'Compras', icon: 'package', perm: 'purchases' },
+            { route: 'cashregister', label: 'Caja', icon: 'landmark', perm: 'sales' },
             { route: 'sales', label: 'Punto de Venta', icon: 'shopping-cart', perm: 'sales' }
         ]
     },
@@ -48,6 +50,7 @@ const ROUTE_TITLES = {
     clients: 'Clientes / Funcionarios',
     products: 'Catálogo de Productos',
     purchases: 'Compras e Inventario',
+    cashregister: 'Caja',
     sales: 'Punto de Venta',
     reports: 'Reportes'
 };
@@ -59,6 +62,7 @@ const ROUTE_HANDLERS = {
     clients: renderClients,
     products: renderProducts,
     purchases: renderPurchases,
+    cashregister: renderCashRegister,
     sales: renderSales,
     reports: renderReports
 };

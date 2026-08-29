@@ -2092,3 +2092,145 @@ tbody tr:last-child td {
 .btn-menu-toggle:hover {
     background: var(--bg-card-hover);
 }
+
+/* ============================================
+   Cash Register Module
+   ============================================ */
+
+.cash-register-status {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-radius: var(--radius);
+    margin-bottom: 1.5rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.cash-register-status.open {
+    background: linear-gradient(135deg, rgba(45, 138, 78, .08), rgba(45, 138, 78, .03));
+    border: 1px solid rgba(45, 138, 78, .25);
+}
+
+.cash-register-status.closed {
+    background: linear-gradient(135deg, rgba(184, 134, 11, .08), rgba(184, 134, 11, .03));
+    border: 1px solid rgba(184, 134, 11, .25);
+}
+
+.cash-status-info {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.cash-status-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.cash-register-status.open .cash-status-icon {
+    background: rgba(45, 138, 78, .15);
+    color: var(--success);
+}
+
+.cash-register-status.closed .cash-status-icon {
+    background: rgba(184, 134, 11, .15);
+    color: var(--warning);
+}
+
+.cash-status-title {
+    font-weight: 700;
+    font-size: .95rem;
+}
+
+.cash-register-status.open .cash-status-title {
+    color: var(--success);
+}
+
+.cash-register-status.closed .cash-status-title {
+    color: var(--warning);
+}
+
+.cash-status-detail {
+    font-size: .82rem;
+    color: var(--text-secondary);
+    margin-top: .15rem;
+}
+
+/* Cash register indicator in POS */
+.cash-register-indicator {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .35rem .75rem;
+    background: rgba(45, 138, 78, .08);
+    border: 1px solid rgba(45, 138, 78, .2);
+    border-radius: var(--radius);
+    font-size: .78rem;
+    color: var(--success);
+    margin-bottom: .75rem;
+    font-weight: 500;
+}
+
+/* KPI cards */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: .75rem;
+}
+
+.kpi-card {
+    padding: 1rem;
+    text-align: center;
+}
+
+.kpi-label {
+    font-size: .72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: .35rem;
+}
+
+.kpi-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+}
+
+.kpi-sub {
+    font-size: .7rem;
+    color: var(--text-muted);
+    margin-top: .15rem;
+}
+
+/* Badge purple for tarjeta */
+.badge-purple {
+    background: rgba(167, 139, 250, .12);
+    color: #a78bfa;
+}
+
+.badge-secondary {
+    background: var(--bg-input);
+    color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+    .cash-register-status {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .cash-status-info {
+        flex-direction: column;
+    }
+
+    .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

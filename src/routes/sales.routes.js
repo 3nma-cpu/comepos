@@ -70,6 +70,14 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Cliente, productos y método de pago son obligatorios' });
     }
 
+    // Verificar que el usuario tenga una caja abierta
+    const openRegister = await prisma.cashRegister.findFirst({
+      where: { openedById: req.user.id, status: 'OPEN' }
+    });
+    if (!openRegister) {
+      return res.status(400).json({ error: 'Debe abrir una caja antes de registrar ventas', code: 'NO_CASH_REGISTER' });
+    }
+
     let createdAt = undefined;
     if (date) {
       const parsedDate = new Date(date);
@@ -105,6 +113,7 @@ router.post('/', async (req, res) => {
         data: {
           clientId,
           userId: req.user.id,
+          cashRegisterId: openRegister.id,
           total,
           paymentMethod: PAY_MAP[paymentMethod] || paymentMethod,
           createdAt: createdAt,
