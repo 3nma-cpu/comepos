@@ -14,7 +14,8 @@ const REPORT_TYPES = [
     { id: 'sales-period', name: 'Ventas por Período', icon: 'calendar' },
     { id: 'purchases-period', name: 'Compras por Período', icon: 'package-check' },
     { id: 'top-products', name: 'Productos Vendidos', icon: 'bar-chart-3' },
-    { id: 'client-consumption', name: 'Consumo por Cliente', icon: 'users' }
+    { id: 'client-consumption', name: 'Consumo por Cliente', icon: 'users' },
+    { id: 'cash-registers', name: 'Sesiones de Caja', icon: 'landmark' }
 ];
 
 export function renderReports() {
@@ -50,7 +51,12 @@ async function loadReport(type) {
     area.innerHTML = '<div class="empty-state"><p>Cargando reporte...</p></div>';
 
     try {
-        const [sales, purchases, providers] = await Promise.all([api.get('/sales'), api.get('/purchases'), api.get('/providers')]);
+        const [sales, purchases, providers, cashRegisters] = await Promise.all([
+            api.get('/sales'),
+            api.get('/purchases'),
+            api.get('/providers'),
+            api.get('/cashregister').catch(() => [])
+        ]);
         
         // Normalizamos los nombres de variables del backend para compatibilidad con reportes anteriores
         const normalizedSales = sales.map(s => ({
@@ -65,6 +71,7 @@ async function loadReport(type) {
             case 'purchases-period': reportPurchasesPeriod(area, purchases, providers); break;
             case 'top-products': reportTopProducts(area, normalizedSales); break;
             case 'client-consumption': reportClientConsumption(area, normalizedSales); break;
+            case 'cash-registers': reportCashRegisters(area, cashRegisters); break;
         }
     } catch (e) {
         area.innerHTML = `<div class="empty-state"><p>Error al cargar reporte: ${e.message}</p></div>`;
@@ -285,16 +292,19 @@ function reportPurchasesPeriod(area, purchases, providers) {
             filtered.forEach(p => {
                 p.items.forEach(i => {
                     rows.push([
-                        p.invoiceNumber || '',
+                        p.providerName || 'Sin proveedor',
+                        p.invoiceNumber || '---',
                         i.name,
                         i.quantity,
                         i.cost,
-                        Math.round(i.cost * i.quantity)
+                        Math.round(i.cost * i.quantity),
+                        p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado',
+                        formatDate(p.date)
                     ]);
                 });
             });
             exportExcel(
-                ['Nº Factura', 'Producto', 'Cantidad', 'Precio Unitario', 'Total'],
+                ['Proveedor', 'Nº Factura', 'Producto', 'Cantidad', 'Precio Unitario', 'Total', 'Tipo de Pago', 'Fecha de Compra'],
                 rows,
                 'reporte_compras_segmentado.xlsx'
             );
@@ -482,6 +492,107 @@ function reportClientConsumption(area, sales) {
     }
 
     document.getElementById('rccApply').onclick = apply;
+    apply();
+}
+
+function reportCashRegisters(area, cashRegisters) {
+    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+    area.innerHTML = `
+    <div class="report-filters" style="flex-wrap:wrap;gap:.75rem">
+      <div class="form-group"><label>Desde</label><input type="date" class="form-control" id="rcrFrom" value="${formatDateInput(d30)}" /></div>
+      <div class="form-group"><label>Hasta</label><input type="date" class="form-control" id="rcrTo" value="${todayStr()}" /></div>
+      <div class="form-group">
+        <label>Estado</label>
+        <select class="form-control" id="rcrStatus">
+          <option value="">Todas</option>
+          <option value="OPEN">Abiertas</option>
+          <option value="CLOSED">Cerradas</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="rcrApply" style="margin-top:auto"><i data-lucide="filter"></i>Aplicar</button>
+      <button class="btn btn-secondary" id="rcrExport" style="margin-top:auto"><i data-lucide="download"></i>Exportar Excel</button>
+    </div>
+    <div class="kpi-grid" id="rcrKpis"></div>
+    <div class="table-container" id="rcrTable"></div>`;
+    if (window.lucide) lucide.createIcons();
+
+    function apply() {
+        const from = document.getElementById('rcrFrom').value;
+        const to = document.getElementById('rcrTo').value;
+        const status = document.getElementById('rcrStatus').value;
+
+        const filtered = cashRegisters.filter(r => {
+            const d = toLocalYMD(r.openedAt);
+            const dateMatch = d >= from && d <= to;
+            const statusMatch = !status || r.status === status;
+            return dateMatch && statusMatch;
+        });
+
+        const totalSales = filtered.reduce((s, r) => s + (r.totalSales || 0), 0);
+        const totalEfectivo = filtered.reduce((s, r) => s + (r.totalEfectivo || 0), 0);
+        const totalNomina = filtered.reduce((s, r) => s + (r.totalNomina || 0), 0);
+        const totalTarjeta = filtered.reduce((s, r) => s + (r.totalTarjeta || 0), 0);
+
+        document.getElementById('rcrKpis').innerHTML = `
+      <div class="kpi-card"><div class="kpi-icon blue"><i data-lucide="landmark"></i></div><div class="kpi-content"><div class="kpi-label">Sesiones de Caja</div><div class="kpi-value">${filtered.length}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon green"><i data-lucide="trending-up"></i></div><div class="kpi-content"><div class="kpi-label">Total Ventas en Cajas</div><div class="kpi-value">${formatCurrency(totalSales)}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon green"><i data-lucide="banknote"></i></div><div class="kpi-content"><div class="kpi-label">Efectivo Total</div><div class="kpi-value">${formatCurrency(totalEfectivo)}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon purple"><i data-lucide="receipt"></i></div><div class="kpi-content"><div class="kpi-label">Vales (Nómina)</div><div class="kpi-value">${formatCurrency(totalNomina)}</div></div></div>
+      <div class="kpi-card"><div class="kpi-icon yellow"><i data-lucide="credit-card"></i></div><div class="kpi-content"><div class="kpi-label">Tarjeta Total</div><div class="kpi-value">${formatCurrency(totalTarjeta)}</div></div></div>`;
+        if (window.lucide) lucide.createIcons();
+
+        document.getElementById('rcrTable').innerHTML = filtered.length === 0
+          ? '<div class="empty-state"><p>No se encontraron cajas en este período.</p></div>'
+          : `<table><thead><tr><th>Apertura</th><th>Cierre</th><th>Cajero</th><th>Fondo (₲)</th><th>Efectivo</th><th>Nómina</th><th>Tarjeta</th><th>Total Ventas</th><th>Contado (₲)</th><th>Diferencia</th><th>Estado</th></tr></thead>
+          <tbody>${filtered.map(r => {
+            const expected = (r.initialAmount || 0) + (r.totalEfectivo || 0);
+            const diff = r.finalAmount !== null ? r.finalAmount - expected : null;
+            const diffBadge = diff !== null
+              ? (diff === 0 ? '<span class="badge badge-success">Cuadra</span>' : diff > 0 ? `<span class="badge badge-warning">+${formatCurrency(diff)}</span>` : `<span class="badge badge-danger">${formatCurrency(diff)}</span>`)
+              : '—';
+            return `<tr>
+              <td style="font-size:.82rem">${formatDateTime(r.openedAt)}</td>
+              <td style="font-size:.82rem">${r.closedAt ? formatDateTime(r.closedAt) : '—'}</td>
+              <td><strong>${escapeHTML(r.openedByName)}</strong></td>
+              <td>${formatCurrency(r.initialAmount)}</td>
+              <td>${formatCurrency(r.totalEfectivo)}</td>
+              <td>${formatCurrency(r.totalNomina)}</td>
+              <td>${formatCurrency(r.totalTarjeta)}</td>
+              <td><strong>${formatCurrency(r.totalSales)}</strong></td>
+              <td>${r.finalAmount !== null ? formatCurrency(r.finalAmount) : '—'}</td>
+              <td>${diffBadge}</td>
+              <td><span class="badge ${r.status === 'OPEN' ? 'badge-success' : 'badge-secondary'}">${r.status === 'OPEN' ? 'Abierta' : 'Cerrada'}</span></td>
+            </tr>`;
+          }).join('')}</tbody></table>`;
+
+        document.getElementById('rcrExport').onclick = () => {
+            const rows = filtered.map(r => {
+                const expected = (r.initialAmount || 0) + (r.totalEfectivo || 0);
+                const diff = r.finalAmount !== null ? r.finalAmount - expected : 0;
+                return [
+                    formatDate(r.openedAt),
+                    r.closedAt ? formatDate(r.closedAt) : 'Abierta',
+                    r.openedByName,
+                    r.initialAmount,
+                    r.totalEfectivo,
+                    r.totalNomina,
+                    r.totalTarjeta,
+                    r.totalSales,
+                    r.finalAmount !== null ? r.finalAmount : '—',
+                    diff,
+                    r.status === 'OPEN' ? 'Abierta' : 'Cerrada'
+                ];
+            });
+            exportExcel(
+                ['Fecha Apertura', 'Fecha Cierre', 'Cajero', 'Fondo Inicial', 'Efectivo', 'Nómina', 'Tarjeta', 'Total Ventas', 'Efectivo Contado', 'Diferencia', 'Estado'],
+                rows,
+                'reporte_sesiones_caja.xlsx'
+            );
+            showToastLocal('Excel exportado');
+        };
+    }
+
+    document.getElementById('rcrApply').onclick = apply;
     apply();
 }
 
