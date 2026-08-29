@@ -403,9 +403,9 @@ export function showTicket(sale) {
       <div style="text-align:center;font-size:.68rem;color:#555;margin:6px 0">¡Gracias por su consumo!</div>
       <div class="ticket-divider" style="margin-bottom:10px"></div>
 
-      <!-- Firma exclusiva del cliente (centrada y destacada) -->
+      <!-- Firma exclusiva del cliente (centrada y destacada con amplio espacio para firmar) -->
       <div style="text-align:center;margin:15px auto 10px auto;width:80%;font-family:'Courier New',Courier,monospace">
-        <div style="border-top:2px solid #333;padding-top:6px;margin-top:35px">
+        <div style="border-top:2px solid #333;padding-top:6px;margin-top:65px">
           <div style="font-weight:700;font-size:.85rem">${escapeHTML(sale.clientName)}</div>
           <div style="font-size:.72rem;font-weight:700;letter-spacing:1px;color:#333;margin-top:2px">FIRMA DEL CLIENTE</div>
         </div>
@@ -632,7 +632,7 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
 
   <!-- ÁREA DE FIRMA (EXCLUSIVA PARA EL CLIENTE - CENTRADA Y DESTACADA) -->
   <div style="text-align:center; margin:8mm auto 4mm auto; width:80%;">
-    <div style="border-top:2px solid #000; padding-top:2mm; margin-top:12mm;">
+    <div style="border-top:2px solid #000; padding-top:2mm; margin-top:25mm;">
       <div style="font-weight:bold; font-size:10pt;">${escapeHTML(sale.clientName)}</div>
       <div style="font-size:8pt; font-weight:bold; letter-spacing:1px; margin-top:1mm;">FIRMA DEL CLIENTE</div>
     </div>

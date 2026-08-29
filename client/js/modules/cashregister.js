@@ -160,12 +160,6 @@ async function renderLiveDashboard(register) {
             <div class="card kpi-card">
                 <div class="kpi-label">Total Ventas</div>
                 <div class="kpi-value" style="color:var(--primary-light)">${formatCurrency(detail.totalSales)}</div>
-                <div class="kpi-sub">${detail.salesCount} operación(es)</div>
-            </div>
-            <div class="card kpi-card">
-                <div class="kpi-label">Efectivo Esperado</div>
-                <div class="kpi-value">${formatCurrency(expectedCash)}</div>
-                <div class="kpi-sub">Inicial + Efectivo ventas</div>
             </div>
         </div>
 
