@@ -3,14 +3,15 @@ import jwt from 'jsonwebtoken';
 const JWT_ISSUER = 'comepos-api';
 const JWT_AUDIENCE = 'comepos-client';
 
-// Regex para validar UUID v4
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Regex para validar CUID (formato usado por Prisma @default(cuid()))
+// CUIDs tienen formato: c + timestamp + random chars, ej: "clxyz123abc456"
+const CUID_REGEX = /^c[a-z0-9]{8,}$/i;
 
 /**
- * Verifica si una cadena es un UUID v4 válido.
+ * Verifica si una cadena es un CUID válido.
  */
 export function isValidUUID(value) {
-  return UUID_REGEX.test(value);
+  return typeof value === 'string' && CUID_REGEX.test(value);
 }
 
 /**
