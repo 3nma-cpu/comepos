@@ -6,8 +6,8 @@ const router = Router();
 router.use(authMiddleware);
 router.use(requirePermission('sales'));
 
-const PAY_MAP = { 'efectivo': 'EFECTIVO', 'tarjeta': 'TARJETA', 'nomina': 'NOMINA' };
-const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TARJETA': 'tarjeta', 'NOMINA': 'nomina' };
+const PAY_MAP = { 'efectivo': 'EFECTIVO', 'transferencia': 'TRANSFERENCIA', 'nomina': 'NOMINA' };
+const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TRANSFERENCIA': 'transferencia', 'NOMINA': 'nomina' };
 
 const CAT_REVERSE = {
   'DIRECTIVO': 'Directivo', 'GERENTE': 'Gerente', 'JEFE_DE_AREA': 'Jefe de Área',

@@ -75,7 +75,7 @@ router.get('/', async (req, res) => {
     res.json(registers.map(r => {
       const totalEfectivo = r.sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((sum, s) => sum + s.total, 0);
       const totalNomina = r.sales.filter(s => s.paymentMethod === 'NOMINA').reduce((sum, s) => sum + s.total, 0);
-      const totalTarjeta = r.sales.filter(s => s.paymentMethod === 'TARJETA').reduce((sum, s) => sum + s.total, 0);
+      const totalTransferencia = r.sales.filter(s => s.paymentMethod === 'TRANSFERENCIA').reduce((sum, s) => sum + s.total, 0);
       const totalSales = r.sales.reduce((sum, s) => sum + s.total, 0);
 
       return {
@@ -94,7 +94,7 @@ router.get('/', async (req, res) => {
         totalSales,
         totalEfectivo,
         totalNomina,
-        totalTarjeta
+        totalTransferencia
       };
     }));
   } catch (err) {
@@ -124,11 +124,11 @@ router.get('/:id', validateUUID, async (req, res) => {
 
     if (!register) return res.status(404).json({ error: 'Caja no encontrada' });
 
-    const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TARJETA': 'tarjeta', 'NOMINA': 'nomina' };
+    const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TRANSFERENCIA': 'transferencia', 'NOMINA': 'nomina' };
 
     const totalEfectivo = register.sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((sum, s) => sum + s.total, 0);
     const totalNomina = register.sales.filter(s => s.paymentMethod === 'NOMINA').reduce((sum, s) => sum + s.total, 0);
-    const totalTarjeta = register.sales.filter(s => s.paymentMethod === 'TARJETA').reduce((sum, s) => sum + s.total, 0);
+    const totalTransferencia = register.sales.filter(s => s.paymentMethod === 'TRANSFERENCIA').reduce((sum, s) => sum + s.total, 0);
     const totalSales = register.sales.reduce((sum, s) => sum + s.total, 0);
     const expectedCash = register.initialAmount + totalEfectivo;
 
@@ -150,7 +150,7 @@ router.get('/:id', validateUUID, async (req, res) => {
       totalSales,
       totalEfectivo,
       totalNomina,
-      totalTarjeta,
+      totalTransferencia,
       sales: register.sales.map(s => ({
         id: s.id,
         clientName: s.client?.name || 'Desconocido',

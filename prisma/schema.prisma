@@ -107,7 +107,7 @@ model Provider {
 
 enum PaymentMethod {
   EFECTIVO
-  TARJETA
+  TRANSFERENCIA
   NOMINA
 }
 

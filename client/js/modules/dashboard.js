@@ -205,12 +205,12 @@ function renderCharts(daily, categories, selectedDate) {
 function renderRecentSales(recentSales) {
     const tbody = document.getElementById('recentSalesBody');
     if (!tbody) return;
-    const payLabels = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', nomina: 'Nómina' };
+    const payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'Nómina' };
     tbody.innerHTML = recentSales.map(s => `
     <tr>
       <td>${s.clientName}</td>
       <td><strong>${formatCurrency(s.total)}</strong></td>
-      <td><span class="badge badge-${s.paymentMethod === 'efectivo' ? 'success' : s.paymentMethod === 'tarjeta' ? 'info' : 'purple'}">${payLabels[s.paymentMethod] || s.paymentMethod}</span></td>
+      <td><span class="badge badge-${s.paymentMethod === 'efectivo' ? 'success' : s.paymentMethod === 'transferencia' ? 'info' : 'purple'}">${payLabels[s.paymentMethod] || s.paymentMethod}</span></td>
       <td style="color:var(--text-secondary);font-size:.8rem">${formatDateTime(s.date)}</td>
     </tr>`).join('');
 }

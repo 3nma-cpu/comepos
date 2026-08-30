@@ -440,7 +440,7 @@ function reportClientConsumption(area, sales) {
             btn.onclick = () => {
                 const client = clientMap[btn.dataset.detail];
                 const sortedSales = [...client.sales].sort((a, b) => new Date(b.date) - new Date(a.date));
-                const payLabels = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', nomina: 'VALE DE COMEDOR' };
+                const payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
                 document.getElementById('rccDetail').innerHTML = `
                 <div class="card fade-in">
                   <div class="card-header">
@@ -531,19 +531,19 @@ function reportCashRegisters(area, cashRegisters) {
         const totalSales = filtered.reduce((s, r) => s + (r.totalSales || 0), 0);
         const totalEfectivo = filtered.reduce((s, r) => s + (r.totalEfectivo || 0), 0);
         const totalNomina = filtered.reduce((s, r) => s + (r.totalNomina || 0), 0);
-        const totalTarjeta = filtered.reduce((s, r) => s + (r.totalTarjeta || 0), 0);
+        const totalTransferencia = filtered.reduce((s, r) => s + (r.totalTransferencia || 0), 0);
 
         document.getElementById('rcrKpis').innerHTML = `
       <div class="kpi-card"><div class="kpi-icon blue"><i data-lucide="landmark"></i></div><div class="kpi-content"><div class="kpi-label">Sesiones de Caja</div><div class="kpi-value">${filtered.length}</div></div></div>
       <div class="kpi-card"><div class="kpi-icon green"><i data-lucide="trending-up"></i></div><div class="kpi-content"><div class="kpi-label">Total Ventas en Cajas</div><div class="kpi-value">${formatCurrency(totalSales)}</div></div></div>
       <div class="kpi-card"><div class="kpi-icon green"><i data-lucide="banknote"></i></div><div class="kpi-content"><div class="kpi-label">Efectivo Total</div><div class="kpi-value">${formatCurrency(totalEfectivo)}</div></div></div>
       <div class="kpi-card"><div class="kpi-icon purple"><i data-lucide="receipt"></i></div><div class="kpi-content"><div class="kpi-label">Vales (Nómina)</div><div class="kpi-value">${formatCurrency(totalNomina)}</div></div></div>
-      <div class="kpi-card"><div class="kpi-icon yellow"><i data-lucide="credit-card"></i></div><div class="kpi-content"><div class="kpi-label">Tarjeta Total</div><div class="kpi-value">${formatCurrency(totalTarjeta)}</div></div></div>`;
+      <div class="kpi-card"><div class="kpi-icon yellow"><i data-lucide="arrow-right-left"></i></div><div class="kpi-content"><div class="kpi-label">Transferencia Total</div><div class="kpi-value">${formatCurrency(totalTransferencia)}</div></div></div>`;
         if (window.lucide) lucide.createIcons();
 
         document.getElementById('rcrTable').innerHTML = filtered.length === 0
           ? '<div class="empty-state"><p>No se encontraron cajas en este período.</p></div>'
-          : `<table><thead><tr><th>Apertura</th><th>Cierre</th><th>Cajero</th><th>Fondo (₲)</th><th>Efectivo</th><th>Nómina</th><th>Tarjeta</th><th>Total Ventas</th><th>Contado (₲)</th><th>Diferencia</th><th>Estado</th></tr></thead>
+          : `<table><thead><tr><th>Apertura</th><th>Cierre</th><th>Cajero</th><th>Fondo (₲)</th><th>Efectivo</th><th>Nómina</th><th>Transferencia</th><th>Total Ventas</th><th>Contado (₲)</th><th>Diferencia</th><th>Estado</th></tr></thead>
           <tbody>${filtered.map(r => {
             const expected = (r.initialAmount || 0) + (r.totalEfectivo || 0);
             const diff = r.finalAmount !== null ? r.finalAmount - expected : null;
@@ -557,7 +557,7 @@ function reportCashRegisters(area, cashRegisters) {
               <td>${formatCurrency(r.initialAmount)}</td>
               <td>${formatCurrency(r.totalEfectivo)}</td>
               <td>${formatCurrency(r.totalNomina)}</td>
-              <td>${formatCurrency(r.totalTarjeta)}</td>
+              <td>${formatCurrency(r.totalTransferencia)}</td>
               <td><strong>${formatCurrency(r.totalSales)}</strong></td>
               <td>${r.finalAmount !== null ? formatCurrency(r.finalAmount) : '—'}</td>
               <td>${diffBadge}</td>
@@ -576,7 +576,7 @@ function reportCashRegisters(area, cashRegisters) {
                     r.initialAmount,
                     r.totalEfectivo,
                     r.totalNomina,
-                    r.totalTarjeta,
+                    r.totalTransferencia,
                     r.totalSales,
                     r.finalAmount !== null ? r.finalAmount : '—',
                     diff,
@@ -584,7 +584,7 @@ function reportCashRegisters(area, cashRegisters) {
                 ];
             });
             exportExcel(
-                ['Fecha Apertura', 'Fecha Cierre', 'Cajero', 'Fondo Inicial', 'Efectivo', 'Nómina', 'Tarjeta', 'Total Ventas', 'Efectivo Contado', 'Diferencia', 'Estado'],
+                ['Fecha Apertura', 'Fecha Cierre', 'Cajero', 'Fondo Inicial', 'Efectivo', 'Nómina', 'Transferencia', 'Total Ventas', 'Efectivo Contado', 'Diferencia', 'Estado'],
                 rows,
                 'reporte_sesiones_caja.xlsx'
             );

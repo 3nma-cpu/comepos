@@ -154,8 +154,8 @@ async function renderLiveDashboard(register) {
                 <div class="kpi-value" style="color:var(--info)">${formatCurrency(detail.totalNomina)}</div>
             </div>
             <div class="card kpi-card">
-                <div class="kpi-label">Tarjeta</div>
-                <div class="kpi-value" style="color:var(--purple, #a78bfa)">${formatCurrency(detail.totalTarjeta)}</div>
+                <div class="kpi-label">Transferencia</div>
+                <div class="kpi-value" style="color:var(--purple, #a78bfa)">${formatCurrency(detail.totalTransferencia)}</div>
             </div>
             <div class="card kpi-card">
                 <div class="kpi-label">Total Ventas</div>
@@ -359,7 +359,7 @@ async function openCloseModal(registerId) {
         <div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap">
             <span class="badge badge-success" style="font-size:.75rem">Efectivo: ${formatCurrency(detail.totalEfectivo)}</span>
             <span class="badge badge-info" style="font-size:.75rem">Nómina: ${formatCurrency(detail.totalNomina)}</span>
-            <span class="badge badge-purple" style="font-size:.75rem">Tarjeta: ${formatCurrency(detail.totalTarjeta)}</span>
+            <span class="badge badge-purple" style="font-size:.75rem">Transferencia: ${formatCurrency(detail.totalTransferencia)}</span>
         </div>
 
         <!-- Cash counting by denomination -->
@@ -512,8 +512,8 @@ async function showRegisterDetail(registerId) {
                     <div style="font-weight:700;color:var(--info)">${formatCurrency(d.totalNomina)}</div>
                 </div>
                 <div style="padding:.5rem;border:1px solid var(--border);border-radius:var(--radius);text-align:center">
-                    <div style="font-size:.65rem;color:var(--text-muted)">Tarjeta</div>
-                    <div style="font-weight:700;color:var(--purple, #a78bfa)">${formatCurrency(d.totalTarjeta)}</div>
+                    <div style="font-size:.65rem;color:var(--text-muted)">Transferencia</div>
+                    <div style="font-weight:700;color:var(--purple, #a78bfa)">${formatCurrency(d.totalTransferencia)}</div>
                 </div>
             </div>
 
@@ -599,7 +599,7 @@ async function showRegisterDetail(registerId) {
                 rows.push(['Monto Inicial', '', '', '', '', d.initialAmount]);
                 rows.push(['Total Efectivo', '', '', '', '', d.totalEfectivo]);
                 rows.push(['Total Nómina', '', '', '', '', d.totalNomina]);
-                rows.push(['Total Tarjeta', '', '', '', '', d.totalTarjeta]);
+                rows.push(['Total Transferencia', '', '', '', '', d.totalTransferencia]);
                 rows.push(['Total General', '', '', '', '', d.totalSales]);
                 if (d.finalAmount !== null) {
                     rows.push(['Efectivo Contado', '', '', '', '', d.finalAmount]);
@@ -659,7 +659,7 @@ async function printRegisterReport(registerId) {
     <div class="info-row"><span>Monto Inicial:</span><span class="bold">${formatCurrency(d.initialAmount)}</span></div>
     <div class="info-row"><span>Ventas Efectivo:</span><span>${formatCurrency(d.totalEfectivo)}</span></div>
     <div class="info-row"><span>Ventas Nómina:</span><span>${formatCurrency(d.totalNomina)}</span></div>
-    <div class="info-row"><span>Ventas Tarjeta:</span><span>${formatCurrency(d.totalTarjeta)}</span></div>
+    <div class="info-row"><span>Ventas Transferencia:</span><span>${formatCurrency(d.totalTransferencia)}</span></div>
     <div class="divider"></div>
     <div class="info-row total-row"><span>TOTAL VENTAS:</span><span>${formatCurrency(d.totalSales)}</span></div>
     <div class="info-row"><span>Operaciones:</span><span>${d.salesCount}</span></div>

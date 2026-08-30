@@ -11,7 +11,7 @@ const CAT_REVERSE = {
   'ANALISTA': 'Analista', 'ASISTENTE': 'Asistente', 'OPERARIO': 'Operario',
   'PRACTICANTE': 'Practicante', 'CONTRATISTA': 'Contratista'
 };
-const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TARJETA': 'tarjeta', 'NOMINA': 'nomina' };
+const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TRANSFERENCIA': 'transferencia', 'NOMINA': 'nomina' };
 
 /**
  * Parsea y valida un string de fecha para uso en queries.

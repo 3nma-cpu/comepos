@@ -359,7 +359,7 @@ function processSale() {
 }
 
 export function showTicket(sale) {
-  const payLabels = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', nomina: 'VALE DE COMEDOR' };
+  const payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
   const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
   const vendorName = sale.userName || user.name || 'Cajero';
 

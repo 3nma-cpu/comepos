@@ -75,7 +75,7 @@ export function seedData() {
 
     // Generate historical sales
     const sales = [];
-    const payMethods = ['efectivo', 'tarjeta', 'nomina'];
+    const payMethods = ['efectivo', 'transferencia', 'nomina'];
     for (let day = 30; day >= 0; day--) {
         const numSales = Math.floor(Math.random() * 6) + 3;
         for (let s = 0; s < numSales; s++) {

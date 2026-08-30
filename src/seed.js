@@ -114,7 +114,7 @@ async function seed() {
   console.log('✅ Productos creados');
 
   // Generate Sales (last 30 days)
-  const payMethods = ['EFECTIVO', 'TARJETA', 'NOMINA'];
+  const payMethods = ['EFECTIVO', 'TRANSFERENCIA', 'NOMINA'];
   let salesCount = 0;
   for (let day = 30; day >= 0; day--) {
     const numSales = Math.floor(Math.random() * 6) + 3;

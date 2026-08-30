@@ -195,7 +195,7 @@ async function showClientHistory(clientId, allClients) {
                 <td style="font-size:.8rem">${formatDateTime(s.date)}</td>
                 <td style="font-size:.8rem">${s.items.map(i => i.name).join(', ')}</td>
                 <td><strong>${formatCurrency(s.total)}</strong></td>
-                <td><span class="badge badge-${s.paymentMethod === 'efectivo' ? 'success' : s.paymentMethod === 'tarjeta' ? 'info' : 'purple'}">${s.paymentMethod}</span></td>
+                <td><span class="badge badge-${s.paymentMethod === 'efectivo' ? 'success' : s.paymentMethod === 'transferencia' ? 'info' : 'purple'}">${s.paymentMethod}</span></td>
               </tr>`).join('')}</tbody>
           </table>
         </div>` : '<div class="empty-state"><p>Sin compras registradas</p></div>'}`;
