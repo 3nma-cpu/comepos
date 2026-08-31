@@ -9,9 +9,10 @@ router.use(requirePermission('reports'));
 const CAT_REVERSE = {
   'DIRECTIVO': 'Directivo', 'GERENTE': 'Gerente', 'JEFE_DE_AREA': 'Jefe de Área',
   'ANALISTA': 'Analista', 'ASISTENTE': 'Asistente', 'OPERARIO': 'Operario',
-  'PRACTICANTE': 'Practicante', 'CONTRATISTA': 'Contratista'
+  'PRACTICANTE': 'Practicante', 'CONTRATISTA': 'Contratista',
+  'ADM': 'ADM', 'CHOFER': 'CHOFER'
 };
-const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TRANSFERENCIA': 'transferencia', 'NOMINA': 'nomina' };
+const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TRANSFERENCIA': 'transferencia', 'NOMINA': 'nomina', 'TARJETA': 'tarjeta' };
 
 /**
  * Parsea y valida un string de fecha para uso en queries.
@@ -67,15 +68,16 @@ router.get('/sales-period', async (req, res) => {
       avgTicket,
       daily: Object.entries(dailyMap).sort(([a], [b]) => a.localeCompare(b)).map(([date, total]) => ({ date, total })),
       sales: sales.map(s => ({
-        id: s.id, date: s.createdAt.toISOString(), clientName: s.client.name,
-        clientCategory: CAT_REVERSE[s.client.category] || s.client.category,
-        paymentMethod: PAY_REVERSE[s.paymentMethod] || s.paymentMethod,
+        id: s.id, date: s.createdAt.toISOString(),
+        clientName: s.client?.name || 'Cliente General',
+        clientCategory: s.client ? (CAT_REVERSE[s.client.category] || s.client.category) : 'General',
+        paymentMethod: PAY_REVERSE[s.paymentMethod] || (s.paymentMethod ? s.paymentMethod.toLowerCase() : 'efectivo'),
         total: s.total,
-        items: s.items.map(i => ({ name: i.product.name, quantity: i.quantity, price: i.unitPrice }))
+        items: (s.items || []).map(i => ({ name: i.product?.name || 'Producto', quantity: i.quantity, price: i.unitPrice }))
       }))
     });
   } catch (err) {
-    console.error(err);
+    console.error('Error en reporte de ventas:', err);
     res.status(500).json({ error: 'Error en reporte de ventas' });
   }
 });
@@ -90,7 +92,7 @@ router.get('/sales-category', async (req, res) => {
     const sales = await prisma.sale.findMany({ where, include: { client: true } });
     const catMap = {};
     sales.forEach(s => {
-      const cat = CAT_REVERSE[s.client.category] || s.client.category;
+      const cat = s.client ? (CAT_REVERSE[s.client.category] || s.client.category) : 'General';
       catMap[cat] = (catMap[cat] || 0) + s.total;
     });
     const total = Object.values(catMap).reduce((s, v) => s + v, 0);
@@ -99,6 +101,7 @@ router.get('/sales-category', async (req, res) => {
       .map(([category, amount]) => ({ category, amount, percentage: total ? ((amount / total) * 100).toFixed(1) : 0 }));
     res.json({ total, categories });
   } catch (err) {
+    console.error('Error en reporte por categoría:', err);
     res.status(500).json({ error: 'Error en reporte por categoría' });
   }
 });

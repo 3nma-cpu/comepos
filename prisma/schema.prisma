@@ -109,6 +109,7 @@ enum PaymentMethod {
   EFECTIVO
   TRANSFERENCIA
   NOMINA
+  TARJETA
 }
 
 model Sale {
