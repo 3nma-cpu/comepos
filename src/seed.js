@@ -22,7 +22,7 @@ async function seed() {
   const adminRole = await prisma.role.create({
     data: {
       name: 'Administrador', description: 'Acceso completo al sistema', protected: true,
-      permissions: { create: ['dashboard', 'users', 'roles', 'clients', 'products', 'purchases', 'cashregister', 'sales', 'reports'].map(m => ({ module: m })) }
+      permissions: { create: ['dashboard', 'users', 'roles', 'clients', 'products', 'purchases', 'cashregister', 'sales', 'reports', 'supplier-payments'].map(m => ({ module: m })) }
     }
   });
   const cajeroRole = await prisma.role.create({

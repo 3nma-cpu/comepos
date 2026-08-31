@@ -189,3 +189,46 @@ model PurchaseItem {
   purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
   product  Product  @relation(fields: [productId], references: [id])
 }
+
+// ============================================
+// Módulo: Pagos a Proveedores (independiente)
+// ============================================
+
+model ProveedorPago {
+  id        String   @id @default(cuid())
+  nombre    String
+  ruc       String?
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  pagos     PagoProveedor[]
+
+  @@map("proveedores_pago")
+}
+
+model FormaPago {
+  id     Int    @id @default(autoincrement())
+  nombre String @unique
+  pagos  PagoProveedor[]
+
+  @@map("formas_pago")
+}
+
+model PagoProveedor {
+  id           String        @id @default(cuid())
+  proveedorId  String
+  formaPagoId  Int
+  mesPago      String        @db.VarChar(7)
+  fechaPago    DateTime      @db.Date
+  monto        Decimal       @db.Decimal(12, 2)
+  observacion  String?
+  createdAt    DateTime      @default(now())
+
+  proveedor    ProveedorPago @relation(fields: [proveedorId], references: [id], onDelete: Restrict)
+  formaPago    FormaPago     @relation(fields: [formaPagoId], references: [id])
+
+  @@index([proveedorId, mesPago])
+  @@index([mesPago])
+  @@index([fechaPago])
+  @@map("pagos_proveedores")
+}

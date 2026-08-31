@@ -2234,3 +2234,183 @@ tbody tr:last-child td {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* ============================================
+   Supplier Payments Module
+   ============================================ */
+
+/* Tab navigation */
+.sp-tabs {
+    display: flex;
+    gap: .25rem;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0;
+    margin-bottom: 0;
+    overflow-x: auto;
+}
+
+.sp-tab {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .65rem 1.1rem;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: .85rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all var(--transition);
+    white-space: nowrap;
+    font-family: inherit;
+}
+
+.sp-tab:hover {
+    color: var(--text);
+    background: var(--bg-card-hover);
+}
+
+.sp-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--text);
+    font-weight: 600;
+}
+
+.sp-tab i,
+.sp-tab svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Report table */
+.sp-report-table-wrap {
+    overflow-x: auto;
+    border-radius: var(--radius);
+}
+
+.sp-report-table {
+    width: 100%;
+    min-width: 600px;
+    border-collapse: collapse;
+}
+
+.sp-report-table th,
+.sp-report-table td {
+    padding: .6rem .75rem;
+    border-bottom: 1px solid var(--border);
+    font-size: .82rem;
+    white-space: nowrap;
+}
+
+.sp-report-table thead th {
+    background: var(--bg-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: .72rem;
+    letter-spacing: .5px;
+    color: var(--text-secondary);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.sp-report-table tbody tr:hover {
+    background: var(--bg-table-row-hover);
+}
+
+.sp-sticky-col {
+    position: sticky;
+    left: 0;
+    background: var(--bg-card);
+    z-index: 2;
+    min-width: 160px;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.sp-report-table thead .sp-sticky-col {
+    background: var(--bg-secondary);
+    z-index: 3;
+}
+
+.sp-report-table tfoot .sp-sticky-col {
+    background: var(--bg-secondary);
+}
+
+.sp-month-col {
+    text-align: right;
+    min-width: 110px;
+    font-variant-numeric: tabular-nums;
+}
+
+.sp-total-col {
+    text-align: right;
+    min-width: 120px;
+    font-variant-numeric: tabular-nums;
+    background: rgba(255, 255, 255, .02);
+    border-left: 2px solid var(--border);
+}
+
+.sp-report-table thead .sp-total-col {
+    background: var(--bg-secondary);
+    border-left: 2px solid var(--border);
+}
+
+.sp-totals-row {
+    background: var(--bg-secondary);
+    font-weight: 700;
+}
+
+.sp-totals-row td {
+    border-top: 2px solid var(--border);
+    padding: .75rem;
+}
+
+/* Cell with value + variation */
+.sp-cell-val {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.sp-cell-var {
+    margin-top: .15rem;
+}
+
+.sp-var-up {
+    color: var(--success);
+    font-size: .68rem;
+    font-weight: 600;
+}
+
+.sp-var-down {
+    color: var(--danger);
+    font-size: .68rem;
+    font-weight: 600;
+}
+
+.sp-var-neutral {
+    color: var(--text-muted);
+    font-size: .68rem;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .sp-tabs {
+        gap: 0;
+    }
+
+    .sp-tab {
+        padding: .5rem .7rem;
+        font-size: .78rem;
+    }
+
+    .sp-sticky-col {
+        min-width: 120px;
+    }
+
+    .sp-month-col {
+        min-width: 90px;
+    }
+}

@@ -114,15 +114,49 @@ export function debounce(fn, ms = 300) {
     return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
-export function exportExcel(headers, rows, filename) {
+export function exportExcel(headers, rows, filename = 'Reporte.xlsx', sheetName = 'Reporte') {
     const ws_data = [headers, ...rows];
     const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+    // Auto-fit column widths
+    const colWidths = headers.map((h, i) => {
+        let maxLen = String(h || '').length;
+        rows.forEach(r => {
+            const cellLen = String(r[i] ?? '').length;
+            if (cellLen > maxLen) maxLen = cellLen;
+        });
+        return { wch: Math.min(Math.max(maxLen + 3, 12), 40) };
+    });
+    ws['!cols'] = colWidths;
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Reporte");
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
     
-    // Check if filename already has .xlsx, otherwise append it
-    const finalFilename = filename.endsWith('.xlsx') ? filename : filename.replace('.csv', '.xlsx') + (!filename.includes('.') ? '.xlsx' : '');
-    XLSX.writeFile(wb, finalFilename);
+    // Ensure filename ends with .xlsx and has no invalid chars
+    let cleanName = (filename || 'Reporte_Pagos.xlsx').trim();
+    if (!cleanName.toLowerCase().endsWith('.xlsx')) {
+        cleanName = cleanName.replace(/\.[^/.]+$/, '') + '.xlsx';
+    }
+    cleanName = cleanName.replace(/[<>:"/\\|?*]/g, '_');
+
+    try {
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = cleanName;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 300);
+    } catch (e) {
+        console.warn('Fallback to XLSX.writeFile:', e);
+        XLSX.writeFile(wb, cleanName, { bookType: 'xlsx' });
+    }
 }
 
 export const EMPLOYEE_CATEGORIES = [

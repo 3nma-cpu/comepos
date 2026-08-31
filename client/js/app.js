@@ -13,6 +13,7 @@ import { renderProducts } from './modules/products.js';
 import { renderSales } from './modules/sales.js';
 import { renderReports } from './modules/reports.js';
 import { renderCashRegister } from './modules/cashregister.js';
+import { renderSupplierPayments } from './modules/supplier-payments.js';
 
 // Navigation items
 const NAV_ITEMS = [
@@ -40,6 +41,11 @@ const NAV_ITEMS = [
         section: 'Análisis', items: [
             { route: 'reports', label: 'Reportes', icon: 'bar-chart-3', perm: 'reports' }
         ]
+    },
+    {
+        section: 'Finanzas', items: [
+            { route: 'supplier-payments', label: 'Pagos Proveedores', icon: 'receipt', perm: 'supplier-payments' }
+        ]
     }
 ];
 
@@ -52,7 +58,8 @@ const ROUTE_TITLES = {
     purchases: 'Compras e Inventario',
     cashregister: 'Caja',
     sales: 'Punto de Venta',
-    reports: 'Reportes'
+    reports: 'Reportes',
+    'supplier-payments': 'Pagos a Proveedores'
 };
 
 const ROUTE_HANDLERS = {
@@ -64,7 +71,8 @@ const ROUTE_HANDLERS = {
     purchases: renderPurchases,
     cashregister: renderCashRegister,
     sales: renderSales,
-    reports: renderReports
+    reports: renderReports,
+    'supplier-payments': renderSupplierPayments
 };
 
 // ============================================

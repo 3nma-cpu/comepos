@@ -18,6 +18,7 @@ import purchasesRoutes from './routes/purchases.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import cashregisterRoutes from './routes/cashregister.routes.js';
+import supplierPaymentsRoutes from './routes/supplier-payments.routes.js';
 
 import helmet from 'helmet';
 import compression from 'compression';
@@ -59,6 +60,8 @@ const productionOrigins = [
 
 const developmentOrigins = [
   ...productionOrigins,
+  'http://localhost:4000',
+  `http://localhost:${PORT}`,
   'http://localhost:3000',
   'http://localhost:5173',
   'http://localhost:4173'
@@ -102,6 +105,7 @@ app.use('/api/purchases', purchasesRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/cashregister', cashregisterRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/supplier-payments', supplierPaymentsRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

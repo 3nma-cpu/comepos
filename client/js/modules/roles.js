@@ -14,7 +14,8 @@ const ALL_PERMISSIONS = [
     { id: 'purchases', label: 'Compras' },
     { id: 'cashregister', label: 'Caja' },
     { id: 'sales', label: 'Ventas' },
-    { id: 'reports', label: 'Reportes' }
+    { id: 'reports', label: 'Reportes' },
+    { id: 'supplier-payments', label: 'Pagos Proveedores' }
 ];
 
 export async function renderRoles() {
