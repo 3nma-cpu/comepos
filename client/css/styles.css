@@ -94,7 +94,7 @@ body {
     background: var(--bg-body);
     color: var(--text);
     min-height: 100vh;
-    overflow-x: hidden;
+    overflow-x: clip;
     line-height: 1.6;
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%
@@ -282,7 +282,7 @@ select:focus:not(:focus-visible) {
     min-height: 100vh;
     width: 100%;
     max-width: 100vw;
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 /* Sidebar */
@@ -451,7 +451,7 @@ select:focus:not(:focus-visible) {
     max-width: calc(100vw - var(--sidebar-width));
     min-height: 100vh;
     transition: margin-left var(--transition);
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 .content-header {
@@ -463,9 +463,10 @@ select:focus:not(:focus-visible) {
     border-bottom: 1px solid var(--border);
     background: var(--bg-header);
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     position: sticky;
     top: 0;
-    z-index: 50
+    z-index: 50;
 }
 
 .content-header h2 {
@@ -484,7 +485,7 @@ select:focus:not(:focus-visible) {
     padding: 1.25rem 1.75rem 2rem;
     min-width: 0;
     max-width: 100%;
-    overflow-x: hidden;
+    overflow-x: clip;
 }
 
 /* ---- Components ---- */
@@ -1666,6 +1667,9 @@ tbody tr:last-child td {
 
     .content-header {
         padding: 0 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 50;
     }
 
     .btn-menu-toggle {
