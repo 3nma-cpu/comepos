@@ -436,7 +436,7 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
   <style>
     @page {
       margin: 0;
-      size: auto;
+      size: 80mm auto;
     }
     * { 
       box-sizing: border-box; 
@@ -445,11 +445,11 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
     }
     body {
       font-family: 'Courier New', Courier, monospace;
-      font-size: 8.5pt;
-      line-height: 1.3;
-      width: 68mm;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      width: 72mm;
       max-width: 100%;
-      padding: 3mm 2mm 8mm 2mm;
+      padding: 2mm 3mm 10mm 3mm;
       margin: 0 auto;
       background: #fff;
       color: #000;
@@ -462,26 +462,26 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
     }
     .header-title {
       font-weight: 700;
-      font-size: 11pt;
-      letter-spacing: 1px;
+      font-size: 12pt;
+      letter-spacing: 1.5px;
     }
     .header-subtitle {
-      font-size: 8pt;
-      color: #333;
+      font-size: 9pt;
+      color: #222;
       margin-top: 2px;
     }
     .divider-dash {
       border: none;
-      border-top: 1px dashed #555;
-      margin: 4px 0;
+      border-top: 1px dashed #444;
+      margin: 5px 0;
     }
     .ticket-line {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 6px;
-      margin: 2px 0;
-      font-size: 8.5pt;
+      gap: 8px;
+      margin: 2.5px 0;
+      font-size: 9.5pt;
     }
     .ticket-line span:first-child {
       flex-shrink: 0;
@@ -494,23 +494,23 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
       display: flex;
       justify-content: space-between;
       font-weight: 700;
-      border-bottom: 1px dashed #555;
-      padding-bottom: 2px;
-      margin-bottom: 3px;
-      font-size: 8.5pt;
+      border-bottom: 1px dashed #444;
+      padding-bottom: 3px;
+      margin-bottom: 4px;
+      font-size: 9.5pt;
     }
     .item-row {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 6px;
-      margin-bottom: 2px;
-      font-size: 8.5pt;
+      gap: 8px;
+      margin-bottom: 3px;
+      font-size: 9.5pt;
     }
     .item-name {
       text-align: left;
       word-break: break-word;
-      padding-right: 4px;
+      padding-right: 6px;
     }
     .item-price {
       white-space: nowrap;
@@ -520,31 +520,31 @@ function printTicket(ticketId, sale, vendorName, payLabels) {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 10.5pt;
+      font-size: 11.5pt;
       font-weight: 700;
-      margin: 3px 0;
+      margin: 4px 0;
     }
     .ticket-message {
       text-align: center;
-      font-size: 8pt;
-      color: #444;
+      font-size: 9pt;
+      color: #333;
       margin: 6px 0;
     }
     .signature-container {
       text-align: center;
-      margin: 18mm auto 4mm auto;
-      width: 82%;
+      margin: 20mm auto 5mm auto;
+      width: 85%;
     }
     .signature-line-bar {
       border-top: 2px solid #000;
-      padding-top: 4px;
+      padding-top: 5px;
     }
     .signature-client {
       font-weight: 700;
-      font-size: 8.5pt;
+      font-size: 9.5pt;
     }
     .signature-caption {
-      font-size: 7.5pt;
+      font-size: 8pt;
       font-weight: 700;
       letter-spacing: 1px;
       color: #222;
