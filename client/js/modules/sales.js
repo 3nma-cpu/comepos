@@ -342,8 +342,8 @@ function processSale() {
       cart = [];
       selectedClient = null;
       
-      // Show success modal (ticket)
-      showTicket(ticketData);
+      // Imprimir directamente el ticket
+      printTicket(ticketData);
       showToast('¡Venta registrada con éxito!');
       
       // Refresh background UI
@@ -421,11 +421,26 @@ export function showTicket(sale) {
   const modal = createModal('Ticket de Venta', body, footer);
   if (window.lucide) lucide.createIcons();
 
-  document.getElementById('btnPrintTicket').onclick = () => printTicket(ticketId, sale, vendorName, payLabels);
+  document.getElementById('btnPrintTicket').onclick = () => printTicket(sale);
 }
 
-function printTicket(ticketId, sale, vendorName, payLabels) {
-  const payLabel = payLabels[sale.paymentMethod] || sale.paymentMethod;
+export function printTicket(sale, ...rest) {
+  let actualSale = sale;
+  let ticketId = (sale && sale.id ? sale.id : '').slice(-6).toUpperCase();
+  let vendorName = sale ? sale.userName : null;
+  let payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
+
+  if (typeof sale === 'string') {
+    ticketId = sale;
+    actualSale = rest[0];
+    vendorName = rest[1];
+    payLabels = rest[2] || payLabels;
+  }
+
+  const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
+  vendorName = vendorName || actualSale.userName || user.name || 'Cajero';
+  const payLabel = payLabels[actualSale.paymentMethod] || actualSale.paymentMethod;
+
   const printWin = window.open('', '_blank', 'width=400,height=600');
 
   printWin.document.write(`<!DOCTYPE html>
