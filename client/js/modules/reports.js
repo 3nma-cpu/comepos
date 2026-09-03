@@ -3,7 +3,7 @@
 // ============================================
 
 import { api } from '../api.js';
-import { formatCurrency, formatDate, formatDateTime, formatDateInput, todayStr, toLocalYMD, exportExcel, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
+import { formatCurrency, formatDate, formatDateTime, formatDateInput, todayStr, toLocalYMD, exportExcel, showToast, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
 import { showTicket } from './sales.js';
 
 let activeChart = null;
@@ -81,9 +81,18 @@ async function loadReport(type) {
 function reportSalesPeriod(area, sales) {
     const d30 = new Date(); d30.setDate(d30.getDate() - 30);
     area.innerHTML = `
-    <div class="report-filters">
+    <div class="report-filters" style="flex-wrap:wrap;gap:.75rem;align-items:flex-end">
       <div class="form-group"><label>Desde</label><input type="date" class="form-control" id="rpFrom" value="${formatDateInput(d30)}" /></div>
       <div class="form-group"><label>Hasta</label><input type="date" class="form-control" id="rpTo" value="${todayStr()}" /></div>
+      <div class="form-group">
+        <label>Forma de Pago</label>
+        <select class="form-control" id="rpPayMethod">
+          <option value="">Todas</option>
+          <option value="nomina">Vale</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+        </select>
+      </div>
       <div class="form-group">
         <label>Categoría</label>
         <select class="form-control" id="rpCat">
@@ -91,8 +100,8 @@ function reportSalesPeriod(area, sales) {
           ${EMPLOYEE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
         </select>
       </div>
-      <button class="btn btn-primary" id="rpApply" style="margin-top: auto;"><i data-lucide="filter"></i>Aplicar</button>
-      <button class="btn btn-secondary" id="rpExport" style="margin-top: auto;"><i data-lucide="download"></i>Exportar Excel</button>
+      <button class="btn btn-primary" id="rpApply"><i data-lucide="filter"></i>Aplicar</button>
+      <button class="btn btn-secondary" id="rpExport"><i data-lucide="download"></i>Exportar Excel</button>
     </div>
     <div class="kpi-grid" id="rpKpis"></div>
     <div class="table-container" id="rpTable"></div>`;
@@ -102,12 +111,14 @@ function reportSalesPeriod(area, sales) {
         const from = document.getElementById('rpFrom').value;
         const to = document.getElementById('rpTo').value;
         const cat = document.getElementById('rpCat').value;
+        const payMethod = document.getElementById('rpPayMethod').value;
         
         const filtered = sales.filter(s => { 
             const d = toLocalYMD(s.date); 
             const dateMatch = d >= from && d <= to;
             const catMatch = !cat || s.clientCategory === cat;
-            return dateMatch && catMatch; 
+            const payMatch = !payMethod || (s.paymentMethod || '').toLowerCase() === payMethod.toLowerCase();
+            return dateMatch && catMatch && payMatch; 
         });
 
         // Obtener fechas únicas en el rango seleccionado que tengan ventas
@@ -138,7 +149,7 @@ function reportSalesPeriod(area, sales) {
         if (window.lucide) lucide.createIcons();
 
         if (uniqueDates.length === 0) {
-            document.getElementById('rpTable').innerHTML = '<div class="empty-state"><p>No se encontraron ventas en este período.</p></div>';
+            document.getElementById('rpTable').innerHTML = '<div class="empty-state"><p>No se encontraron ventas en este período con los filtros seleccionados.</p></div>';
             return;
         }
 
@@ -164,7 +175,7 @@ function reportSalesPeriod(area, sales) {
             });
             const exportHeaders = ['Nombre del Cliente', 'Categoría', ...uniqueDates.map(d => formatDate(d)), 'Total General'];
             exportExcel(exportHeaders, exportData, 'reporte_ventas_pivot.xlsx');
-            showToastLocal('Excel exportado');
+            showToast('Excel exportado');
         };
     }
 
