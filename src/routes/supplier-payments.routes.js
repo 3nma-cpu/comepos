@@ -120,7 +120,7 @@ router.get('/pagos', async (req, res) => {
         proveedor: { select: { id: true, nombre: true } },
         formaPago: { select: { id: true, nombre: true } }
       },
-      orderBy: [{ mesPago: 'desc' }, { fechaPago: 'desc' }],
+      orderBy: [{ fechaPago: 'desc' }, { mesPago: 'desc' }],
       take: 300
     });
     res.json(pagos.map(p => ({
@@ -131,6 +131,7 @@ router.get('/pagos', async (req, res) => {
       formaPagoNombre: p.formaPago.nombre,
       mesPago: p.mesPago,
       fechaPago: p.fechaPago.toISOString(),
+      fechaCobro: p.fechaCobro ? p.fechaCobro.toISOString() : null,
       monto: parseFloat(p.monto),
       observacion: p.observacion,
       createdAt: p.createdAt.toISOString()
@@ -144,9 +145,9 @@ router.get('/pagos', async (req, res) => {
 // POST /api/supplier-payments/pagos
 router.post('/pagos', async (req, res) => {
   try {
-    const { proveedorId, formaPagoId, mesPago, fechaPago, monto, observacion } = req.body;
+    const { proveedorId, formaPagoId, mesPago, fechaPago, fechaCobro, monto, observacion } = req.body;
     if (!proveedorId || !formaPagoId || !fechaPago) {
-      return res.status(400).json({ error: 'Proveedor, forma de pago y fecha son obligatorios' });
+      return res.status(400).json({ error: 'Proveedor, forma de pago y fecha de pago son obligatorios' });
     }
     const montoNum = parseFloat(monto);
     if (!montoNum || montoNum <= 0) {
@@ -163,6 +164,7 @@ router.post('/pagos', async (req, res) => {
         formaPagoId: parseInt(formaPagoId),
         mesPago: finalMesPago,
         fechaPago: new Date(fechaPago),
+        fechaCobro: fechaCobro ? new Date(fechaCobro) : new Date(fechaPago),
         monto: montoNum,
         observacion: observacion?.trim() || null
       },
@@ -179,6 +181,7 @@ router.post('/pagos', async (req, res) => {
       formaPagoNombre: pago.formaPago.nombre,
       mesPago: pago.mesPago,
       fechaPago: pago.fechaPago.toISOString(),
+      fechaCobro: pago.fechaCobro ? pago.fechaCobro.toISOString() : null,
       monto: parseFloat(pago.monto),
       observacion: pago.observacion,
       createdAt: pago.createdAt.toISOString()
@@ -192,12 +195,13 @@ router.post('/pagos', async (req, res) => {
 // PUT /api/supplier-payments/pagos/:id
 router.put('/pagos/:id', async (req, res) => {
   try {
-    const { proveedorId, formaPagoId, mesPago, fechaPago, monto, observacion } = req.body;
+    const { proveedorId, formaPagoId, mesPago, fechaPago, fechaCobro, monto, observacion } = req.body;
     const data = {};
     if (proveedorId) data.proveedorId = proveedorId;
     if (formaPagoId) data.formaPagoId = parseInt(formaPagoId);
     if (mesPago && /^\d{4}-\d{2}$/.test(mesPago)) data.mesPago = mesPago;
     if (fechaPago) data.fechaPago = new Date(fechaPago);
+    if (fechaCobro !== undefined) data.fechaCobro = fechaCobro ? new Date(fechaCobro) : null;
     if (monto !== undefined) {
       const m = parseFloat(monto);
       if (m <= 0) return res.status(400).json({ error: 'Monto debe ser mayor a 0' });
@@ -221,6 +225,7 @@ router.put('/pagos/:id', async (req, res) => {
       formaPagoNombre: pago.formaPago.nombre,
       mesPago: pago.mesPago,
       fechaPago: pago.fechaPago.toISOString(),
+      fechaCobro: pago.fechaCobro ? pago.fechaCobro.toISOString() : null,
       monto: parseFloat(pago.monto),
       observacion: pago.observacion,
       createdAt: pago.createdAt.toISOString()
@@ -243,31 +248,46 @@ router.delete('/pagos/:id', async (req, res) => {
 });
 
 // ============================================
-// Reporte comparativo mensual (agrupado por mesPago)
+// Reporte comparativo mensual y detallado
 // ============================================
 
-// GET /api/supplier-payments/reporte?mes=2026-08 o ?mesDesde=2026-01&mesHasta=2026-08 o ?desde=2026-01-01&hasta=2026-08-31
+// GET /api/supplier-payments/reporte
 router.get('/reporte', async (req, res) => {
   try {
-    let { desde, hasta, mes, mesDesde, mesHasta, proveedorId, formaPagoId } = req.query;
+    let { filtroFecha = 'fechaPago', fecha, desde, hasta, mes, mesDesde, mesHasta, proveedorId, formaPagoId } = req.query;
 
     const where = {};
 
-    if (mes) {
-      where.mesPago = mes;
-    } else if (mesDesde && mesHasta) {
-      where.mesPago = {
-        gte: mesDesde,
-        lte: mesHasta
-      };
-    } else if (desde && hasta) {
-      // If dates provided, filter by mesPago range derived or fechaPago
-      const mStart = desde.substring(0, 7);
-      const mEnd = hasta.substring(0, 7);
-      where.mesPago = {
-        gte: mStart,
-        lte: mEnd
-      };
+    if (filtroFecha === 'mesPago') {
+      if (mes) {
+        where.mesPago = mes;
+      } else if (mesDesde && mesHasta) {
+        where.mesPago = { gte: mesDesde, lte: mesHasta };
+      } else if (desde && hasta) {
+        where.mesPago = { gte: desde.substring(0, 7), lte: hasta.substring(0, 7) };
+      }
+    } else {
+      const dateField = filtroFecha === 'fechaCobro' ? 'fechaCobro' : 'fechaPago';
+      if (fecha) {
+        const dStart = new Date(`${fecha}T00:00:00.000Z`);
+        const dEnd = new Date(`${fecha}T23:59:59.999Z`);
+        where[dateField] = { gte: dStart, lte: dEnd };
+      } else if (desde && hasta) {
+        const dStart = new Date(`${desde}T00:00:00.000Z`);
+        const dEnd = new Date(`${hasta}T23:59:59.999Z`);
+        where[dateField] = { gte: dStart, lte: dEnd };
+      } else if (mes) {
+        const [y, m] = mes.split('-').map(Number);
+        const start = new Date(Date.UTC(y, m - 1, 1, 0, 0, 0));
+        const end = new Date(Date.UTC(y, m, 0, 23, 59, 59, 999));
+        where[dateField] = { gte: start, lte: end };
+      } else if (mesDesde && mesHasta) {
+        const [y1, m1] = mesDesde.split('-').map(Number);
+        const [y2, m2] = mesHasta.split('-').map(Number);
+        const start = new Date(Date.UTC(y1, m1 - 1, 1, 0, 0, 0));
+        const end = new Date(Date.UTC(y2, m2, 0, 23, 59, 59, 999));
+        where[dateField] = { gte: start, lte: end };
+      }
     }
 
     if (proveedorId) where.proveedorId = proveedorId;
@@ -279,10 +299,10 @@ router.get('/reporte', async (req, res) => {
         proveedor: { select: { id: true, nombre: true } },
         formaPago: { select: { id: true, nombre: true } }
       },
-      orderBy: [{ mesPago: 'asc' }, { fechaPago: 'asc' }]
+      orderBy: [{ fechaPago: 'asc' }, { mesPago: 'asc' }]
     });
 
-    // Build pivot: grouped by p.mesPago (mes al que corresponde el pago)
+    // Build pivot grouped by mesPago
     const pivot = {};
     const allMonths = new Set();
 
@@ -303,10 +323,8 @@ router.get('/reporte', async (req, res) => {
       entry.total += parseFloat(p.monto);
     }
 
-    // Sort months chronologically
     const mesesOrdenados = [...allMonths].sort();
 
-    // Convert to array and round values
     const data = Object.values(pivot).map(row => {
       const meses = {};
       for (const m of mesesOrdenados) {
@@ -320,7 +338,21 @@ router.get('/reporte', async (req, res) => {
       };
     }).sort((a, b) => a.proveedor.localeCompare(b.proveedor));
 
-    res.json({ meses: mesesOrdenados, data });
+    const detallePagos = pagos.map(p => ({
+      id: p.id,
+      proveedorId: p.proveedorId,
+      proveedorNombre: p.proveedor.nombre,
+      formaPagoId: p.formaPagoId,
+      formaPagoNombre: p.formaPago.nombre,
+      mesPago: p.mesPago,
+      fechaPago: p.fechaPago.toISOString(),
+      fechaCobro: p.fechaCobro ? p.fechaCobro.toISOString() : null,
+      monto: parseFloat(p.monto),
+      observacion: p.observacion,
+      createdAt: p.createdAt.toISOString()
+    }));
+
+    res.json({ meses: mesesOrdenados, data, pagos: detallePagos });
   } catch (err) {
     console.error('Error reporte:', err);
     res.status(500).json({ error: 'Error al generar reporte' });

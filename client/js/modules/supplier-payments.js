@@ -236,11 +236,15 @@ async function renderPagos() {
               </div>
               <div class="form-group" style="flex:1">
                 <label>Mes que se Paga *</label>
-                <input type="month" class="form-control" id="spPayMes" value="${currentYearMonth}" title="Mes correspondiente al gasto o servicio" />
+                <input type="month" class="form-control" id="spPayMes" value="${currentYearMonth}" title="Mes correspondiente al gasto o factura" />
               </div>
               <div class="form-group" style="flex:1">
-                <label>Fecha de Cobro / Emisión *</label>
-                <input type="date" class="form-control" id="spPayFecha" value="${todayStr()}" title="Fecha real de entrega o cobro del cheque" />
+                <label>Día de Pago (Entrega) *</label>
+                <input type="date" class="form-control" id="spPayFecha" value="${todayStr()}" title="Día en que se entrega el cheque o dinero" />
+              </div>
+              <div class="form-group" style="flex:1">
+                <label>Día de Cobro (Cheque)</label>
+                <input type="date" class="form-control" id="spPayFechaCobro" value="${todayStr()}" title="Día en que será cobrado o habilitado el cheque" />
               </div>
               <div class="form-group" style="flex:1">
                 <label>Forma de Pago *</label>
@@ -275,7 +279,8 @@ async function renderPagos() {
               <thead>
                 <tr>
                   <th>Mes Pagado</th>
-                  <th>Fecha Pago/Cobro</th>
+                  <th>Día de Pago (Entrega)</th>
+                  <th>Día de Cobro (Cheque)</th>
                   <th>Proveedor</th>
                   <th>Forma de Pago</th>
                   <th style="text-align:right">Monto</th>
@@ -301,13 +306,14 @@ async function renderPagos() {
             const tbody = document.getElementById('pagosTableBody');
             if (!tbody) return;
             if (data.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem">Sin pagos registrados</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem">Sin pagos registrados</td></tr>';
                 return;
             }
             tbody.innerHTML = data.map(p => `
             <tr>
               <td><span class="badge badge-primary" style="font-weight:600">${formatMesLabel(p.mesPago)}</span></td>
-              <td style="color:var(--text-secondary)">${formatDate(p.fechaPago)}</td>
+              <td style="color:var(--text-primary);font-weight:500">${formatDate(p.fechaPago)}</td>
+              <td style="color:var(--text-secondary)">${p.fechaCobro ? formatDate(p.fechaCobro) : '—'}</td>
               <td><strong>${escapeHTML(p.proveedorNombre)}</strong></td>
               <td><span class="badge badge-info">${escapeHTML(p.formaPagoNombre)}</span></td>
               <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${formatCurrency(p.monto)}</td>
@@ -357,13 +363,14 @@ async function renderPagos() {
             const proveedorId = document.getElementById('spPayProv').value;
             const mesPago = document.getElementById('spPayMes').value;
             const fechaPago = document.getElementById('spPayFecha').value;
+            const fechaCobro = document.getElementById('spPayFechaCobro').value || fechaPago;
             const formaPagoId = document.getElementById('spPayForma').value;
             const monto = document.getElementById('spPayMonto').value;
             const observacion = document.getElementById('spPayObs').value;
 
             if (!proveedorId) return showToast('Seleccione un proveedor', 'error');
             if (!mesPago) return showToast('Seleccione el mes que se paga', 'error');
-            if (!fechaPago) return showToast('Seleccione la fecha de cobro o emisión', 'error');
+            if (!fechaPago) return showToast('Seleccione el día de pago / entrega', 'error');
             if (!monto || parseFloat(monto) <= 0) return showToast('Monto debe ser mayor a 0', 'error');
 
             const btn = document.getElementById('btnRegistrarPago');
@@ -373,7 +380,7 @@ async function renderPagos() {
 
             try {
                 await api.post('/supplier-payments/pagos', {
-                    proveedorId, mesPago, fechaPago, formaPagoId, monto: parseFloat(monto), observacion
+                    proveedorId, mesPago, fechaPago, fechaCobro, formaPagoId, monto: parseFloat(monto), observacion
                 });
                 showToast('Pago registrado exitosamente');
                 renderPagos();
@@ -391,7 +398,8 @@ async function renderPagos() {
 
 function openEditPagoModal(pago) {
     const provActivos = cachedProveedores.filter(p => p.activo || p.id === pago.proveedorId);
-    const fechaVal = pago.fechaPago.substring(0, 10);
+    const fechaVal = pago.fechaPago ? pago.fechaPago.substring(0, 10) : todayStr();
+    const fechaCobroVal = pago.fechaCobro ? pago.fechaCobro.substring(0, 10) : fechaVal;
     const mesVal = pago.mesPago || fechaVal.substring(0, 7);
 
     const body = `
@@ -409,8 +417,12 @@ function openEditPagoModal(pago) {
     </div>
     <div class="form-row">
       <div class="form-group" style="flex:1">
-        <label>Fecha de Cobro / Emisión *</label>
+        <label>Día de Pago (Entrega) *</label>
         <input type="date" class="form-control" id="mEditFecha" value="${fechaVal}" />
+      </div>
+      <div class="form-group" style="flex:1">
+        <label>Día de Cobro (Cheque)</label>
+        <input type="date" class="form-control" id="mEditFechaCobro" value="${fechaCobroVal}" />
       </div>
       <div class="form-group" style="flex:1">
         <label>Forma de Pago *</label>
@@ -432,12 +444,13 @@ function openEditPagoModal(pago) {
             proveedorId: document.getElementById('mEditProv').value,
             mesPago: document.getElementById('mEditMes').value,
             fechaPago: document.getElementById('mEditFecha').value,
+            fechaCobro: document.getElementById('mEditFechaCobro').value || document.getElementById('mEditFecha').value,
             formaPagoId: document.getElementById('mEditForma').value,
             monto: parseFloat(document.getElementById('mEditMonto').value),
             observacion: document.getElementById('mEditObs').value
         };
         if (!data.mesPago) return showToast('Mes que se paga es obligatorio', 'error');
-        if (!data.fechaPago) return showToast('Fecha es obligatoria', 'error');
+        if (!data.fechaPago) return showToast('Día de pago es obligatorio', 'error');
         if (!data.monto || data.monto <= 0) return showToast('Monto inválido', 'error');
 
         const btn = document.getElementById('btnUpdatePago');
@@ -456,7 +469,7 @@ function openEditPagoModal(pago) {
 
 // ============================================
 // ============================================
-// Tab 3: Reporte comparativo mensual
+// Tab 3: Reporte comparativo mensual y por día de pago
 // ============================================
 async function renderReporte() {
     const area = document.getElementById('spContent');
@@ -471,21 +484,35 @@ async function renderReporte() {
     area.innerHTML = `
     <div class="fade-in" style="margin-top:1rem">
       <div class="report-filters" style="align-items:flex-end">
-        <div class="form-group" style="min-width:160px">
+        <div class="form-group" style="min-width:170px">
+          <label>Filtrar por Fecha</label>
+          <select class="form-control" id="rpDateFilterField">
+            <option value="fechaPago" selected>Día de Pago (Entrega)</option>
+            <option value="fechaCobro">Día de Cobro (Cheque)</option>
+            <option value="mesPago">Mes que se Paga (Imputado)</option>
+          </select>
+        </div>
+
+        <div class="form-group" style="min-width:170px">
           <label>Tipo de Período</label>
           <select class="form-control" id="rpPeriodType">
+            <option value="single-day">Día Específico (Fecha Exacta)</option>
             <option value="single-month" selected>Por Mes (Mes único)</option>
             <option value="month-range">Rango de Meses</option>
             <option value="date-range">Rango de Fechas (Días)</option>
           </select>
         </div>
 
+        <!-- Single Day Input -->
+        <div class="form-group period-input-group" id="groupSingleDay" style="display:none;min-width:150px">
+          <label>Día / Fecha</label>
+          <input type="date" class="form-control" id="rpSingleDay" value="${todayStr()}" />
+        </div>
+
         <!-- Single Month Inputs -->
-        <div class="form-group period-input-group" id="groupSingleMonth" style="min-width:180px">
+        <div class="form-group period-input-group" id="groupSingleMonth" style="min-width:170px">
           <label>Mes</label>
-          <div style="display:flex;gap:0.35rem">
-            <input type="month" class="form-control" id="rpSingleMonth" value="${currentYearMonth}" />
-          </div>
+          <input type="month" class="form-control" id="rpSingleMonth" value="${currentYearMonth}" />
         </div>
 
         <!-- Month Range Inputs -->
@@ -537,6 +564,7 @@ async function renderReporte() {
     const periodSelect = document.getElementById('rpPeriodType');
     function updatePeriodInputs() {
         const type = periodSelect.value;
+        document.getElementById('groupSingleDay').style.display = type === 'single-day' ? 'block' : 'none';
         document.getElementById('groupSingleMonth').style.display = type === 'single-month' ? 'block' : 'none';
         document.getElementById('groupMonthFrom').style.display = type === 'month-range' ? 'block' : 'none';
         document.getElementById('groupMonthTo').style.display = type === 'month-range' ? 'block' : 'none';
@@ -546,53 +574,52 @@ async function renderReporte() {
     periodSelect.addEventListener('change', updatePeriodInputs);
 
     async function loadReport() {
+        const filtroFecha = document.getElementById('rpDateFilterField').value;
         const periodType = periodSelect.value;
         const proveedorId = document.getElementById('rpProv').value;
         const formaPagoId = document.getElementById('rpForma').value;
 
-        let desde = '';
-        let hasta = '';
+        let queryParams = `filtroFecha=${filtroFecha}`;
         let isSingleMonth = false;
+        let isSingleDay = false;
         let singleMonthLabel = '';
+        let singleDayLabel = '';
 
-        if (periodType === 'single-month') {
+        if (periodType === 'single-day') {
+            const singleDay = document.getElementById('rpSingleDay').value;
+            if (!singleDay) return showToast('Seleccione un día / fecha', 'error');
+            isSingleDay = true;
+            queryParams += `&fecha=${singleDay}`;
+            singleDayLabel = formatDate(singleDay);
+        } else if (periodType === 'single-month') {
             const singleMonth = document.getElementById('rpSingleMonth').value;
             if (!singleMonth) return showToast('Seleccione un mes', 'error');
             isSingleMonth = true;
+            queryParams += `&mes=${singleMonth}`;
             const [y, m] = singleMonth.split('-').map(Number);
-            const start = new Date(y, m - 1, 1);
-            const end = new Date(y, m, 0); // last day of month
-            desde = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`;
-            hasta = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
-
             const monthDate = new Date(y, m - 1, 1);
             singleMonthLabel = monthDate.toLocaleDateString('es-PY', { month: 'long', year: 'numeric' });
         } else if (periodType === 'month-range') {
             const mFrom = document.getElementById('rpMonthFrom').value;
             const mTo = document.getElementById('rpMonthTo').value;
             if (!mFrom || !mTo) return showToast('Seleccione los meses del rango', 'error');
-            const [y1, mo1] = mFrom.split('-').map(Number);
-            const [y2, mo2] = mTo.split('-').map(Number);
-            const start = new Date(y1, mo1 - 1, 1);
-            const end = new Date(y2, mo2, 0);
-            desde = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`;
-            hasta = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, '0')}-${String(end.getDate()).padStart(2, '0')}`;
+            queryParams += `&mesDesde=${mFrom}&mesHasta=${mTo}`;
         } else {
-            desde = document.getElementById('rpDesde').value;
-            hasta = document.getElementById('rpHasta').value;
+            const desde = document.getElementById('rpDesde').value;
+            const hasta = document.getElementById('rpHasta').value;
             if (!desde || !hasta) return showToast('Seleccione rango de fechas', 'error');
+            queryParams += `&desde=${desde}&hasta=${hasta}`;
         }
+
+        if (proveedorId) queryParams += `&proveedorId=${proveedorId}`;
+        if (formaPagoId) queryParams += `&formaPagoId=${formaPagoId}`;
 
         const rpTable = document.getElementById('rpTable');
         rpTable.innerHTML = '<div class="empty-state"><p>Cargando reporte...</p></div>';
 
         try {
-            let url = `/supplier-payments/reporte?desde=${desde}&hasta=${hasta}`;
-            if (proveedorId) url += `&proveedorId=${proveedorId}`;
-            if (formaPagoId) url += `&formaPagoId=${formaPagoId}`;
-
-            const result = await api.get(url);
-            renderReportTable(result, { isSingleMonth, singleMonthLabel, desde, hasta });
+            const result = await api.get(`/supplier-payments/reporte?${queryParams}`);
+            renderReportTable(result, { isSingleMonth, isSingleDay, singleMonthLabel, singleDayLabel, filtroFecha });
         } catch (err) {
             rpTable.innerHTML = `<div class="empty-state"><p>Error: ${err.message}</p></div>`;
         }
@@ -610,13 +637,13 @@ let lastReportMeta = null;
 function renderReportTable(result, meta = {}) {
     lastReportData = result;
     lastReportMeta = meta;
-    const { meses, data } = result;
+    const { meses, data, pagos = [] } = result;
     const kpisEl = document.getElementById('rpKpis');
     const tableEl = document.getElementById('rpTable');
 
-    if (data.length === 0) {
+    if (data.length === 0 && pagos.length === 0) {
         kpisEl.innerHTML = '';
-        tableEl.innerHTML = '<div class="empty-state" style="padding:3rem"><i data-lucide="file-x"></i><h3>Sin datos</h3><p>No se encontraron pagos a proveedores en el período seleccionado.</p></div>';
+        tableEl.innerHTML = '<div class="empty-state" style="padding:3rem"><i data-lucide="file-x"></i><h3>Sin datos</h3><p>No se encontraron pagos a proveedores con los filtros seleccionados.</p></div>';
         if (window.lucide) lucide.createIcons();
         return;
     }
@@ -627,20 +654,24 @@ function renderReportTable(result, meta = {}) {
     const promedioMensual = meses.length > 0 ? totalGeneral / meses.length : 0;
     const mayorPago = data.reduce((a, b) => a.total > b.total ? a : b, { total: 0, proveedor: '—' });
 
+    let subPeriodo = `${meses.length} mes(es)`;
+    if (meta.isSingleDay) subPeriodo = meta.singleDayLabel || 'Día único';
+    else if (meta.isSingleMonth) subPeriodo = meta.singleMonthLabel || meses[0];
+
     kpisEl.innerHTML = `
       <div class="card kpi-card">
         <div class="kpi-label">Total Pagado</div>
         <div class="kpi-value">${formatCurrency(totalGeneral)}</div>
-        <div class="kpi-sub">${meta.isSingleMonth ? (meta.singleMonthLabel || meses[0]) : `${meses.length} mes(es)`}</div>
+        <div class="kpi-sub">${subPeriodo}</div>
       </div>
       <div class="card kpi-card">
         <div class="kpi-label">Proveedores Pagados</div>
         <div class="kpi-value">${totalProveedores}</div>
-        <div class="kpi-sub">${data.filter(d => d.total > 0).length} con movimiento</div>
+        <div class="kpi-sub">${pagos.length} registro(s) de pago</div>
       </div>
       <div class="card kpi-card">
-        <div class="kpi-label">${meta.isSingleMonth ? 'Promedio por Proveedor' : 'Promedio Mensual'}</div>
-        <div class="kpi-value">${formatCurrency(meta.isSingleMonth ? (totalProveedores ? totalGeneral / totalProveedores : 0) : promedioMensual)}</div>
+        <div class="kpi-label">${meta.isSingleMonth || meta.isSingleDay ? 'Promedio por Proveedor' : 'Promedio Mensual'}</div>
+        <div class="kpi-value">${formatCurrency(meta.isSingleMonth || meta.isSingleDay ? (totalProveedores ? totalGeneral / totalProveedores : 0) : promedioMensual)}</div>
       </div>
       <div class="card kpi-card">
         <div class="kpi-label">Mayor Proveedor</div>
@@ -658,110 +689,140 @@ function renderReportTable(result, meta = {}) {
 
     const totalsPorMes = meses.map(m => data.reduce((s, r) => s + (r.meses[m] || 0), 0));
 
-    tableEl.innerHTML = `
-    <div class="table-container sp-report-table-wrap">
-      <table class="sp-report-table">
-        <thead>
-          <tr>
-            <th class="sp-sticky-col">Proveedor</th>
-            ${meses.map((m, i) => `<th class="sp-month-col">${monthLabels[i]}</th>`).join('')}
-            ${meta.isSingleMonth ? '<th style="text-align:right">% Participación</th>' : ''}
-            <th class="sp-total-col">Total Pagado</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${data.map(row => {
-              const cells = meses.map((m, i) => {
-                  const val = row.meses[m] || 0;
-                  let variacion = '';
-                  if (i > 0) {
-                      const prev = row.meses[meses[i - 1]] || 0;
-                      if (prev > 0) {
-                          const pct = ((val - prev) / prev * 100).toFixed(1);
-                          const cls = parseFloat(pct) > 0 ? 'sp-var-up' : parseFloat(pct) < 0 ? 'sp-var-down' : 'sp-var-neutral';
-                          const arrow = parseFloat(pct) > 0 ? '↑' : parseFloat(pct) < 0 ? '↓' : '→';
-                          variacion = `<span class="${cls}">${arrow}${Math.abs(parseFloat(pct))}%</span>`;
-                      } else if (val > 0) {
-                          variacion = '<span class="sp-var-up">↑ nuevo</span>';
+    let html = '';
+
+    // If month comparison pivot has columns
+    if (meses.length > 0) {
+        html += `
+        <div class="table-container sp-report-table-wrap" style="margin-bottom:1.5rem">
+          <table class="sp-report-table">
+            <thead>
+              <tr>
+                <th class="sp-sticky-col">Proveedor</th>
+                ${meses.map((m, i) => `<th class="sp-month-col">${monthLabels[i]}</th>`).join('')}
+                ${meta.isSingleMonth ? '<th style="text-align:right">% Participación</th>' : ''}
+                <th class="sp-total-col">Total Pagado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.map(row => {
+                  const cells = meses.map((m, i) => {
+                      const val = row.meses[m] || 0;
+                      let variacion = '';
+                      if (i > 0) {
+                          const prev = row.meses[meses[i - 1]] || 0;
+                          if (prev > 0) {
+                              const pct = ((val - prev) / prev * 100).toFixed(1);
+                              const cls = parseFloat(pct) > 0 ? 'sp-var-up' : parseFloat(pct) < 0 ? 'sp-var-down' : 'sp-var-neutral';
+                              const arrow = parseFloat(pct) > 0 ? '↑' : parseFloat(pct) < 0 ? '↓' : '→';
+                              variacion = `<span class="${cls}">${arrow}${Math.abs(parseFloat(pct))}%</span>`;
+                          } else if (val > 0) {
+                              variacion = '<span class="sp-var-up">↑ nuevo</span>';
+                          }
                       }
-                  }
-                  return `<td class="sp-month-col"><div class="sp-cell-val">${val > 0 ? formatCurrency(val) : '<span style="color:var(--text-muted)">—</span>'}</div>${variacion ? `<div class="sp-cell-var">${variacion}</div>` : ''}</td>`;
-              }).join('');
+                      return `<td class="sp-month-col"><div class="sp-cell-val">${val > 0 ? formatCurrency(val) : '<span style="color:var(--text-muted)">—</span>'}</div>${variacion ? `<div class="sp-cell-var">${variacion}</div>` : ''}</td>`;
+                  }).join('');
 
-              const participacion = meta.isSingleMonth && totalGeneral > 0
-                  ? `<td style="text-align:right;color:var(--text-secondary);font-size:.82rem;font-variant-numeric:tabular-nums">${((row.total / totalGeneral) * 100).toFixed(1)}%</td>`
-                  : '';
+                  const participacion = meta.isSingleMonth && totalGeneral > 0
+                      ? `<td style="text-align:right;color:var(--text-secondary);font-size:.82rem;font-variant-numeric:tabular-nums">${((row.total / totalGeneral) * 100).toFixed(1)}%</td>`
+                      : '';
 
-              return `<tr>
-                <td class="sp-sticky-col"><strong>${escapeHTML(row.proveedor)}</strong></td>
-                ${cells}
-                ${participacion}
-                <td class="sp-total-col"><strong>${formatCurrency(row.total)}</strong></td>
-              </tr>`;
-          }).join('')}
-        </tbody>
-        <tfoot>
-          <tr class="sp-totals-row">
-            <td class="sp-sticky-col"><strong>TOTAL</strong></td>
-            ${totalsPorMes.map(t => `<td class="sp-month-col"><strong>${formatCurrency(t)}</strong></td>`).join('')}
-            ${meta.isSingleMonth ? '<td style="text-align:right;font-weight:700">100.0%</td>' : ''}
-            <td class="sp-total-col"><strong>${formatCurrency(totalGeneral)}</strong></td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>`;
+                  return `<tr>
+                    <td class="sp-sticky-col"><strong>${escapeHTML(row.proveedor)}</strong></td>
+                    ${cells}
+                    ${participacion}
+                    <td class="sp-total-col"><strong>${formatCurrency(row.total)}</strong></td>
+                  </tr>`;
+              }).join('')}
+            </tbody>
+            <tfoot>
+              <tr class="sp-totals-row">
+                <td class="sp-sticky-col"><strong>TOTAL</strong></td>
+                ${totalsPorMes.map(t => `<td class="sp-month-col"><strong>${formatCurrency(t)}</strong></td>`).join('')}
+                ${meta.isSingleMonth ? '<td style="text-align:right;font-weight:700">100.0%</td>' : ''}
+                <td class="sp-total-col"><strong>${formatCurrency(totalGeneral)}</strong></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>`;
+    }
+
+    // Detailed List of Payments
+    if (pagos.length > 0) {
+        html += `
+        <div style="margin-top:1.5rem">
+          <h4 style="font-size:.9rem;font-weight:700;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
+            <i data-lucide="list"></i>Detalle de Cheques / Pagos Entregados (${pagos.length})
+          </h4>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Día de Pago (Entrega)</th>
+                  <th>Día de Cobro (Cheque)</th>
+                  <th>Mes Imputado</th>
+                  <th>Proveedor</th>
+                  <th>Forma de Pago</th>
+                  <th style="text-align:right">Monto</th>
+                  <th>Observación</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pagos.map(p => `
+                <tr>
+                  <td><strong>${formatDate(p.fechaPago)}</strong></td>
+                  <td style="color:var(--text-secondary)">${p.fechaCobro ? formatDate(p.fechaCobro) : '—'}</td>
+                  <td><span class="badge badge-primary">${p.mesPago || '—'}</span></td>
+                  <td>${escapeHTML(p.proveedorNombre)}</td>
+                  <td><span class="badge badge-info">${escapeHTML(p.formaPagoNombre)}</span></td>
+                  <td style="text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${formatCurrency(p.monto)}</td>
+                  <td style="color:var(--text-secondary);font-size:.82rem">${escapeHTML(p.observacion || '—')}</td>
+                </tr>`).join('')}
+              </tbody>
+              <tfoot>
+                <tr style="font-weight:700;background:rgba(128,128,128,0.06)">
+                  <td colspan="5">TOTAL</td>
+                  <td style="text-align:right">${formatCurrency(pagos.reduce((s, p) => s + p.monto, 0))}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>`;
+    }
+
+    tableEl.innerHTML = html;
     if (window.lucide) lucide.createIcons();
 }
 
 function exportReport() {
-    if (!lastReportData || !lastReportData.data.length) return showToast('No hay datos para exportar', 'error');
-    const { meses, data } = lastReportData;
+    if (!lastReportData || (!lastReportData.data.length && !lastReportData.pagos?.length)) return showToast('No hay datos para exportar', 'error');
+    const { data, pagos = [] } = lastReportData;
     const meta = lastReportMeta || {};
 
-    const monthLabels = meses.map(m => {
-        const [y, mo] = m.split('-');
-        const date = new Date(parseInt(y), parseInt(mo) - 1);
-        return date.toLocaleDateString('es-PY', { month: 'long', year: 'numeric' });
-    });
-
-    const totalGeneral = data.reduce((s, r) => s + r.total, 0);
-
-    let headers = [];
+    let headers = ['Día de Pago (Entrega)', 'Día de Cobro (Cheque)', 'Mes Imputado', 'Proveedor', 'Forma de Pago', 'Monto (₲)', 'Observación'];
     let rows = [];
 
-    if (meta.isSingleMonth) {
-        headers = ['Proveedor', `Monto Pagado (${monthLabels[0] || 'Mes'})`, '% Participación', 'Total'];
-        rows = data.map(row => [
-            row.proveedor,
-            row.total,
-            totalGeneral > 0 ? `${((row.total / totalGeneral) * 100).toFixed(1)}%` : '0%',
-            row.total
+    if (pagos.length > 0) {
+        rows = pagos.map(p => [
+            formatDate(p.fechaPago),
+            p.fechaCobro ? formatDate(p.fechaCobro) : '—',
+            p.mesPago || '—',
+            p.proveedorNombre,
+            p.formaPagoNombre,
+            p.monto,
+            p.observacion || ''
         ]);
-        rows.push(['TOTAL', totalGeneral, '100.0%', totalGeneral]);
+        const totalPagos = pagos.reduce((s, p) => s + p.monto, 0);
+        rows.push(['TOTAL', '', '', '', '', totalPagos, '']);
     } else {
-        headers = ['Proveedor', ...monthLabels, 'Total Pagado'];
-        rows = data.map(row => [
-            row.proveedor,
-            ...meses.map(m => row.meses[m] || 0),
-            row.total
-        ]);
-        const totalRow = ['TOTAL', ...meses.map(m => data.reduce((s, r) => s + (r.meses[m] || 0), 0)), totalGeneral];
-        rows.push(totalRow);
+        headers = ['Proveedor', 'Total Pagado'];
+        rows = data.map(r => [r.proveedor, r.total]);
+        const total = data.reduce((s, r) => s + r.total, 0);
+        rows.push(['TOTAL', total]);
     }
 
-    let filename = 'Reporte_Pagos_Proveedores.xlsx';
-    if (meta.isSingleMonth && meses[0]) {
-        const [y, mo] = meses[0].split('-');
-        const date = new Date(parseInt(y), parseInt(mo) - 1, 1);
-        const monthName = date.toLocaleDateString('es-PY', { month: 'long' });
-        const cleanMonthName = monthName.charAt(0).toUpperCase() + monthName.slice(1);
-        filename = `Reporte_Pagos_Proveedores_${cleanMonthName}_${y}.xlsx`;
-    } else if (meses.length > 1) {
-        filename = `Reporte_Pagos_Proveedores_${meses[0]}_a_${meses[meses.length - 1]}.xlsx`;
-    } else {
-        filename = `Reporte_Pagos_Proveedores_${todayStr()}.xlsx`;
-    }
-
+    let filename = `Reporte_Pagos_Proveedores_${todayStr()}.xlsx`;
     exportExcel(headers, rows, filename, 'Pagos Proveedores');
     showToast('Reporte exportado exitosamente a Excel');
 }
