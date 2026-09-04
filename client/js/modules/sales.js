@@ -366,48 +366,48 @@ export function showTicket(sale) {
   const ticketId = sale.id.slice(-6).toUpperCase();
 
   const body = `
-    <div class="ticket-preview" id="ticketPrintArea">
+    <div class="ticket-preview" id="ticketPrintArea" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#000;font-weight:600">
       <!-- Encabezado -->
-      <div style="text-align:center;font-family:'Courier New',Courier,monospace">
-        <div style="font-weight:700;font-size:1rem;letter-spacing:1px">COMEDOR TTA S.A.</div>
-        <div style="font-size:.72rem;color:#555;margin-top:2px">Vale de Comedor</div>
+      <div style="text-align:center">
+        <div style="font-weight:800;font-size:1.05rem;letter-spacing:0.5px">COMEDOR TTA S.A.</div>
+        <div style="font-size:.78rem;font-weight:700;color:#000;margin-top:2px">Vale de Comedor</div>
       </div>
-      <div class="ticket-divider"></div>
+      <div class="ticket-divider" style="border-color:#000"></div>
 
       <!-- Datos de venta -->
-      <div class="ticket-line"><span>Ticket #:</span><span>${ticketId}</span></div>
+      <div class="ticket-line"><span>Ticket #:</span><span style="font-weight:800">${ticketId}</span></div>
       <div class="ticket-line"><span>Fecha:</span><span>${formatDateTime(sale.date)}</span></div>
-      <div class="ticket-line"><span>Cliente:</span><span>${escapeHTML(sale.clientName)}</span></div>
+      <div class="ticket-line"><span>Cliente:</span><span style="font-weight:700">${escapeHTML(sale.clientName)}</span></div>
       <div class="ticket-line"><span>Pago:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
       <div class="ticket-line"><span>Cajero:</span><span>${escapeHTML(vendorName)}</span></div>
-      <div class="ticket-divider"></div>
+      <div class="ticket-divider" style="border-color:#000"></div>
 
       <!-- Items -->
-      <div style="font-family:'Courier New',Courier,monospace;font-size:.72rem">
-        <div style="display:flex;justify-content:space-between;font-weight:700;border-bottom:1px dashed #ccc;padding-bottom:2px;margin-bottom:4px">
+      <div style="font-size:.8rem">
+        <div style="display:flex;justify-content:space-between;font-weight:800;border-bottom:1.5px dashed #000;padding-bottom:2px;margin-bottom:4px">
           <span>Producto</span><span>SubTotal</span>
         </div>
         ${sale.items.map(it => `
         <div style="display:flex;justify-content:space-between;margin-bottom:2px">
           <span>${escapeHTML(it.name)} x${it.quantity}${it.unit ? ' '+it.unit : ''}</span>
-          <span>${formatCurrency(it.price * it.quantity)}</span>
+          <span style="font-weight:700">${formatCurrency(it.price * it.quantity)}</span>
         </div>`).join('')}
       </div>
-      <div class="ticket-divider"></div>
+      <div class="ticket-divider" style="border-color:#000"></div>
 
       <!-- Total -->
-      <div class="ticket-line ticket-total"><span>TOTAL</span><span>${formatCurrency(sale.total)}</span></div>
-      <div class="ticket-divider"></div>
+      <div class="ticket-line ticket-total" style="font-weight:800;font-size:1rem;color:#000"><span>TOTAL</span><span>${formatCurrency(sale.total)}</span></div>
+      <div class="ticket-divider" style="border-color:#000"></div>
 
       <!-- Mensaje -->
-      <div style="text-align:center;font-size:.68rem;color:#555;margin:6px 0">¡Gracias por su consumo!</div>
-      <div class="ticket-divider" style="margin-bottom:10px"></div>
+      <div style="text-align:center;font-size:.75rem;font-weight:700;color:#000;margin:6px 0">¡Gracias por su consumo!</div>
+      <div class="ticket-divider" style="margin-bottom:10px;border-color:#000"></div>
 
-      <!-- Firma exclusiva del cliente (centrada y destacada con amplio espacio para firmar) -->
-      <div style="text-align:center;margin:15px auto 10px auto;width:80%;font-family:'Courier New',Courier,monospace">
-        <div style="border-top:2px solid #333;padding-top:6px;margin-top:65px">
-          <div style="font-weight:700;font-size:.85rem">${escapeHTML(sale.clientName)}</div>
-          <div style="font-size:.72rem;font-weight:700;letter-spacing:1px;color:#333;margin-top:2px">FIRMA DEL CLIENTE</div>
+      <!-- Firma exclusiva del cliente -->
+      <div style="text-align:center;margin:15px auto 10px auto;width:85%">
+        <div style="border-top:2px solid #000;padding-top:6px;margin-top:55px">
+          <div style="font-weight:800;font-size:.85rem">${escapeHTML(sale.clientName)}</div>
+          <div style="font-size:.72rem;font-weight:800;letter-spacing:0.5px;color:#000;margin-top:2px">FIRMA DEL CLIENTE</div>
         </div>
       </div>
     </div>`;
@@ -451,118 +451,136 @@ export function printTicket(sale, ...rest) {
   <style>
     @page {
       margin: 0;
-      size: 80mm auto;
+      size: auto;
     }
     * { 
       box-sizing: border-box; 
       margin: 0; 
-      padding: 0; 
+      padding: 0;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      color-adjust: exact !important;
     }
     body {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 9.5pt;
-      line-height: 1.35;
-      width: 72mm;
-      max-width: 100%;
-      padding: 2mm 3mm 10mm 3mm;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 8.5pt;
+      font-weight: 600;
+      line-height: 1.3;
+      width: 100%;
+      max-width: 60mm;
+      padding: 2mm 3mm 8mm 3mm;
       margin: 0 auto;
       background: #fff;
-      color: #000;
+      color: #000000;
+      -webkit-font-smoothing: antialiased;
     }
     .center { 
       text-align: center; 
     }
     .bold { 
-      font-weight: 700; 
+      font-weight: 800; 
     }
     .header-title {
-      font-weight: 700;
-      font-size: 12pt;
-      letter-spacing: 1.5px;
+      font-weight: 800;
+      font-size: 11pt;
+      letter-spacing: 0.5px;
+      color: #000000;
     }
     .header-subtitle {
-      font-size: 9pt;
-      color: #222;
-      margin-top: 2px;
+      font-size: 8pt;
+      font-weight: 700;
+      color: #000000;
+      margin-top: 1px;
     }
     .divider-dash {
       border: none;
-      border-top: 1px dashed #444;
-      margin: 5px 0;
+      border-top: 1.5px dashed #000000;
+      margin: 4px 0;
     }
     .ticket-line {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 8px;
-      margin: 2.5px 0;
-      font-size: 9.5pt;
+      gap: 6px;
+      margin: 2px 0;
+      font-size: 8.5pt;
+      font-weight: 600;
+      color: #000000;
     }
     .ticket-line span:first-child {
       flex-shrink: 0;
+      font-weight: 700;
     }
     .ticket-line span:last-child {
       text-align: right;
       word-break: break-word;
+      font-weight: 600;
     }
     .items-header {
       display: flex;
       justify-content: space-between;
-      font-weight: 700;
-      border-bottom: 1px dashed #444;
-      padding-bottom: 3px;
-      margin-bottom: 4px;
-      font-size: 9.5pt;
+      font-weight: 800;
+      border-bottom: 1.5px dashed #000000;
+      padding-bottom: 2px;
+      margin-bottom: 3px;
+      font-size: 8.5pt;
+      color: #000000;
     }
     .item-row {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 3px;
-      font-size: 9.5pt;
+      gap: 6px;
+      margin-bottom: 2.5px;
+      font-size: 8.5pt;
+      font-weight: 600;
+      color: #000000;
     }
     .item-name {
       text-align: left;
       word-break: break-word;
-      padding-right: 6px;
+      padding-right: 4px;
     }
     .item-price {
       white-space: nowrap;
       text-align: right;
+      font-weight: 700;
     }
     .ticket-total {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 11.5pt;
-      font-weight: 700;
-      margin: 4px 0;
+      font-size: 10.5pt;
+      font-weight: 800;
+      margin: 3px 0;
+      color: #000000;
     }
     .ticket-message {
       text-align: center;
-      font-size: 9pt;
-      color: #333;
-      margin: 6px 0;
+      font-size: 8pt;
+      font-weight: 700;
+      color: #000000;
+      margin: 5px 0;
     }
     .signature-container {
       text-align: center;
-      margin: 20mm auto 5mm auto;
-      width: 85%;
+      margin: 14mm auto 4mm auto;
+      width: 90%;
     }
     .signature-line-bar {
-      border-top: 2px solid #000;
-      padding-top: 5px;
+      border-top: 2px solid #000000;
+      padding-top: 4px;
     }
     .signature-client {
-      font-weight: 700;
-      font-size: 9.5pt;
+      font-weight: 800;
+      font-size: 8.5pt;
+      color: #000000;
     }
     .signature-caption {
-      font-size: 8pt;
-      font-weight: 700;
-      letter-spacing: 1px;
-      color: #222;
+      font-size: 7.5pt;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #000000;
       margin-top: 2px;
     }
   </style>

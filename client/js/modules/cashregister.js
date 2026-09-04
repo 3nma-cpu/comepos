@@ -632,21 +632,21 @@ async function printRegisterReport(registerId) {
     <meta charset="UTF-8"/>
     <title>Reporte de Caja</title>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Courier New', Courier, monospace; font-size: 10pt; padding: 10mm; max-width: 210mm; margin: 0 auto; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; font-size: 9pt; font-weight: 600; padding: 6mm; max-width: 80mm; margin: 0 auto; color: #000; }
         .center { text-align: center; }
-        .bold { font-weight: bold; }
-        .divider { border-top: 1px dashed #000; margin: 4px 0; }
-        .info-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 9pt; }
+        .bold { font-weight: 800; }
+        .divider { border-top: 1.5px dashed #000; margin: 4px 0; }
+        .info-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 8.5pt; }
         table { width: 100%; border-collapse: collapse; font-size: 8pt; margin: 4px 0; }
-        td, th { padding: 2px 4px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { font-weight: bold; }
-        .total-row { font-weight: bold; font-size: 11pt; border-top: 2px solid #000; }
-        @media print { body { padding: 5mm; } }
+        td, th { padding: 2px 4px; text-align: left; border-bottom: 1px solid #000; }
+        th { font-weight: 800; }
+        .total-row { font-weight: 800; font-size: 10.5pt; border-top: 2px solid #000; }
+        @media print { body { padding: 2mm; width: 100%; max-width: 70mm; } }
     </style>
 </head>
 <body>
-    <div class="center bold" style="font-size:14pt;letter-spacing:2px">COMEDOR TTA S.A.</div>
+    <div class="center bold" style="font-size:12pt;letter-spacing:1px">COMEDOR TTA S.A.</div>
     <div class="center" style="font-size:9pt;margin-bottom:4px">Reporte de Cierre de Caja</div>
     <div class="divider"></div>
 
