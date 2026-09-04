@@ -39,8 +39,10 @@ export async function refreshCurrentUser() {
 
 export function hasPermission(module) {
   const user = getCurrentUser();
-  if (!user) return false;
-  return user.permissions && user.permissions.includes(module);
+  if (!user || !user.permissions) return false;
+  if (module === 'pagos-proveedores' && user.permissions.includes('supplier-payments')) return true;
+  if (module === 'supplier-payments' && user.permissions.includes('pagos-proveedores')) return true;
+  return user.permissions.includes(module);
 }
 
 export function renderLoginScreen(onLogin) {

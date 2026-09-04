@@ -63,6 +63,20 @@ const ROUTE_TITLES = {
     'supplier-payments': 'Pagos a Proveedores'
 };
 
+const ROUTE_PERMS = {
+    dashboard: 'dashboard',
+    users: 'users',
+    roles: 'roles',
+    clients: 'clients',
+    products: 'products',
+    purchases: 'purchases',
+    cashregister: 'cashregister',
+    sales: 'sales',
+    reports: 'reports',
+    'pagos-proveedores': 'supplier-payments',
+    'supplier-payments': 'supplier-payments'
+};
+
 const ROUTE_HANDLERS = {
     dashboard: renderDashboard,
     users: renderUsers,
@@ -405,7 +419,8 @@ function renderApp(user, defaultRoute = null) {
     Object.entries(ROUTE_HANDLERS).forEach(([path, handler]) => {
         registerRoute(path, () => {
             document.getElementById('pageTitle').textContent = ROUTE_TITLES[path] || path;
-            if (hasPermission(path)) {
+            const requiredPerm = ROUTE_PERMS[path] || path;
+            if (hasPermission(requiredPerm)) {
                 handler();
             } else {
                 document.getElementById('module-content').innerHTML = `
