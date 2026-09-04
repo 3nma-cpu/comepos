@@ -15,7 +15,7 @@ const ALL_PERMISSIONS = [
     { id: 'cashregister', label: 'Caja' },
     { id: 'sales', label: 'Ventas' },
     { id: 'reports', label: 'Reportes' },
-    { id: 'supplier-payments', label: 'Pagos Proveedores' }
+    { id: 'supplier-payments', label: 'Pagos a Proveedores' }
 ];
 
 export async function renderRoles() {

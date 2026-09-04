@@ -44,7 +44,7 @@ const NAV_ITEMS = [
     },
     {
         section: 'Finanzas', items: [
-            { route: 'supplier-payments', label: 'Pagos Proveedores', icon: 'receipt', perm: 'supplier-payments' }
+            { route: 'pagos-proveedores', label: 'Pagos a Proveedores', icon: 'receipt', perm: 'supplier-payments' }
         ]
     }
 ];
@@ -59,6 +59,7 @@ const ROUTE_TITLES = {
     cashregister: 'Caja',
     sales: 'Punto de Venta',
     reports: 'Reportes',
+    'pagos-proveedores': 'Pagos a Proveedores',
     'supplier-payments': 'Pagos a Proveedores'
 };
 
@@ -72,6 +73,7 @@ const ROUTE_HANDLERS = {
     cashregister: renderCashRegister,
     sales: renderSales,
     reports: renderReports,
+    'pagos-proveedores': renderSupplierPayments,
     'supplier-payments': renderSupplierPayments
 };
 
@@ -216,6 +218,9 @@ function confirmLogout() {
             overlay.remove();
             stopInactivityWatcher();
             logout();
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', '/');
+            }
             boot();
         }, 200);
     });
@@ -235,6 +240,25 @@ window.addEventListener('comepos:session-expired', () => {
     showSessionExpiredScreen('sesión inválida o expirada');
 });
 
+// Calculate default route for user:
+// 1. Dashboard (if has permission)
+// 2. Punto de Venta / Sales (if has permission)
+// 3. First available module
+export function getDefaultRoute(user) {
+    if (!user) return 'dashboard';
+    if (hasPermission('dashboard')) return 'dashboard';
+    if (hasPermission('sales')) return 'sales';
+    
+    for (const section of NAV_ITEMS) {
+        for (const item of section.items) {
+            if (hasPermission(item.perm)) {
+                return item.route;
+            }
+        }
+    }
+    return 'dashboard';
+}
+
 // Boot
 async function boot() {
     initTheme();
@@ -250,7 +274,8 @@ async function boot() {
         } catch (e) {
             console.warn('Could not sync user profile:', e);
         }
-        renderApp(user);
+        const defaultRoute = getDefaultRoute(user);
+        renderApp(user, defaultRoute);
     }
 }
 
@@ -273,11 +298,15 @@ function toggleTheme() {
 }
 
 function onLogin(user) {
-    renderApp(user);
+    const targetRoute = getDefaultRoute(user);
+    renderApp(user, targetRoute);
+    navigate(targetRoute, { replace: true, trigger: true });
 }
 
-function renderApp(user) {
+function renderApp(user, defaultRoute = null) {
     const app = document.getElementById('app');
+    const userDefaultRoute = defaultRoute || getDefaultRoute(user);
+
     const visibleNav = NAV_ITEMS.map(section => ({
         ...section,
         items: section.items.filter(item => hasPermission(item.perm))
@@ -333,8 +362,6 @@ function renderApp(user) {
       </main>
     </div>`;
 
-
-
     // Sidebar Mobile Toggle
     const sidebar = document.getElementById('mainSidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -388,7 +415,7 @@ function renderApp(user) {
         });
     });
 
-    initRouter('dashboard');
+    initRouter(userDefaultRoute);
 
     // Start inactivity watcher after app is rendered
     startInactivityWatcher();
