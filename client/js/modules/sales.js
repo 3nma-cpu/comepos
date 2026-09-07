@@ -174,9 +174,11 @@ function renderProductGrid(products, category, search) {
     const stockDisplay = unit === 'UNI' ? Math.floor(p.stock) : Number(p.stock).toFixed(2);
     return `
     <div class="product-card ${p.stock <= 0 ? 'out-of-stock' : ''}" data-prod-id="${p.id}">
-      <div class="product-name" style="font-weight:700">${escapeHTML(p.name)}</div>
-      <div class="product-price">${formatCurrency(p.price)}<span style="font-size:.7rem;color:var(--text-muted)"> / ${unit}</span></div>
-      <div style="font-size:.7rem;color:${p.stock <= 5 ? 'var(--warning)' : 'var(--text-muted)'};margin-top:.25rem">Stock: ${stockDisplay} ${unit}</div>
+      <div class="product-name">${escapeHTML(p.name)}</div>
+      <div class="product-info-bottom">
+        <div class="product-price">${formatCurrency(p.price)}<span class="product-unit"> / ${unit}</span></div>
+        <div class="product-stock ${p.stock <= 5 ? 'low-stock' : ''}">Stock: ${stockDisplay} ${unit}</div>
+      </div>
     </div>`;
   }).join('');
 

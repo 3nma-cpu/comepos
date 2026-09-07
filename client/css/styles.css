@@ -1038,22 +1038,29 @@ tbody tr:last-child td {
 
 .product-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: .65rem
+    grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+    gap: .75rem
 }
 
 .product-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: .85rem;
+    padding: 1.1rem .9rem;
     cursor: pointer;
     transition: all var(--transition);
-    text-align: center
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 125px
 }
 
 .product-card:hover {
-    border-color: var(--text-muted);
+    border-color: var(--primary-light);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow)
 }
 
 .product-card .product-emoji {
@@ -1062,18 +1069,45 @@ tbody tr:last-child td {
 }
 
 .product-card .product-name {
-    font-size: .8rem;
-    font-weight: 600;
-    margin-bottom: .2rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis
+    font-size: .88rem;
+    font-weight: 700;
+    margin-bottom: .4rem;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.35;
+    width: 100%
+}
+
+.product-card .product-info-bottom {
+    margin-top: auto;
+    width: 100%
 }
 
 .product-card .product-price {
-    color: var(--text-secondary);
+    color: var(--text);
     font-weight: 700;
-    font-size: .85rem
+    font-size: .95rem;
+    line-height: 1.2
+}
+
+.product-card .product-unit {
+    font-size: .75rem;
+    color: var(--text-muted);
+    font-weight: 500
+}
+
+.product-card .product-stock {
+    font-size: .75rem;
+    margin-top: .3rem;
+    color: var(--text-muted);
+    font-weight: 500
+}
+
+.product-card .product-stock.low-stock {
+    color: var(--warning)
 }
 
 .product-card.out-of-stock {
