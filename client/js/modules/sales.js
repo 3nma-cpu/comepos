@@ -364,21 +364,92 @@ function processSale() {
   });
 }
 
+export function promptCancellationReason(saleTotal, onConfirm) {
+  const body = `
+    <div style="padding:0.5rem 0">
+      <p style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.9rem">
+        Se anulará la venta por <strong>${formatCurrency(saleTotal)}</strong>. Todos los productos serán reintegrados al stock automáticamente.
+      </p>
+      <div class="form-group" style="margin-bottom:1rem">
+        <label style="font-weight:600;margin-bottom:0.4rem;display:block;font-size:0.85rem">Motivo de anulación:</label>
+        <select class="form-control" id="mCancelReasonSelect" style="margin-bottom:0.6rem">
+          <option value="Error de digitación / cobro">Error de digitación / cobro</option>
+          <option value="Cliente desistió / devolvió productos">Cliente desistió / devolvió productos</option>
+          <option value="Error de cajero / producto duplicado">Error de cajero / producto duplicado</option>
+          <option value="Cambio de método de pago">Cambio de método de pago</option>
+          <option value="Otro">Otro motivo...</option>
+        </select>
+        <textarea class="form-control" id="mCancelReasonText" rows="2" placeholder="Detalle adicional o especifique el motivo..." style="resize:vertical"></textarea>
+      </div>
+    </div>`;
+
+  const footer = `
+    <button class="btn btn-ghost modal-close">Cancelar</button>
+    <button class="btn btn-danger" id="mBtnConfirmCancel">
+      <i data-lucide="ban"></i> Confirmar Anulación
+    </button>`;
+
+  const modal = createModal('Anular Venta y Devolver Stock', body, footer);
+  if (window.lucide) lucide.createIcons();
+
+  const select = modal.querySelector('#mCancelReasonSelect');
+  const textarea = modal.querySelector('#mCancelReasonText');
+  const btn = modal.querySelector('#mBtnConfirmCancel');
+
+  btn.onclick = async () => {
+    let reason = select.value;
+    const details = textarea.value.trim();
+    if (reason === 'Otro') {
+      if (!details) {
+        showToast('Por favor especifique el motivo de anulación', 'warning');
+        textarea.focus();
+        return;
+      }
+      reason = details;
+    } else if (details) {
+      reason = `${reason}: ${details}`;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i data-lucide="loader"></i> Anulando...';
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      await onConfirm(reason);
+      closeModal(modal);
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="ban"></i> Confirmar Anulación';
+      if (window.lucide) lucide.createIcons();
+    }
+  };
+}
+
 export function showTicket(sale, onDeleted = null) {
   const payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
   const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
   const vendorName = sale.userName || user.name || 'Cajero';
   const clientName = sale.clientName || sale.client?.name || 'Cliente';
   const saleDate = sale.date || sale.createdAt || new Date();
+  const isCancelled = sale.status === 'CANCELLED';
 
   const ticketId = (sale.id || '').slice(-6).toUpperCase();
 
   const body = `
     <div class="ticket-preview" id="ticketPrintArea" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#000;font-weight:600">
+      ${isCancelled ? `
+      <!-- Banner Anulación -->
+      <div style="background:#fee2e2;border:2px dashed #dc2626;color:#991b1b;border-radius:6px;padding:8px 10px;margin-bottom:12px;text-align:center">
+        <div style="font-weight:900;font-size:1.05rem;letter-spacing:1px">⚠️ VENTA ANULADA</div>
+        <div style="font-size:0.75rem;margin-top:3px"><strong>Fecha Anulación:</strong> ${formatDateTime(sale.cancelledAt || saleDate)}</div>
+        ${sale.cancelledByName ? `<div style="font-size:0.75rem"><strong>Por:</strong> ${escapeHTML(sale.cancelledByName)}</div>` : ''}
+        <div style="font-size:0.75rem;margin-top:2px"><strong>Motivo:</strong> ${escapeHTML(sale.cancellationReason || 'No especificado')}</div>
+      </div>` : ''}
+
       <!-- Encabezado -->
       <div style="text-align:center">
         <div style="font-weight:800;font-size:1.05rem;letter-spacing:0.5px">COMEDOR TTA S.A.</div>
-        <div style="font-size:.78rem;font-weight:700;color:#000;margin-top:2px">Vale de Comedor</div>
+        <div style="font-size:.78rem;font-weight:700;color:#000;margin-top:2px">${isCancelled ? 'Vale Anulado' : 'Vale de Comedor'}</div>
       </div>
       <div class="ticket-divider" style="border-color:#000"></div>
 
@@ -404,11 +475,16 @@ export function showTicket(sale, onDeleted = null) {
       <div class="ticket-divider" style="border-color:#000"></div>
 
       <!-- Total -->
-      <div class="ticket-line ticket-total" style="font-weight:800;font-size:1rem;color:#000"><span>TOTAL</span><span>${formatCurrency(sale.total)}</span></div>
+      <div class="ticket-line ticket-total" style="font-weight:800;font-size:1rem;color:#000">
+        <span>TOTAL</span>
+        <span style="${isCancelled ? 'text-decoration:line-through;color:#991b1b;' : ''}">${formatCurrency(sale.total)}</span>
+      </div>
       <div class="ticket-divider" style="border-color:#000"></div>
 
       <!-- Mensaje -->
-      <div style="text-align:center;font-size:.75rem;font-weight:700;color:#000;margin:6px 0">¡Gracias por su consumo!</div>
+      <div style="text-align:center;font-size:.75rem;font-weight:700;color:#000;margin:6px 0">
+        ${isCancelled ? 'COMPROBANTE DE VENTA ANULADA' : '¡Gracias por su consumo!'}
+      </div>
       <div class="ticket-divider" style="margin-bottom:10px;border-color:#000"></div>
 
       <!-- Firma exclusiva del cliente -->
@@ -421,42 +497,36 @@ export function showTicket(sale, onDeleted = null) {
     </div>`;
 
   const footer = `
+    ${!isCancelled ? `
     <button class="btn btn-danger btn-sm" id="btnDeleteSale">
-      <i data-lucide="trash-2"></i> Eliminar Venta
-    </button>
+      <i data-lucide="ban"></i> Anular Venta
+    </button>` : ''}
     <button class="btn btn-ghost" id="btnPrintTicket">
       <i data-lucide="printer"></i> Imprimir
     </button>
     <button class="btn btn-primary modal-close">Cerrar</button>`;
 
-  const modal = createModal('Ticket de Venta', body, footer);
+  const modal = createModal(isCancelled ? 'Ticket de Venta (ANULADA)' : 'Ticket de Venta', body, footer);
   if (window.lucide) lucide.createIcons();
 
   document.getElementById('btnPrintTicket').onclick = () => printTicket(sale);
 
   const btnDelete = document.getElementById('btnDeleteSale');
   if (btnDelete) {
-    btnDelete.onclick = async () => {
-      if (!confirm(`¿Está seguro de eliminar esta venta por ${formatCurrency(sale.total)}? Los productos volverán al stock.`)) {
-        return;
-      }
-      btnDelete.disabled = true;
-      btnDelete.innerHTML = '<i data-lucide="loader"></i> Eliminando...';
-      if (window.lucide) lucide.createIcons();
-
-      try {
-        await api.delete(`/sales/${sale.id}`);
-        showToast('Venta eliminada y stock devuelto', 'success');
-        closeModal(modal);
-        if (typeof onDeleted === 'function') {
-          onDeleted(sale.id);
+    btnDelete.onclick = () => {
+      promptCancellationReason(sale.total, async (reason) => {
+        try {
+          await api.delete(`/sales/${sale.id}`, { reason });
+          showToast('Venta anulada y stock devuelto', 'success');
+          closeModal(modal);
+          if (typeof onDeleted === 'function') {
+            onDeleted(sale.id, reason);
+          }
+        } catch (err) {
+          showToast('Error al anular venta: ' + err.message, 'error');
+          throw err;
         }
-      } catch (err) {
-        showToast('Error al eliminar venta: ' + err.message, 'error');
-        btnDelete.disabled = false;
-        btnDelete.innerHTML = '<i data-lucide="trash-2"></i> Eliminar Venta';
-        if (window.lucide) lucide.createIcons();
-      }
+      });
     };
   }
 }

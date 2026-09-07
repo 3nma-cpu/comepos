@@ -48,7 +48,7 @@ export const api = {
   get: (endpoint) => fetchAPI(endpoint),
   post: (endpoint, body) => fetchAPI(endpoint, { method: 'POST', body: JSON.stringify(body) }),
   put: (endpoint, body) => fetchAPI(endpoint, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: (endpoint) => fetchAPI(endpoint, { method: 'DELETE' }),
+  delete: (endpoint, body) => fetchAPI(endpoint, { method: 'DELETE', ...(body ? { body: JSON.stringify(body) } : {}) }),
 
   // Auth helpers
   login: async (username, password) => {

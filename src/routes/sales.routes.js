@@ -20,12 +20,18 @@ const MAX_LIMIT = 500;
 // GET /api/sales
 router.get('/', async (req, res) => {
   try {
-    const { from, to, limit } = req.query;
+    const { from, to, limit, status } = req.query;
     const where = {};
     if (from || to) {
       where.createdAt = {};
       if (from) where.createdAt.gte = new Date(from);
       if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999Z');
+    }
+
+    if (status) {
+      where.status = status;
+    } else {
+      where.status = 'COMPLETED'; // Por defecto solo ventas activas
     }
 
     // Acotar el límite para prevenir extracción masiva de datos
@@ -37,7 +43,12 @@ router.get('/', async (req, res) => {
 
     const sales = await prisma.sale.findMany({
       where,
-      include: { client: true, items: { include: { product: true } }, user: true },
+      include: {
+        client: true,
+        items: { include: { product: true } },
+        user: true,
+        cancelledBy: { select: { id: true, name: true, username: true } }
+      },
       orderBy: { createdAt: 'desc' },
       take
     });
@@ -50,6 +61,11 @@ router.get('/', async (req, res) => {
       clientCategory: CAT_REVERSE[s.client?.category] || s.client?.category || '',
       total: s.total,
       paymentMethod: PAY_REVERSE[s.paymentMethod] || s.paymentMethod,
+      status: s.status,
+      cancelledAt: s.cancelledAt ? s.cancelledAt.toISOString() : null,
+      cancelledById: s.cancelledById,
+      cancelledByName: s.cancelledBy?.name || null,
+      cancellationReason: s.cancellationReason || null,
       date: s.createdAt.toISOString(),
       userId: s.userId,
       items: s.items.map(i => ({
@@ -175,10 +191,12 @@ router.post('/', async (req, res) => {
   }
 });
 
-// DELETE /api/sales/:id
+// DELETE /api/sales/:id (Anulación de venta con soft-delete y trazabilidad)
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const { reason } = req.body || {};
+
     const sale = await prisma.sale.findUnique({
       where: { id },
       include: { items: true }
@@ -186,6 +204,10 @@ router.delete('/:id', async (req, res) => {
 
     if (!sale) {
       return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    if (sale.status === 'CANCELLED') {
+      return res.status(400).json({ error: 'Esta venta ya fue anulada previamente' });
     }
 
     await prisma.$transaction(async (tx) => {
@@ -199,16 +221,22 @@ router.delete('/:id', async (req, res) => {
         }
       }
 
-      // Eliminar la venta (saleItems se eliminan en cascada por onDelete: Cascade)
-      await tx.sale.delete({
-        where: { id }
+      // Marcar la venta como CANCELLED en lugar de borrarla físicamente
+      await tx.sale.update({
+        where: { id },
+        data: {
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancelledById: req.user.id,
+          cancellationReason: (reason && reason.trim()) ? reason.trim() : 'Anulación manual'
+        }
       });
     }, { maxWait: 10000, timeout: 30000 });
 
-    res.json({ message: 'Venta eliminada y stock restituido', id });
+    res.json({ message: 'Venta anulada y stock restituido', id });
   } catch (err) {
-    console.error('Error deleting sale:', err);
-    res.status(500).json({ error: 'Error al eliminar venta: ' + err.message });
+    console.error('Error cancelling sale:', err);
+    res.status(500).json({ error: 'Error al anular venta: ' + err.message });
   }
 });
 

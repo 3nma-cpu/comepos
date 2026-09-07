@@ -3,7 +3,7 @@
 // ============================================
 
 import { api } from '../api.js';
-import { formatCurrency, formatDate, formatDateTime, formatDateInput, todayStr, toLocalYMD, exportExcel, showToast, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
+import { formatCurrency, formatDate, formatDateTime, formatDateInput, todayStr, toLocalYMD, exportExcel, showToast, escapeHTML, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
 import { showTicket } from './sales.js';
 
 let activeChart = null;
@@ -15,7 +15,8 @@ const REPORT_TYPES = [
     { id: 'purchases-period', name: 'Compras por Período', icon: 'package-check' },
     { id: 'top-products', name: 'Productos Vendidos', icon: 'bar-chart-3' },
     { id: 'client-consumption', name: 'Consumo por Cliente', icon: 'users' },
-    { id: 'cash-registers', name: 'Sesiones de Caja', icon: 'landmark' }
+    { id: 'cash-registers', name: 'Sesiones de Caja', icon: 'landmark' },
+    { id: 'cancelled-sales', name: 'Ventas Anuladas', icon: 'ban' }
 ];
 
 export function renderReports() {
@@ -65,6 +66,11 @@ async function loadReport(type) {
             clientCategory: s.client?.category || s.clientCategory || 'General',
             clientId: s.clientId || '1'
         }));
+
+        if (type === 'cancelled-sales') {
+            await reportCancelledSales(area);
+            return;
+        }
 
         switch (type) {
             case 'sales-period': reportSalesPeriod(area, normalizedSales); break;
@@ -651,4 +657,168 @@ function reportCashRegisters(area, cashRegisters) {
 
 function showToastLocal(msg) {
     import('../utils.js').then(m => m.showToast(msg));
+}
+
+async function reportCancelledSales(area) {
+    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+    area.innerHTML = `
+    <div class="report-filters" style="flex-wrap:wrap;gap:.75rem;align-items:flex-end">
+      <div class="form-group"><label>Desde</label><input type="date" class="form-control" id="rcanFrom" value="${formatDateInput(d30)}" /></div>
+      <div class="form-group"><label>Hasta</label><input type="date" class="form-control" id="rcanTo" value="${todayStr()}" /></div>
+      <div class="form-group" style="flex:1;min-width:200px">
+        <label>Buscar</label>
+        <input type="text" class="form-control" id="rcanSearch" placeholder="Ticket #, cliente, motivo o usuario..." />
+      </div>
+      <button class="btn btn-primary" id="rcanApply"><i data-lucide="filter"></i> Filtrar</button>
+      <button class="btn btn-secondary" id="rcanExport"><i data-lucide="download"></i> Excel</button>
+    </div>
+    <div class="kpi-grid" id="rcanKpis" style="margin-bottom:1.5rem"></div>
+    <div class="table-container" id="rcanTable"></div>`;
+    if (window.lucide) lucide.createIcons();
+
+    let allCancelled = [];
+
+    async function loadData() {
+        const from = document.getElementById('rcanFrom')?.value;
+        const to = document.getElementById('rcanTo')?.value;
+        const params = new URLSearchParams();
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+
+        try {
+            allCancelled = await api.get(`/reports/cancelled-sales?${params.toString()}`);
+            renderTable();
+        } catch (err) {
+            const tableEl = document.getElementById('rcanTable');
+            if (tableEl) tableEl.innerHTML = `<div class="empty-state"><p>Error al cargar ventas anuladas: ${err.message}</p></div>`;
+        }
+    }
+
+    function renderTable() {
+        const search = (document.getElementById('rcanSearch')?.value || '').toLowerCase().trim();
+
+        const filtered = allCancelled.filter(s => {
+            if (!search) return true;
+            const matchTicket = (s.id || '').toLowerCase().includes(search);
+            const matchClient = (s.clientName || '').toLowerCase().includes(search);
+            const matchUser = (s.userName || '').toLowerCase().includes(search);
+            const matchCancelledBy = (s.cancelledByName || '').toLowerCase().includes(search);
+            const matchReason = (s.cancellationReason || '').toLowerCase().includes(search);
+            return matchTicket || matchClient || matchUser || matchCancelledBy || matchReason;
+        });
+
+        const totalAmount = filtered.reduce((sum, s) => sum + s.total, 0);
+        const totalUnitsReturned = filtered.reduce((sum, s) => {
+            return sum + (s.items || []).reduce((isum, item) => isum + (item.quantity || 0), 0);
+        }, 0);
+
+        const kpisEl = document.getElementById('rcanKpis');
+        if (kpisEl) {
+            kpisEl.innerHTML = `
+            <div class="kpi-card">
+              <div class="kpi-icon red" style="background:rgba(239,68,68,0.15);color:var(--danger)"><i data-lucide="ban"></i></div>
+              <div class="kpi-content"><div class="kpi-label">Ventas Anuladas</div><div class="kpi-value">${filtered.length}</div></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon yellow" style="background:rgba(245,158,11,0.15);color:var(--warning)"><i data-lucide="alert-triangle"></i></div>
+              <div class="kpi-content"><div class="kpi-label">Monto Total Anulado</div><div class="kpi-value">${formatCurrency(totalAmount)}</div></div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-icon blue" style="background:rgba(59,130,246,0.15);color:#3b82f6"><i data-lucide="package"></i></div>
+              <div class="kpi-content"><div class="kpi-label">Unidades Reintegradas al Stock</div><div class="kpi-value">${totalUnitsReturned}</div></div>
+            </div>`;
+            if (window.lucide) lucide.createIcons();
+        }
+
+        const tableEl = document.getElementById('rcanTable');
+        if (!tableEl) return;
+
+        if (filtered.length === 0) {
+            tableEl.innerHTML = '<div class="empty-state"><p>No se registraron ventas anuladas en el período seleccionado.</p></div>';
+            return;
+        }
+
+        tableEl.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha Venta</th>
+              <th>Fecha Anulación</th>
+              <th>Ticket #</th>
+              <th>Cliente</th>
+              <th>Total Anulado</th>
+              <th>Pago</th>
+              <th>Anulado Por</th>
+              <th>Motivo de Anulación</th>
+              <th style="text-align:center">Acción</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(s => {
+                const ticketId = (s.id || '').slice(-6).toUpperCase();
+                return `
+                <tr style="background:rgba(239,68,68,0.03)">
+                  <td style="font-size:.82rem">${formatDateTime(s.date)}</td>
+                  <td style="font-size:.82rem;font-weight:600;color:var(--danger)">${formatDateTime(s.cancelledAt)}</td>
+                  <td><code>${ticketId}</code></td>
+                  <td><strong>${escapeHTML(s.clientName)}</strong></td>
+                  <td><strong style="color:var(--danger)">${formatCurrency(s.total)}</strong></td>
+                  <td><span class="badge badge-${s.paymentMethod === 'efectivo' ? 'success' : s.paymentMethod === 'transferencia' ? 'info' : 'purple'}">${s.paymentMethod}</span></td>
+                  <td><strong>${escapeHTML(s.cancelledByName || 'Desconocido')}</strong></td>
+                  <td style="max-width:240px;word-break:break-word"><span class="badge badge-secondary" style="font-weight:normal;text-align:left;display:inline-block">${escapeHTML(s.cancellationReason || 'Sin motivo')}</span></td>
+                  <td style="text-align:center">
+                    <button class="btn btn-sm btn-ghost btn-view-cancelled-ticket" data-sale-id="${s.id}" title="Ver Ticket Anulado">
+                      <i data-lucide="eye" style="width:14px;height:14px"></i> Ver
+                    </button>
+                  </td>
+                </tr>`;
+            }).join('')}
+          </tbody>
+        </table>`;
+        if (window.lucide) lucide.createIcons();
+
+        tableEl.querySelectorAll('.btn-view-cancelled-ticket').forEach(btn => {
+            btn.onclick = () => {
+                const sale = filtered.find(x => x.id === btn.dataset.saleId);
+                if (sale) {
+                    showTicket({ ...sale, status: 'CANCELLED' });
+                }
+            };
+        });
+    }
+
+    const applyBtn = document.getElementById('rcanApply');
+    if (applyBtn) applyBtn.onclick = loadData;
+
+    const searchInput = document.getElementById('rcanSearch');
+    if (searchInput) {
+        searchInput.oninput = () => renderTable();
+    }
+
+    const exportBtn = document.getElementById('rcanExport');
+    if (exportBtn) {
+        exportBtn.onclick = () => {
+            const rows = allCancelled.map(s => [
+                formatDateTime(s.date),
+                formatDateTime(s.cancelledAt),
+                (s.id || '').slice(-6).toUpperCase(),
+                s.clientName,
+                s.clientCategory || 'General',
+                s.total,
+                s.paymentMethod,
+                s.cancelledByName || 'Desconocido',
+                s.cancellationReason || 'Sin motivo',
+                s.userName || 'Cajero',
+                (s.items || []).map(i => `${i.name} (x${i.quantity})`).join(', ')
+            ]);
+            exportExcel(
+                ['Fecha Venta', 'Fecha Anulación', 'Ticket', 'Cliente', 'Categoría', 'Total Anulado', 'Método Pago', 'Anulado Por', 'Motivo', 'Cajero Original', 'Productos'],
+                rows,
+                'reporte_ventas_anuladas.xlsx'
+            );
+            showToast('Excel exportado', 'success');
+        };
+    }
+
+    await loadData();
 }

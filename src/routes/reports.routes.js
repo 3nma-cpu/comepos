@@ -44,7 +44,10 @@ router.get('/sales-period', async (req, res) => {
   try {
     const { from, to } = req.query;
     const dateFilter = buildDateFilter(from, to);
-    const where = dateFilter ? { createdAt: dateFilter } : {};
+    const where = {
+      status: 'COMPLETED',
+      ...(dateFilter ? { createdAt: dateFilter } : {})
+    };
 
     const sales = await prisma.sale.findMany({
       where,
@@ -87,7 +90,10 @@ router.get('/sales-category', async (req, res) => {
   try {
     const { from, to } = req.query;
     const dateFilter = buildDateFilter(from, to);
-    const where = dateFilter ? { createdAt: dateFilter } : {};
+    const where = {
+      status: 'COMPLETED',
+      ...(dateFilter ? { createdAt: dateFilter } : {})
+    };
 
     const sales = await prisma.sale.findMany({ where, include: { client: true } });
     const catMap = {};
@@ -110,11 +116,13 @@ router.get('/sales-category', async (req, res) => {
 router.get('/top-products', async (req, res) => {
   try {
     const { from, to } = req.query;
-    const where = {};
     const dateFilter = buildDateFilter(from, to);
-    if (dateFilter) {
-      where.sale = { createdAt: dateFilter };
-    }
+    const where = {
+      sale: {
+        status: 'COMPLETED',
+        ...(dateFilter ? { createdAt: dateFilter } : {})
+      }
+    };
 
     const items = await prisma.saleItem.findMany({ where, include: { product: true } });
     const prodMap = {};
@@ -136,7 +144,7 @@ router.get('/top-products', async (req, res) => {
 // GET /api/reports/payment-methods
 router.get('/payment-methods', async (req, res) => {
   try {
-    const sales = await prisma.sale.findMany();
+    const sales = await prisma.sale.findMany({ where: { status: 'COMPLETED' } });
     const payMap = {};
     sales.forEach(s => {
       const method = PAY_REVERSE[s.paymentMethod] || s.paymentMethod;
@@ -157,7 +165,7 @@ router.get('/payment-methods', async (req, res) => {
 // GET /api/reports/purchases-vs-sales
 router.get('/purchases-vs-sales', async (req, res) => {
   try {
-    const sales = await prisma.sale.findMany();
+    const sales = await prisma.sale.findMany({ where: { status: 'COMPLETED' } });
     const purchases = await prisma.purchase.findMany();
     const totalSales = sales.reduce((s, x) => s + x.total, 0);
     const totalPurchases = purchases.reduce((s, x) => s + x.total, 0);
@@ -184,7 +192,10 @@ router.get('/purchases-vs-sales', async (req, res) => {
 // GET /api/reports/client-consumption
 router.get('/client-consumption', async (req, res) => {
   try {
-    const sales = await prisma.sale.findMany({ include: { client: true } });
+    const sales = await prisma.sale.findMany({
+      where: { status: 'COMPLETED' },
+      include: { client: true }
+    });
     const clientMap = {};
     sales.forEach(s => {
       if (!clientMap[s.clientId]) clientMap[s.clientId] = { name: s.client.name, category: CAT_REVERSE[s.client.category] || s.client.category, count: 0, total: 0 };
@@ -197,6 +208,52 @@ router.get('/client-consumption', async (req, res) => {
     res.json({ clients });
   } catch (err) {
     res.status(500).json({ error: 'Error en reporte de consumo' });
+  }
+});
+
+// GET /api/reports/cancelled-sales
+router.get('/cancelled-sales', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    const dateFilter = buildDateFilter(from, to);
+    const where = {
+      status: 'CANCELLED',
+      ...(dateFilter ? { cancelledAt: dateFilter } : {})
+    };
+
+    const sales = await prisma.sale.findMany({
+      where,
+      include: {
+        client: true,
+        user: { select: { id: true, name: true, username: true } },
+        cancelledBy: { select: { id: true, name: true, username: true } },
+        items: { include: { product: true } }
+      },
+      orderBy: { cancelledAt: 'desc' }
+    });
+
+    res.json(sales.map(s => ({
+      id: s.id,
+      date: s.createdAt.toISOString(),
+      cancelledAt: s.cancelledAt ? s.cancelledAt.toISOString() : s.createdAt.toISOString(),
+      cancelledById: s.cancelledById,
+      cancelledByName: s.cancelledBy?.name || 'Desconocido',
+      cancellationReason: s.cancellationReason || 'Sin motivo registrado',
+      clientName: s.client?.name || 'Cliente General',
+      clientCategory: s.client ? (CAT_REVERSE[s.client.category] || s.client.category) : 'General',
+      paymentMethod: PAY_REVERSE[s.paymentMethod] || (s.paymentMethod ? s.paymentMethod.toLowerCase() : 'efectivo'),
+      total: s.total,
+      userName: s.user?.name || 'Cajero',
+      items: (s.items || []).map(i => ({
+        name: i.product?.name || 'Producto',
+        quantity: i.quantity,
+        price: i.unitPrice,
+        unit: i.product?.unit || 'UNI'
+      }))
+    })));
+  } catch (err) {
+    console.error('Error en reporte de ventas anuladas:', err);
+    res.status(500).json({ error: 'Error al obtener reporte de ventas anuladas' });
   }
 });
 

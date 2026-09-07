@@ -38,7 +38,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   role      Role       @relation(fields: [roleId], references: [id])
-  sales     Sale[]
+  sales     Sale[]     @relation("SaleUser")
+  cancelledSales Sale[] @relation("SaleCancelledBy")
   purchases Purchase[]
   cashRegistersOpened CashRegister[] @relation("CashRegisterOpenedBy")
   cashRegistersClosed CashRegister[] @relation("CashRegisterClosedBy")
@@ -113,18 +114,28 @@ enum PaymentMethod {
   TARJETA
 }
 
+enum SaleStatus {
+  COMPLETED
+  CANCELLED
+}
+
 model Sale {
-  id             String        @id @default(cuid())
-  clientId       String
-  userId         String
-  cashRegisterId String?
-  total          Int
-  paymentMethod  PaymentMethod
-  createdAt      DateTime      @default(now())
-  client       Client        @relation(fields: [clientId], references: [id])
-  user         User          @relation(fields: [userId], references: [id])
-  cashRegister CashRegister? @relation(fields: [cashRegisterId], references: [id])
-  items        SaleItem[]
+  id                 String        @id @default(cuid())
+  clientId           String
+  userId             String
+  cashRegisterId     String?
+  total              Int
+  paymentMethod      PaymentMethod
+  status             SaleStatus    @default(COMPLETED)
+  cancelledAt        DateTime?
+  cancelledById      String?
+  cancellationReason String?
+  createdAt          DateTime      @default(now())
+  client             Client        @relation(fields: [clientId], references: [id])
+  user               User          @relation("SaleUser", fields: [userId], references: [id])
+  cancelledBy        User?         @relation("SaleCancelledBy", fields: [cancelledById], references: [id])
+  cashRegister       CashRegister? @relation(fields: [cashRegisterId], references: [id])
+  items              SaleItem[]
 }
 
 enum CashRegisterStatus {

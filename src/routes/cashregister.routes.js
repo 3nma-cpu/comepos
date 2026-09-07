@@ -13,7 +13,7 @@ router.get('/active', async (req, res) => {
       where: { status: 'OPEN' },
       include: {
         openedBy: { select: { id: true, name: true } },
-        _count: { select: { sales: true } }
+        _count: { select: { sales: { where: { status: 'COMPLETED' } } } }
       },
       orderBy: { openedAt: 'desc' }
     });
@@ -66,8 +66,8 @@ router.get('/', async (req, res) => {
       include: {
         openedBy: { select: { id: true, name: true } },
         closedBy: { select: { id: true, name: true } },
-        _count: { select: { sales: true } },
-        sales: { select: { total: true, paymentMethod: true } }
+        _count: { select: { sales: { where: { status: 'COMPLETED' } } } },
+        sales: { where: { status: 'COMPLETED' }, select: { total: true, paymentMethod: true } }
       },
       orderBy: { openedAt: 'desc' }
     });
@@ -115,6 +115,7 @@ router.get('/:id', validateUUID, async (req, res) => {
           include: {
             client: { select: { name: true, cedula: true, category: true } },
             user: { select: { name: true } },
+            cancelledBy: { select: { name: true } },
             items: { include: { product: { select: { name: true, unit: true } } } }
           },
           orderBy: { createdAt: 'asc' }
@@ -126,10 +127,11 @@ router.get('/:id', validateUUID, async (req, res) => {
 
     const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TRANSFERENCIA': 'transferencia', 'NOMINA': 'nomina' };
 
-    const totalEfectivo = register.sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((sum, s) => sum + s.total, 0);
-    const totalNomina = register.sales.filter(s => s.paymentMethod === 'NOMINA').reduce((sum, s) => sum + s.total, 0);
-    const totalTransferencia = register.sales.filter(s => s.paymentMethod === 'TRANSFERENCIA').reduce((sum, s) => sum + s.total, 0);
-    const totalSales = register.sales.reduce((sum, s) => sum + s.total, 0);
+    const activeSales = register.sales.filter(s => s.status === 'COMPLETED');
+    const totalEfectivo = activeSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((sum, s) => sum + s.total, 0);
+    const totalNomina = activeSales.filter(s => s.paymentMethod === 'NOMINA').reduce((sum, s) => sum + s.total, 0);
+    const totalTransferencia = activeSales.filter(s => s.paymentMethod === 'TRANSFERENCIA').reduce((sum, s) => sum + s.total, 0);
+    const totalSales = activeSales.reduce((sum, s) => sum + s.total, 0);
     const expectedCash = register.initialAmount + totalEfectivo;
 
     res.json({
@@ -146,13 +148,17 @@ router.get('/:id', validateUUID, async (req, res) => {
       difference: register.finalAmount !== null ? register.finalAmount - expectedCash : null,
       closingNotes: register.closingNotes,
       status: register.status,
-      salesCount: register.sales.length,
+      salesCount: activeSales.length,
       totalSales,
       totalEfectivo,
       totalNomina,
       totalTransferencia,
       sales: register.sales.map(s => ({
         id: s.id,
+        status: s.status,
+        cancelledAt: s.cancelledAt ? s.cancelledAt.toISOString() : null,
+        cancelledByName: s.cancelledBy?.name || null,
+        cancellationReason: s.cancellationReason || null,
         clientName: s.client?.name || 'Desconocido',
         clientCedula: s.client?.cedula || '',
         userName: s.user?.name || '',
@@ -217,7 +223,7 @@ router.post('/:id/close', validateUUID, async (req, res) => {
 
     const register = await prisma.cashRegister.findUnique({
       where: { id: req.params.id },
-      include: { sales: { select: { total: true, paymentMethod: true } } }
+      include: { sales: { where: { status: 'COMPLETED' }, select: { total: true, paymentMethod: true } } }
     });
 
     if (!register) return res.status(404).json({ error: 'Caja no encontrada' });

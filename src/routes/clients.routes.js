@@ -56,16 +56,26 @@ router.get('/:id/history', validateUUID, async (req, res) => {
   try {
     const sales = await prisma.sale.findMany({
       where: { clientId: req.params.id },
-      include: { items: { include: { product: true } } },
+      include: {
+        items: { include: { product: true } },
+        cancelledBy: { select: { id: true, name: true, username: true } }
+      },
       orderBy: { createdAt: 'desc' }
     });
-    const totalSpent = sales.reduce((s, sale) => s + sale.total, 0);
+    const completedSales = sales.filter(s => s.status === 'COMPLETED');
+    const totalSpent = completedSales.reduce((s, sale) => s + sale.total, 0);
     res.json({
-      totalSales: sales.length,
+      totalSales: completedSales.length,
       totalSpent,
       sales: sales.map(s => ({
-        id: s.id, total: s.total, paymentMethod: s.paymentMethod.toLowerCase(),
+        id: s.id,
+        total: s.total,
+        paymentMethod: s.paymentMethod.toLowerCase(),
         date: s.createdAt.toISOString(),
+        status: s.status,
+        cancelledAt: s.cancelledAt ? s.cancelledAt.toISOString() : null,
+        cancelledByName: s.cancelledBy?.name || null,
+        cancellationReason: s.cancellationReason || null,
         items: s.items.map(i => ({ name: i.product.name, quantity: i.quantity, price: i.unitPrice }))
       }))
     });
