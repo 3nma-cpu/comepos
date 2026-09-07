@@ -239,11 +239,14 @@ function renderEditPurchaseView(purchase, providers, products) {
               ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
             </select>
           </div>
-          <div style="display:flex;align-items:center;height:100%;padding-bottom:4px">
-            <label class="purchase-checkbox-label">
+          <div style="display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:4px;padding-bottom:2px">
+            <label class="purchase-checkbox-label" style="margin-bottom:0">
               <input type="checkbox" id="epForResale" checked />
               <span>Para Venta</span>
             </label>
+            <button type="button" class="btn btn-secondary btn-mini" id="btnQuickCreateProdEdit" style="width:100%;justify-content:center" title="Crear nuevo producto">
+              <i data-lucide="plus"></i> Producto
+            </button>
           </div>
           <div class="form-group" style="margin-bottom:0">
             <label style="font-size:0.75rem">Cantidad</label>
@@ -319,6 +322,47 @@ function renderEditPurchaseView(purchase, providers, products) {
     }
   }
   forResaleInp.addEventListener('change', togglePriceInput);
+
+  const btnQuickCreateProdEdit = document.getElementById('btnQuickCreateProdEdit');
+  if (btnQuickCreateProdEdit) {
+    btnQuickCreateProdEdit.onclick = async () => {
+      const { showProductModal } = await import('./products.js');
+      const currentCost = parseFloat(costInp.value) || 0;
+      const currentPrice = parseFloat(priceInp.value) || 0;
+      const currentForResale = forResaleInp.checked;
+
+      const initialData = {};
+      if (currentCost > 0) initialData.cost = currentCost;
+      if (currentPrice > 0) initialData.price = currentPrice;
+      initialData.forResale = currentForResale;
+
+      showProductModal(Object.keys(initialData).length > 0 ? initialData : null, (newProd) => {
+        if (!newProd || !newProd.id) return;
+        const idx = products.findIndex(p => p.id === newProd.id);
+        if (idx >= 0) products[idx] = newProd;
+        else products.push(newProd);
+
+        let opt = prodSel.querySelector(`option[value="${newProd.id}"]`);
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = newProd.id;
+          opt.textContent = newProd.name;
+          prodSel.appendChild(opt);
+        } else {
+          opt.textContent = newProd.name;
+        }
+
+        prodSel.value = newProd.id;
+        costInp.value = newProd.cost !== undefined ? newProd.cost : 0;
+        priceInp.value = newProd.price !== undefined ? newProd.price : 0;
+        forResaleInp.checked = newProd.forResale !== false;
+        togglePriceInput();
+        calcFromUnit();
+        qtyInp.focus();
+        qtyInp.select();
+      });
+    };
+  }
 
   function resetEntryBar() {
     prodSel.value = '';
@@ -566,11 +610,14 @@ function renderNewPurchaseView(providers, products) {
               ${products.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
             </select>
           </div>
-          <div style="display:flex;align-items:center;height:100%;padding-bottom:4px">
-            <label class="purchase-checkbox-label">
+          <div style="display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-end;gap:4px;padding-bottom:2px">
+            <label class="purchase-checkbox-label" style="margin-bottom:0">
               <input type="checkbox" id="npForResale" checked />
               <span>Para Venta</span>
             </label>
+            <button type="button" class="btn btn-secondary btn-mini" id="btnQuickCreateProd" style="width:100%;justify-content:center" title="Crear nuevo producto">
+              <i data-lucide="plus"></i> Producto
+            </button>
           </div>
           <div class="form-group" style="margin-bottom:0">
             <label style="font-size:0.75rem">Cant.</label>
@@ -649,6 +696,50 @@ function renderNewPurchaseView(providers, products) {
     }
   }
   forResaleInp.addEventListener('change', togglePriceInput);
+
+  const btnQuickCreateProd = document.getElementById('btnQuickCreateProd');
+  if (btnQuickCreateProd) {
+    btnQuickCreateProd.onclick = async () => {
+      const { showProductModal } = await import('./products.js');
+      const currentBarcode = barcodeInp.value.trim();
+      const currentCost = parseFloat(costInp.value) || 0;
+      const currentPrice = parseFloat(priceInp.value) || 0;
+      const currentForResale = forResaleInp.checked;
+
+      const initialData = {};
+      if (currentBarcode) initialData.barcode = currentBarcode;
+      if (currentCost > 0) initialData.cost = currentCost;
+      if (currentPrice > 0) initialData.price = currentPrice;
+      initialData.forResale = currentForResale;
+
+      showProductModal(Object.keys(initialData).length > 0 ? initialData : null, (newProd) => {
+        if (!newProd || !newProd.id) return;
+        const idx = products.findIndex(p => p.id === newProd.id);
+        if (idx >= 0) products[idx] = newProd;
+        else products.push(newProd);
+
+        let opt = prodSel.querySelector(`option[value="${newProd.id}"]`);
+        if (!opt) {
+          opt = document.createElement('option');
+          opt.value = newProd.id;
+          opt.textContent = newProd.name;
+          prodSel.appendChild(opt);
+        } else {
+          opt.textContent = newProd.name;
+        }
+
+        prodSel.value = newProd.id;
+        barcodeInp.value = newProd.barcode || '';
+        costInp.value = newProd.cost !== undefined ? newProd.cost : 0;
+        priceInp.value = newProd.price !== undefined ? newProd.price : 0;
+        forResaleInp.checked = newProd.forResale !== false;
+        togglePriceInput();
+        calcFromUnit();
+        qtyInp.focus();
+        qtyInp.select();
+      });
+    };
+  }
 
   function resetEntryBar() {
     barcodeInp.value = '';

@@ -553,6 +553,20 @@ select:focus:not(:focus-visible) {
     font-size: .78rem
 }
 
+.btn-mini {
+    padding: .2rem .5rem;
+    font-size: .72rem;
+    height: 24px;
+    gap: .25rem;
+    border-radius: var(--radius-sm);
+    font-weight: 500
+}
+
+.btn-mini svg {
+    width: 12px;
+    height: 12px
+}
+
 .btn-icon {
     padding: .4rem;
     border-radius: var(--radius-sm)
@@ -1276,7 +1290,7 @@ tbody tr:last-child td {
 
 .purchase-entry-grid {
     display: grid;
-    grid-template-columns: 140px 1fr 100px 90px 110px 110px 110px 42px;
+    grid-template-columns: 140px 1fr 105px 90px 110px 110px 110px 42px;
     gap: .5rem;
     align-items: flex-end;
 }

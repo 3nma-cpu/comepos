@@ -100,8 +100,8 @@ function renderProductList(container, products) {
     });
 }
 
-function showProductModal(product = null) {
-    const isEdit = !!product;
+export function showProductModal(product = null, onSuccess = null) {
+    const isEdit = !!(product && product.id);
     const p = product || { name: '', category: 'Platos Principales', unit: 'UNI', price: '', cost: '', stock: 0 };
 
     const body = `
@@ -122,11 +122,11 @@ function showProductModal(product = null) {
             <label style="display:flex;justify-content:space-between">
                 <span>Código de Barras</span>
                 <label class="checkbox-container" style="margin:0;font-size:0.7rem;font-weight:normal">
-                    <input type="checkbox" id="mpAutoBarcode" ${!isEdit ? 'checked' : ''} />
+                    <input type="checkbox" id="mpAutoBarcode" ${(!isEdit && !p.barcode) ? 'checked' : ''} />
                     <span class="checkmark" style="width:14px;height:14px"></span> Generar Automático
                 </label>
             </label>
-            <input type="text" class="form-control" id="mpBarcode" value="${isEdit ? escapeHTML(p.barcode || '') : ''}" placeholder="Ej. 1000000001" ${!isEdit ? 'disabled' : ''} />
+            <input type="text" class="form-control" id="mpBarcode" value="${escapeHTML(p.barcode || '')}" placeholder="Ej. 1000000001" ${(!isEdit && !p.barcode) ? 'disabled' : ''} />
         </div>
         <div class="form-group">
             <label>Categoría</label>
@@ -137,16 +137,16 @@ function showProductModal(product = null) {
         <div class="form-row">
             <div class="form-group">
                 <label>Precio de Compra (Costo ₲)</label>
-                <input type="number" class="form-control" id="mpCost" value="${p.cost}" required min="0" step="any" />
+                <input type="number" class="form-control" id="mpCost" value="${p.cost !== undefined ? p.cost : ''}" required min="0" step="any" />
             </div>
             <div class="form-group">
                 <label>Precio de Venta (₲)</label>
-                <input type="number" class="form-control" id="mpPrice" value="${p.price}" required min="0" step="any" />
+                <input type="number" class="form-control" id="mpPrice" value="${p.price !== undefined ? p.price : ''}" required min="0" step="any" />
             </div>
         </div>
         <div class="form-group">
             <label>Stock</label>
-            <input type="number" class="form-control" id="mpStock" value="${p.stock}" required min="${isEdit ? p.stock : 0}" step="any" />
+            <input type="number" class="form-control" id="mpStock" value="${p.stock !== undefined ? p.stock : 0}" required min="${isEdit ? p.stock : 0}" step="any" />
             ${isEdit ? `<small style="color:var(--text-muted)">El stock no puede ser menor a ${p.stock} desde esta pantalla.</small>` : ''}
         </div>
         <div class="form-group">
@@ -207,14 +207,19 @@ function showProductModal(product = null) {
         data.stock = parseFloat(document.getElementById('mpStock').value) || 0;
 
         try {
+            let res;
             if (isEdit) {
-                await api.put(`/products/${p.id}`, data);
+                res = await api.put(`/products/${p.id}`, data);
             } else {
-                await api.post('/products', data);
+                res = await api.post('/products', data);
             }
             closeModal(modal);
             showToast(isEdit ? 'Producto actualizado' : 'Producto creado');
-            renderProducts();
+            if (typeof onSuccess === 'function') {
+                onSuccess(res);
+            } else {
+                renderProducts();
+            }
         } catch (err) {
             showToast(err.message, 'error');
             btnSave.disabled = false;
