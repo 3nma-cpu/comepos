@@ -325,9 +325,11 @@ function processSale() {
     const payload = {
       clientId: selectedClient.id,
       items: cart.map(it => ({ productId: it.productId, quantity: it.quantity })),
-      paymentMethod,
-      date: saleDate
+      paymentMethod
     };
+    if (saleDate && saleDate !== today) {
+      payload.date = saleDate;
+    }
 
     try {
       const newSale = await api.post('/sales', payload);
@@ -336,7 +338,9 @@ function processSale() {
       // Save references for ticket before clearing
       const ticketData = {
         ...newSale,
+        date: newSale.date || new Date().toISOString(),
         clientName: selectedClient.name,
+        userName: user.name || 'Cajero',
         items: [...cart]
       };
 
@@ -360,12 +364,14 @@ function processSale() {
   });
 }
 
-export function showTicket(sale) {
+export function showTicket(sale, onDeleted = null) {
   const payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
   const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
   const vendorName = sale.userName || user.name || 'Cajero';
+  const clientName = sale.clientName || sale.client?.name || 'Cliente';
+  const saleDate = sale.date || sale.createdAt || new Date();
 
-  const ticketId = sale.id.slice(-6).toUpperCase();
+  const ticketId = (sale.id || '').slice(-6).toUpperCase();
 
   const body = `
     <div class="ticket-preview" id="ticketPrintArea" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#000;font-weight:600">
@@ -378,8 +384,8 @@ export function showTicket(sale) {
 
       <!-- Datos de venta -->
       <div class="ticket-line"><span>Ticket #:</span><span style="font-weight:800">${ticketId}</span></div>
-      <div class="ticket-line"><span>Fecha:</span><span>${formatDateTime(sale.date)}</span></div>
-      <div class="ticket-line"><span>Cliente:</span><span style="font-weight:700">${escapeHTML(sale.clientName)}</span></div>
+      <div class="ticket-line"><span>Fecha:</span><span>${formatDateTime(saleDate)}</span></div>
+      <div class="ticket-line"><span>Cliente:</span><span style="font-weight:700">${escapeHTML(clientName)}</span></div>
       <div class="ticket-line"><span>Pago:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
       <div class="ticket-line"><span>Cajero:</span><span>${escapeHTML(vendorName)}</span></div>
       <div class="ticket-divider" style="border-color:#000"></div>
@@ -408,13 +414,16 @@ export function showTicket(sale) {
       <!-- Firma exclusiva del cliente -->
       <div style="text-align:center;margin:15px auto 10px auto;width:85%">
         <div style="border-top:2px solid #000;padding-top:6px;margin-top:55px">
-          <div style="font-weight:800;font-size:.85rem">${escapeHTML(sale.clientName)}</div>
+          <div style="font-weight:800;font-size:.85rem">${escapeHTML(clientName)}</div>
           <div style="font-size:.72rem;font-weight:800;letter-spacing:0.5px;color:#000;margin-top:2px">FIRMA DEL CLIENTE</div>
         </div>
       </div>
     </div>`;
 
   const footer = `
+    <button class="btn btn-danger btn-sm" id="btnDeleteSale">
+      <i data-lucide="trash-2"></i> Eliminar Venta
+    </button>
     <button class="btn btn-ghost" id="btnPrintTicket">
       <i data-lucide="printer"></i> Imprimir
     </button>
@@ -424,6 +433,32 @@ export function showTicket(sale) {
   if (window.lucide) lucide.createIcons();
 
   document.getElementById('btnPrintTicket').onclick = () => printTicket(sale);
+
+  const btnDelete = document.getElementById('btnDeleteSale');
+  if (btnDelete) {
+    btnDelete.onclick = async () => {
+      if (!confirm(`¿Está seguro de eliminar esta venta por ${formatCurrency(sale.total)}? Los productos volverán al stock.`)) {
+        return;
+      }
+      btnDelete.disabled = true;
+      btnDelete.innerHTML = '<i data-lucide="loader"></i> Eliminando...';
+      if (window.lucide) lucide.createIcons();
+
+      try {
+        await api.delete(`/sales/${sale.id}`);
+        showToast('Venta eliminada y stock devuelto', 'success');
+        closeModal(modal);
+        if (typeof onDeleted === 'function') {
+          onDeleted(sale.id);
+        }
+      } catch (err) {
+        showToast('Error al eliminar venta: ' + err.message, 'error');
+        btnDelete.disabled = false;
+        btnDelete.innerHTML = '<i data-lucide="trash-2"></i> Eliminar Venta';
+        if (window.lucide) lucide.createIcons();
+      }
+    };
+  }
 }
 
 export function printTicket(sale, ...rest) {
@@ -440,8 +475,12 @@ export function printTicket(sale, ...rest) {
   }
 
   const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
-  vendorName = vendorName || actualSale.userName || user.name || 'Cajero';
-  const payLabel = payLabels[actualSale.paymentMethod] || actualSale.paymentMethod;
+  vendorName = vendorName || (actualSale ? actualSale.userName : null) || user.name || 'Cajero';
+  const payLabel = payLabels[actualSale?.paymentMethod] || actualSale?.paymentMethod || 'Efectivo';
+  const clientName = actualSale?.clientName || actualSale?.client?.name || 'Cliente';
+  const saleDate = actualSale?.date || actualSale?.createdAt || new Date();
+  const items = actualSale?.items || [];
+  const total = actualSale?.total || 0;
 
   const printWin = window.open('', '_blank', 'width=400,height=600');
 
@@ -603,11 +642,11 @@ export function printTicket(sale, ...rest) {
   </div>
   <div class="ticket-line">
     <span>Fecha:</span>
-    <span>${formatDateTime(sale.date)}</span>
+    <span>${formatDateTime(saleDate)}</span>
   </div>
   <div class="ticket-line">
     <span>Cliente:</span>
-    <span>${escapeHTML(sale.clientName)}</span>
+    <span>${escapeHTML(clientName)}</span>
   </div>
   <div class="ticket-line">
     <span>Pago:</span>
@@ -625,7 +664,7 @@ export function printTicket(sale, ...rest) {
       <span>Producto</span>
       <span>SubTotal</span>
     </div>
-    ${sale.items.map(it => `
+    ${items.map(it => `
     <div class="item-row">
       <span class="item-name">${escapeHTML(it.name)} x${it.quantity}${it.unit ? ' ' + it.unit : ''}</span>
       <span class="item-price">${formatCurrency(it.price * it.quantity)}</span>
@@ -636,7 +675,7 @@ export function printTicket(sale, ...rest) {
   <!-- Total -->
   <div class="ticket-total">
     <span>TOTAL</span>
-    <span>${formatCurrency(sale.total)}</span>
+    <span>${formatCurrency(total)}</span>
   </div>
   <hr class="divider-dash"/>
 
@@ -644,10 +683,10 @@ export function printTicket(sale, ...rest) {
   <div class="ticket-message">¡Gracias por su consumo!</div>
   <hr class="divider-dash"/>
 
-  <!-- Firma del cliente -->
+  <!-- Firma exclusiva del cliente -->
   <div class="signature-container">
     <div class="signature-line-bar">
-      <div class="signature-client">${escapeHTML(sale.clientName)}</div>
+      <div class="signature-client">${escapeHTML(clientName)}</div>
       <div class="signature-caption">FIRMA DEL CLIENTE</div>
     </div>
   </div>

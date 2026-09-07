@@ -80,11 +80,25 @@ router.post('/', async (req, res) => {
 
     let createdAt = undefined;
     if (date) {
-      const parsedDate = new Date(date);
-      if (parsedDate > new Date()) {
-        return res.status(400).json({ error: 'No se pueden registrar ventas en el futuro' });
+      if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const now = new Date();
+        const [y, m, d] = date.split('-').map(Number);
+        // Si la fecha es hoy, usar el timestamp actual exacto con hora y minutos
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (date === todayStr) {
+          createdAt = now;
+        } else {
+          // Si es una fecha pasada, combinarla con la hora actual local
+          const candidate = new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds());
+          createdAt = candidate > now ? now : candidate;
+        }
+      } else {
+        const parsedDate = new Date(date);
+        if (parsedDate > new Date()) {
+          return res.status(400).json({ error: 'No se pueden registrar ventas en el futuro' });
+        }
+        createdAt = parsedDate;
       }
-      createdAt = parsedDate;
     }
 
     // Normalize quantities to float
@@ -158,6 +172,43 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('Sale error:', err);
     res.status(500).json({ error: err.message || 'Error al registrar venta' });
+  }
+});
+
+// DELETE /api/sales/:id
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const sale = await prisma.sale.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!sale) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Revertir el stock a cada producto de la venta
+      for (const item of sale.items) {
+        if (item.productId && item.quantity > 0) {
+          await tx.product.updateMany({
+            where: { id: item.productId },
+            data: { stock: { increment: item.quantity } }
+          });
+        }
+      }
+
+      // Eliminar la venta (saleItems se eliminan en cascada por onDelete: Cascade)
+      await tx.sale.delete({
+        where: { id }
+      });
+    }, { maxWait: 10000, timeout: 30000 });
+
+    res.json({ message: 'Venta eliminada y stock restituido', id });
+  } catch (err) {
+    console.error('Error deleting sale:', err);
+    res.status(500).json({ error: 'Error al eliminar venta: ' + err.message });
   }
 });
 

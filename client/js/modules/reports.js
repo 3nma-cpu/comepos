@@ -468,7 +468,10 @@ function reportClientConsumption(area, sales) {
                             <td><span class="badge ${sale.paymentMethod === 'nomina' ? 'badge-purple' : 'badge-success'}">${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></td>
                             <td style="font-size:.8rem;color:var(--text-secondary)">${sale.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td>
                             <td style="text-align:right"><strong>${formatCurrency(sale.total)}</strong></td>
-                            <td style="text-align:center"><button class="btn btn-sm btn-ghost btn-reprint" data-sale-id="${sale.id}"><i data-lucide="printer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Ticket</button></td>
+                            <td style="text-align:center;white-space:nowrap">
+                              <button class="btn btn-sm btn-ghost btn-reprint" data-sale-id="${sale.id}"><i data-lucide="printer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Ticket</button>
+                              <button class="btn btn-sm btn-ghost text-danger btn-delete-sale" data-sale-id="${sale.id}" title="Eliminar venta"><i data-lucide="trash-2" style="width:14px;height:14px;vertical-align:middle"></i></button>
+                            </td>
                           </tr>`).join('')}
                       </tbody>
                       <tfoot>
@@ -483,12 +486,51 @@ function reportClientConsumption(area, sales) {
                 </div>`;
                 if (window.lucide) lucide.createIcons();
 
+                function handleDeletedSale(saleId) {
+                  const sIdx = sales.findIndex(s => s.id === saleId);
+                  if (sIdx >= 0) sales.splice(sIdx, 1);
+
+                  const cIdx = client.sales.findIndex(s => s.id === saleId);
+                  if (cIdx >= 0) {
+                    client.total -= client.sales[cIdx].total;
+                    client.count -= 1;
+                    client.sales.splice(cIdx, 1);
+                  }
+
+                  apply();
+                  if (client.sales.length > 0) {
+                    const freshBtn = document.querySelector(`[data-detail="${client.id}"]`);
+                    if (freshBtn) freshBtn.click();
+                  } else {
+                    const detailArea = document.getElementById('rccDetail');
+                    if (detailArea) detailArea.innerHTML = '';
+                  }
+                }
+
                 document.getElementById('rccDetail').querySelectorAll('.btn-reprint').forEach(reprintBtn => {
                     reprintBtn.onclick = () => {
                         const saleId = reprintBtn.dataset.saleId;
                         const sale = client.sales.find(s => s.id === saleId);
                         if (sale) {
-                            showTicket(sale);
+                            showTicket(sale, (deletedId) => handleDeletedSale(deletedId));
+                        }
+                    };
+                });
+
+                document.getElementById('rccDetail').querySelectorAll('.btn-delete-sale').forEach(delBtn => {
+                    delBtn.onclick = async () => {
+                        const saleId = delBtn.dataset.saleId;
+                        const sale = client.sales.find(s => s.id === saleId);
+                        if (!sale) return;
+                        if (!confirm(`¿Está seguro de eliminar esta venta por ${formatCurrency(sale.total)}? Los productos volverán al stock.`)) {
+                          return;
+                        }
+                        try {
+                          await api.delete(`/sales/${saleId}`);
+                          showToast('Venta eliminada y stock devuelto', 'success');
+                          handleDeletedSale(saleId);
+                        } catch (err) {
+                          showToast('Error al eliminar venta: ' + err.message, 'error');
                         }
                     };
                 });

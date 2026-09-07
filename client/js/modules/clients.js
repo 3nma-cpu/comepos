@@ -4,6 +4,7 @@
 
 import { api } from '../api.js';
 import { generateId, showToast, createModal, closeModal, escapeHTML, formatCurrency, formatDateTime, EMPLOYEE_CATEGORIES, CATEGORY_BADGE_COLORS } from '../utils.js';
+import { showTicket } from './sales.js';
 
 export async function renderClients() {
     const container = document.getElementById('module-content');
@@ -179,27 +180,89 @@ async function showClientHistory(clientId, allClients) {
     const client = allClients.find(c => c.id === clientId);
     try {
         const data = await api.get(`/clients/${clientId}/history`);
-        const sales = data.sales;
+        let sales = data.sales;
 
-        const body = `
-        <div style="margin-bottom:1rem;display:flex;gap:1rem">
-          <div class="card" style="flex:1;padding:1rem"><div class="kpi-label">Total Compras</div><div style="font-size:1.2rem;font-weight:700">${data.totalSales}</div></div>
-          <div class="card" style="flex:1;padding:1rem"><div class="kpi-label">Total Gastado</div><div style="font-size:1.2rem;font-weight:700;color:var(--primary-light)">${formatCurrency(data.totalSpent)}</div></div>
-        </div>
-        ${sales.length > 0 ? `
-        <div class="table-container" style="max-height:300px;overflow-y:auto">
-          <table>
-            <thead><tr><th>Fecha</th><th>Productos</th><th>Total</th><th>Pago</th></tr></thead>
-            <tbody>${sales.map(s => `
-              <tr>
-                <td style="font-size:.8rem">${formatDateTime(s.date)}</td>
-                <td style="font-size:.8rem">${s.items.map(i => i.name).join(', ')}</td>
-                <td><strong>${formatCurrency(s.total)}</strong></td>
-                <td><span class="badge badge-${s.paymentMethod === 'efectivo' ? 'success' : s.paymentMethod === 'transferencia' ? 'info' : 'purple'}">${s.paymentMethod}</span></td>
-              </tr>`).join('')}</tbody>
-          </table>
-        </div>` : '<div class="empty-state"><p>Sin compras registradas</p></div>'}`;
-        createModal(`Historial — ${client?.name || ''}`, body);
+        function renderHistoryBody() {
+          return `
+          <div style="margin-bottom:1rem;display:flex;gap:1rem">
+            <div class="card" style="flex:1;padding:1rem"><div class="kpi-label">Total Compras</div><div style="font-size:1.2rem;font-weight:700" id="chCount">${data.totalSales}</div></div>
+            <div class="card" style="flex:1;padding:1rem"><div class="kpi-label">Total Gastado</div><div style="font-size:1.2rem;font-weight:700;color:var(--primary-light)" id="chSpent">${formatCurrency(data.totalSpent)}</div></div>
+          </div>
+          <div id="chTableContainer">
+          ${sales.length > 0 ? `
+          <div class="table-container" style="max-height:300px;overflow-y:auto">
+            <table>
+              <thead><tr><th>Fecha</th><th>Productos</th><th>Total</th><th>Pago</th><th style="text-align:center">Acción</th></tr></thead>
+              <tbody>${sales.map(s => `
+                <tr id="ch-row-${s.id}">
+                  <td style="font-size:.8rem">${formatDateTime(s.date)}</td>
+                  <td style="font-size:.8rem">${s.items.map(i => i.name).join(', ')}</td>
+                  <td><strong>${formatCurrency(s.total)}</strong></td>
+                  <td><span class="badge badge-${s.paymentMethod === 'efectivo' ? 'success' : s.paymentMethod === 'transferencia' ? 'info' : 'purple'}">${s.paymentMethod}</span></td>
+                  <td style="text-align:center;white-space:nowrap">
+                    <button class="btn btn-sm btn-ghost btn-reprint-client" data-sale-id="${s.id}" title="Ver ticket / Imprimir"><i data-lucide="printer" style="width:14px;height:14px"></i></button>
+                    <button class="btn btn-sm btn-ghost text-danger btn-del-client-sale" data-sale-id="${s.id}" title="Eliminar venta"><i data-lucide="trash-2" style="width:14px;height:14px"></i></button>
+                  </td>
+                </tr>`).join('')}</tbody>
+            </table>
+          </div>` : '<div class="empty-state"><p>Sin compras registradas</p></div>'}
+          </div>`;
+        }
+
+        const modal = createModal(`Historial — ${client?.name || ''}`, renderHistoryBody());
+
+        function bindEvents() {
+          if (window.lucide) lucide.createIcons();
+
+          modal.querySelectorAll('.btn-reprint-client').forEach(btn => {
+            btn.onclick = () => {
+              const saleId = btn.dataset.saleId;
+              const sale = sales.find(s => s.id === saleId);
+              if (sale) {
+                showTicket({ ...sale, clientName: client?.name }, (deletedId) => handleDeleted(deletedId));
+              }
+            };
+          });
+
+          modal.querySelectorAll('.btn-del-client-sale').forEach(btn => {
+            btn.onclick = async () => {
+              const saleId = btn.dataset.saleId;
+              const sale = sales.find(s => s.id === saleId);
+              if (!sale) return;
+              if (!confirm(`¿Está seguro de eliminar esta venta por ${formatCurrency(sale.total)}? Los productos volverán al stock.`)) {
+                return;
+              }
+              try {
+                await api.delete(`/sales/${saleId}`);
+                showToast('Venta eliminada y stock devuelto', 'success');
+                handleDeleted(saleId);
+              } catch (err) {
+                showToast('Error al eliminar venta: ' + err.message, 'error');
+              }
+            };
+          });
+        }
+
+        function handleDeleted(saleId) {
+          const idx = sales.findIndex(s => s.id === saleId);
+          if (idx >= 0) {
+            data.totalSpent -= sales[idx].total;
+            data.totalSales -= 1;
+            sales.splice(idx, 1);
+          }
+          const chCount = modal.querySelector('#chCount');
+          const chSpent = modal.querySelector('#chSpent');
+          if (chCount) chCount.textContent = data.totalSales;
+          if (chSpent) chSpent.textContent = formatCurrency(data.totalSpent);
+          const row = modal.querySelector(`#ch-row-${saleId}`);
+          if (row) row.remove();
+          if (sales.length === 0) {
+            const tableCont = modal.querySelector('#chTableContainer');
+            if (tableCont) tableCont.innerHTML = '<div class="empty-state"><p>Sin compras registradas</p></div>';
+          }
+        }
+
+        bindEvents();
     } catch (err) {
         showToast('Error al cargar historial', 'error');
     }
