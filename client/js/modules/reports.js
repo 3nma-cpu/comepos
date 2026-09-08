@@ -4,7 +4,7 @@
 
 import { api } from '../api.js';
 import { formatCurrency, formatDate, formatDateTime, formatDateInput, todayStr, toLocalYMD, exportExcel, showToast, escapeHTML, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
-import { showTicket } from './sales.js';
+import { showTicket, promptCancellationReason } from './sales.js';
 
 let activeChart = null;
 
@@ -524,20 +524,20 @@ function reportClientConsumption(area, sales) {
                 });
 
                 document.getElementById('rccDetail').querySelectorAll('.btn-delete-sale').forEach(delBtn => {
-                    delBtn.onclick = async () => {
+                    delBtn.onclick = () => {
                         const saleId = delBtn.dataset.saleId;
                         const sale = client.sales.find(s => s.id === saleId);
                         if (!sale) return;
-                        if (!confirm(`¿Está seguro de eliminar esta venta por ${formatCurrency(sale.total)}? Los productos volverán al stock.`)) {
-                          return;
-                        }
-                        try {
-                          await api.delete(`/sales/${saleId}`);
-                          showToast('Venta eliminada y stock devuelto', 'success');
-                          handleDeletedSale(saleId);
-                        } catch (err) {
-                          showToast('Error al eliminar venta: ' + err.message, 'error');
-                        }
+                        promptCancellationReason(sale.total, async (reason) => {
+                          try {
+                            await api.delete(`/sales/${saleId}`, { reason });
+                            showToast('Venta anulada y stock devuelto', 'success');
+                            handleDeletedSale(saleId);
+                          } catch (err) {
+                            showToast('Error al anular venta: ' + err.message, 'error');
+                            throw err;
+                          }
+                        });
                     };
                 });
 

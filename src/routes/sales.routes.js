@@ -197,6 +197,10 @@ router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     const { reason } = req.body || {};
 
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({ error: 'El motivo de anulación es obligatorio' });
+    }
+
     const sale = await prisma.sale.findUnique({
       where: { id },
       include: { items: true }
@@ -228,7 +232,7 @@ router.delete('/:id', async (req, res) => {
           status: 'CANCELLED',
           cancelledAt: new Date(),
           cancelledById: req.user.id,
-          cancellationReason: (reason && reason.trim()) ? reason.trim() : 'Anulación manual'
+          cancellationReason: reason.trim()
         }
       });
     }, { maxWait: 10000, timeout: 30000 });

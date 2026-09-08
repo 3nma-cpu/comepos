@@ -371,48 +371,88 @@ function processSale() {
 
 export function promptCancellationReason(saleTotal, onConfirm) {
   const body = `
-    <div style="padding:0.5rem 0">
-      <p style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.9rem">
-        Se anulará la venta por <strong>${formatCurrency(saleTotal)}</strong>. Todos los productos serán reintegrados al stock automáticamente.
-      </p>
-      <div class="form-group" style="margin-bottom:1rem">
-        <label style="font-weight:600;margin-bottom:0.4rem;display:block;font-size:0.85rem">Motivo de anulación:</label>
-        <select class="form-control" id="mCancelReasonSelect" style="margin-bottom:0.6rem">
-          <option value="Error de digitación / cobro">Error de digitación / cobro</option>
-          <option value="Cliente desistió / devolvió productos">Cliente desistió / devolvió productos</option>
-          <option value="Error de cajero / producto duplicado">Error de cajero / producto duplicado</option>
-          <option value="Cambio de método de pago">Cambio de método de pago</option>
-          <option value="Otro">Otro motivo...</option>
-        </select>
-        <textarea class="form-control" id="mCancelReasonText" rows="2" placeholder="Detalle adicional o especifique el motivo..." style="resize:vertical"></textarea>
+    <div style="padding:0.25rem 0">
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.75rem 0.9rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius);margin-bottom:1rem">
+        <i data-lucide="alert-triangle" style="width:22px;height:22px;color:var(--danger);flex-shrink:0"></i>
+        <div style="font-size:0.85rem;color:var(--text);line-height:1.35">
+          Se anulará la venta por <strong>${formatCurrency(saleTotal)}</strong>.<br/>
+          <span style="font-size:0.78rem;color:var(--text-secondary)">Todos los productos volverán al stock automáticamente.</span>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:0.5rem">
+        <label style="font-weight:600;font-size:0.85rem;margin-bottom:0.4rem;display:flex;justify-content:space-between">
+          <span>Motivo de la anulación <span style="color:var(--danger)">*</span></span>
+          <span style="font-size:0.72rem;color:var(--text-muted);font-weight:normal">(Obligatorio)</span>
+        </label>
+        
+        <!-- Botones rápidos sugeridos -->
+        <div style="display:flex;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.6rem">
+          <button type="button" class="btn btn-xs btn-ghost cancel-chip" style="font-size:0.75rem;padding:3px 8px;border:1px solid var(--border);border-radius:12px">Error de digitación</button>
+          <button type="button" class="btn btn-xs btn-ghost cancel-chip" style="font-size:0.75rem;padding:3px 8px;border:1px solid var(--border);border-radius:12px">Cliente desistió / devolvió</button>
+          <button type="button" class="btn btn-xs btn-ghost cancel-chip" style="font-size:0.75rem;padding:3px 8px;border:1px solid var(--border);border-radius:12px">Cobro duplicado</button>
+          <button type="button" class="btn btn-xs btn-ghost cancel-chip" style="font-size:0.75rem;padding:3px 8px;border:1px solid var(--border);border-radius:12px">Cambio de método de pago</button>
+        </div>
+
+        <textarea class="form-control" id="mCancelReasonText" rows="3" placeholder="Especifique detalladamente el motivo de la anulación..." style="resize:vertical;font-size:0.88rem" required></textarea>
+        <div id="mCancelErrorMsg" style="display:none;color:var(--danger);font-size:0.78rem;margin-top:0.35rem;font-weight:600">
+          ⚠️ Debe ingresar el motivo para poder anular la venta.
+        </div>
       </div>
     </div>`;
 
   const footer = `
     <button class="btn btn-ghost modal-close">Cancelar</button>
-    <button class="btn btn-danger" id="mBtnConfirmCancel">
+    <button class="btn btn-danger" id="mBtnConfirmCancel" disabled style="opacity:0.55;cursor:not-allowed">
       <i data-lucide="ban"></i> Confirmar Anulación
     </button>`;
 
-  const modal = createModal('Anular Venta y Devolver Stock', body, footer);
+  const modal = createModal('Anular Venta', body, footer);
+  modal.style.zIndex = '1100';
+  const modalBox = modal.querySelector('.modal');
+  if (modalBox) {
+    modalBox.style.maxWidth = '440px';
+    modalBox.style.width = '92%';
+  }
   if (window.lucide) lucide.createIcons();
 
-  const select = modal.querySelector('#mCancelReasonSelect');
   const textarea = modal.querySelector('#mCancelReasonText');
+  const errorMsg = modal.querySelector('#mCancelErrorMsg');
   const btn = modal.querySelector('#mBtnConfirmCancel');
+  const chips = modal.querySelectorAll('.cancel-chip');
+
+  function updateBtnState() {
+    const val = textarea.value.trim();
+    if (val.length > 0) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      errorMsg.style.display = 'none';
+    } else {
+      btn.disabled = true;
+      btn.style.opacity = '0.55';
+      btn.style.cursor = 'not-allowed';
+    }
+  }
+
+  textarea.addEventListener('input', updateBtnState);
+
+  chips.forEach(chip => {
+    chip.onclick = () => {
+      textarea.value = chip.textContent.trim();
+      updateBtnState();
+      textarea.focus();
+    };
+  });
+
+  setTimeout(() => textarea.focus(), 150);
 
   btn.onclick = async () => {
-    let reason = select.value;
-    const details = textarea.value.trim();
-    if (reason === 'Otro') {
-      if (!details) {
-        showToast('Por favor especifique el motivo de anulación', 'warning');
-        textarea.focus();
-        return;
-      }
-      reason = details;
-    } else if (details) {
-      reason = `${reason}: ${details}`;
+    const reason = textarea.value.trim();
+    if (!reason) {
+      errorMsg.style.display = 'block';
+      textarea.focus();
+      return;
     }
 
     btn.disabled = true;
