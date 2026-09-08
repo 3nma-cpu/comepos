@@ -336,11 +336,12 @@ function processSale() {
       closeModal(overlay);
 
       // Save references for ticket before clearing
+      const currentUser = api.getCurrentUser() || JSON.parse(localStorage.getItem('comepos_session') || '{}');
       const ticketData = {
         ...newSale,
         date: newSale.date || new Date().toISOString(),
         clientName: selectedClient.name,
-        userName: user.name || 'Cajero',
+        userName: currentUser.name || 'Cajero',
         items: [...cart]
       };
 
@@ -349,7 +350,11 @@ function processSale() {
       selectedClient = null;
       
       // Imprimir directamente el ticket
-      printTicket(ticketData);
+      try {
+        printTicket(ticketData);
+      } catch (printErr) {
+        console.error('Error al imprimir ticket:', printErr);
+      }
       showToast('¡Venta registrada con éxito!');
       
       // Refresh background UI
@@ -553,6 +558,10 @@ export function printTicket(sale, ...rest) {
   const total = actualSale?.total || 0;
 
   const printWin = window.open('', '_blank', 'width=400,height=600');
+  if (!printWin) {
+    showToast('Ventana de impresión bloqueada. Permita las ventanas emergentes en su navegador.', 'warning');
+    return;
+  }
 
   printWin.document.write(`<!DOCTYPE html>
 <html lang="es">
@@ -767,5 +776,12 @@ export function printTicket(sale, ...rest) {
 
   printWin.document.close();
   printWin.focus();
-  setTimeout(() => { printWin.print(); printWin.close(); }, 350);
+  setTimeout(() => {
+    try {
+      printWin.print();
+      printWin.close();
+    } catch (e) {
+      console.warn('Error al imprimir ticket:', e);
+    }
+  }, 350);
 }
