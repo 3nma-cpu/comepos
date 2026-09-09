@@ -196,6 +196,13 @@ function reportPurchasesPeriod(area, purchases, providers) {
       <div class="form-group"><label>Desde</label><input type="date" class="form-control" id="rppFrom" value="${formatDateInput(d30)}" /></div>
       <div class="form-group"><label>Hasta</label><input type="date" class="form-control" id="rppTo" value="${todayStr()}" /></div>
       <div class="form-group">
+        <label>Formato</label>
+        <select class="form-control" id="rppViewMode">
+          <option value="detalles">Por Detalle</option>
+          <option value="totales">Totales</option>
+        </select>
+      </div>
+      <div class="form-group">
         <label>Propósito</label>
         <select class="form-control" id="rppPurpose">
           <option value="todos">Todos</option>
@@ -217,7 +224,7 @@ function reportPurchasesPeriod(area, purchases, providers) {
         <label>Proveedor</label>
         <select class="form-control" id="rppProv">
           <option value="">Todos</option>
-          ${providers.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+          ${providers.map(p => `<option value="${p.id}">${escapeHTML(p.name)}</option>`).join('')}
         </select>
       </div>
       <!-- Filtro: Tipo de Pago -->
@@ -249,9 +256,12 @@ function reportPurchasesPeriod(area, purchases, providers) {
         document.getElementById('rppFacturaGroup').style.display = val === 'factura'   ? '' : 'none';
     });
 
+    document.getElementById('rppViewMode').addEventListener('change', apply);
+
     function apply() {
         const from       = document.getElementById('rppFrom').value;
         const to         = document.getElementById('rppTo').value;
+        const viewMode   = document.getElementById('rppViewMode').value;
         const purpose    = document.getElementById('rppPurpose').value;
         const filterType = document.getElementById('rppFilterType').value;
         const provId     = document.getElementById('rppProv')?.value    || '';
@@ -279,7 +289,7 @@ function reportPurchasesPeriod(area, purchases, providers) {
             if (filterType === 'tipo'      && tipo   && p.paymentMethod !== tipo) return false;
             if (filterType === 'factura'   && factura && !(p.invoiceNumber || '').toLowerCase().includes(factura)) return false;
             return true;
-        }).sort((a, b) => new Date(b.date) - new Date(a.date));
+        });
 
         const totalCost = filtered.reduce((s, x) => s + x.total, 0);
         const totalContado = filtered.filter(p => p.paymentMethod !== 'CREDITO').reduce((s, x) => s + x.total, 0);
@@ -292,41 +302,252 @@ function reportPurchasesPeriod(area, purchases, providers) {
       <div class="kpi-card"><div class="kpi-icon purple"><i data-lucide="clock"></i></div><div class="kpi-content"><div class="kpi-label">Crédito (Filtrado)</div><div class="kpi-value">${formatCurrency(totalCredito)}</div></div></div>`;
         if (window.lucide) lucide.createIcons();
 
-        document.getElementById('rppTable').innerHTML = filtered.length === 0
-          ? '<div class="empty-state"><p>No se encontraron compras con los filtros aplicados.</p></div>'
-          : `<table><thead><tr><th>Fecha</th><th>Proveedor</th><th>Factura</th><th>Pago</th><th>Productos</th><th>Total Segmentado</th></tr></thead>
-          <tbody>${filtered.slice(0, 100).map(p => `<tr>
-            <td>${formatDate(p.date)}</td>
-            <td><strong>${p.providerName}</strong></td>
-            <td><code>${p.invoiceNumber || '---'}</code></td>
-            <td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td>
-            <td style="font-size:.8rem;color:var(--text-secondary)">${p.items.map(i => `${i.name} (x${i.quantity}) ${i.forResale !== false ? '<span style="color:#2d8a4e;font-weight:600;font-size:.7rem">(Venta)</span>' : '<span style="color:#b8860b;font-weight:600;font-size:.7rem">(Uso Interno)</span>'}`).join(', ')}</td>
-            <td><strong>${formatCurrency(p.total)}</strong></td>
-          </tr>`).join('')}</tbody></table>`;
+        if (filtered.length === 0) {
+            document.getElementById('rppTable').innerHTML = '<div class="empty-state"><p>No se encontraron compras con los filtros aplicados.</p></div>';
+            document.getElementById('rppExport').onclick = () => showToast('No hay datos para exportar', 'warning');
+            return;
+        }
 
-        document.getElementById('rppExport').onclick = () => {
-            const rows = [];
-            filtered.forEach(p => {
-                p.items.forEach(i => {
+        // Agrupación por proveedor para calcular subtotales
+        const providerMap = new Map();
+        filtered.forEach(p => {
+            const provName = p.providerName || 'Sin proveedor';
+            if (!providerMap.has(provName)) {
+                providerMap.set(provName, {
+                    providerName: provName,
+                    purchases: [],
+                    subtotal: 0
+                });
+            }
+            const group = providerMap.get(provName);
+            group.purchases.push(p);
+            group.subtotal += p.total;
+        });
+
+        const sortedGroups = Array.from(providerMap.values()).sort((a, b) => 
+            a.providerName.localeCompare(b.providerName, 'es', { sensitivity: 'base' })
+        );
+
+        sortedGroups.forEach(g => {
+            g.purchases.sort((a, b) => new Date(b.date) - new Date(a.date));
+        });
+
+        if (viewMode === 'totales') {
+            let tableHtml = `
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Proveedor</th>
+                  <th>Factura</th>
+                  <th>Condición</th>
+                  <th style="text-align:right">Total Factura</th>
+                </tr>
+              </thead>
+              <tbody>`;
+
+            sortedGroups.forEach(group => {
+                group.purchases.forEach(p => {
+                    const factText = p.invoiceNumber 
+                        ? `FACT Nº ${escapeHTML(p.invoiceNumber)}` 
+                        : (p.noInvoice ? 'Sin Factura' : '---');
+
+                    tableHtml += `
+                    <tr>
+                      <td>${formatDate(p.date)}</td>
+                      <td><strong>${escapeHTML(p.providerName || 'Sin proveedor')}</strong></td>
+                      <td><code>${factText}</code></td>
+                      <td><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td>
+                      <td style="text-align:right"><strong>${formatCurrency(p.total)}</strong></td>
+                    </tr>`;
+                });
+
+                // Fila de subtotal por proveedor
+                tableHtml += `
+                <tr style="background:rgba(128,128,128,0.08); font-weight:700; border-top:1px solid var(--border); border-bottom:2px solid var(--border);">
+                  <td colspan="4" style="text-align:right; padding:0.65rem 0.85rem;">
+                    <span style="color:var(--text-secondary); text-transform:uppercase; font-size:0.75rem; letter-spacing:0.05em">Subtotal Proveedor:</span>
+                    <strong style="margin-left:0.5rem; color:var(--text)">${escapeHTML(group.providerName)}</strong>
+                  </td>
+                  <td style="text-align:right; padding:0.65rem 0.85rem;">
+                    <strong style="color:var(--text); font-size:0.95rem;">${formatCurrency(group.subtotal)}</strong>
+                  </td>
+                </tr>`;
+            });
+
+            tableHtml += `
+              </tbody>
+              <tfoot>
+                <tr style="background:rgba(128,128,128,0.15); font-weight:800; font-size:0.95rem;">
+                  <td colspan="4" style="text-align:right; padding:0.85rem;">TOTAL GENERAL:</td>
+                  <td style="text-align:right; padding:0.85rem; color:var(--text)">${formatCurrency(totalCost)}</td>
+                </tr>
+              </tfoot>
+            </table>`;
+
+            document.getElementById('rppTable').innerHTML = tableHtml;
+
+            document.getElementById('rppExport').onclick = () => {
+                const rows = [];
+                sortedGroups.forEach(group => {
+                    group.purchases.forEach(p => {
+                        rows.push([
+                            p.providerName || 'Sin proveedor',
+                            p.invoiceNumber ? `FACT Nº ${p.invoiceNumber}` : (p.noInvoice ? 'Sin Factura' : '---'),
+                            formatDate(p.date),
+                            p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado',
+                            p.total
+                        ]);
+                    });
                     rows.push([
-                        p.providerName || 'Sin proveedor',
-                        p.invoiceNumber || '---',
-                        i.name,
-                        i.quantity,
-                        i.cost,
-                        Math.round(i.cost * i.quantity),
-                        p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado',
-                        formatDate(p.date)
+                        `Subtotal ${group.providerName}`,
+                        '',
+                        '',
+                        '',
+                        group.subtotal
                     ]);
                 });
+                rows.push([
+                    'TOTAL GENERAL',
+                    '',
+                    '',
+                    '',
+                    totalCost
+                ]);
+
+                exportExcel(
+                    ['Proveedor', 'Nº Factura', 'Fecha', 'Condición / Pago', 'Total Factura'],
+                    rows,
+                    'reporte_compras_totales.xlsx'
+                );
+                showToast('Excel exportado');
+            };
+        } else {
+            // Modo "detalles"
+            let tableHtml = `
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Proveedor</th>
+                  <th>Factura</th>
+                  <th>Condición</th>
+                  <th>Detalle de Productos</th>
+                  <th style="text-align:right">Total Factura</th>
+                </tr>
+              </thead>
+              <tbody>`;
+
+            sortedGroups.forEach(group => {
+                group.purchases.forEach(p => {
+                    const factText = p.invoiceNumber 
+                        ? `FACT Nº ${escapeHTML(p.invoiceNumber)}` 
+                        : (p.noInvoice ? 'Sin Factura' : '---');
+
+                    const itemsHtml = p.items.map(i => {
+                        const tag = i.forResale !== false 
+                            ? '<span style="color:#2d8a4e;font-weight:600;font-size:.72rem">(Venta)</span>' 
+                            : '<span style="color:#b8860b;font-weight:600;font-size:.72rem">(Uso Interno)</span>';
+                        const itemSubtotal = Math.round(i.cost * i.quantity);
+                        return `
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:2px 0; border-bottom:1px dashed rgba(128,128,128,0.12); font-size:0.82rem;">
+                          <div>
+                            <strong>${escapeHTML(i.name)}</strong> ${tag}
+                          </div>
+                          <div style="white-space:nowrap; color:var(--text-secondary); font-size:0.8rem;">
+                            ${i.quantity} × ${formatCurrency(i.cost)} = <strong style="color:var(--text)">${formatCurrency(itemSubtotal)}</strong>
+                          </div>
+                        </div>`;
+                    }).join('');
+
+                    tableHtml += `
+                    <tr>
+                      <td style="vertical-align:top">${formatDate(p.date)}</td>
+                      <td style="vertical-align:top"><strong>${escapeHTML(p.providerName || 'Sin proveedor')}</strong></td>
+                      <td style="vertical-align:top"><code>${factText}</code></td>
+                      <td style="vertical-align:top"><span class="badge ${p.paymentMethod === 'CREDITO' ? 'badge-warning' : 'badge-success'}">${p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado'}</span></td>
+                      <td style="vertical-align:top">
+                        <div style="display:flex; flex-direction:column; gap:3px;">${itemsHtml}</div>
+                      </td>
+                      <td style="vertical-align:top; text-align:right"><strong>${formatCurrency(p.total)}</strong></td>
+                    </tr>`;
+                });
+
+                // Fila de subtotal por proveedor
+                tableHtml += `
+                <tr style="background:rgba(128,128,128,0.08); font-weight:700; border-top:1px solid var(--border); border-bottom:2px solid var(--border);">
+                  <td colspan="5" style="text-align:right; padding:0.65rem 0.85rem;">
+                    <span style="color:var(--text-secondary); text-transform:uppercase; font-size:0.75rem; letter-spacing:0.05em">Subtotal Proveedor:</span>
+                    <strong style="margin-left:0.5rem; color:var(--text)">${escapeHTML(group.providerName)}</strong>
+                  </td>
+                  <td style="text-align:right; padding:0.65rem 0.85rem;">
+                    <strong style="color:var(--text); font-size:0.95rem;">${formatCurrency(group.subtotal)}</strong>
+                  </td>
+                </tr>`;
             });
-            exportExcel(
-                ['Proveedor', 'Nº Factura', 'Producto', 'Cantidad', 'Precio Unitario', 'Total', 'Tipo de Pago', 'Fecha de Compra'],
-                rows,
-                'reporte_compras_segmentado.xlsx'
-            );
-            showToastLocal('Excel exportado');
-        };
+
+            tableHtml += `
+              </tbody>
+              <tfoot>
+                <tr style="background:rgba(128,128,128,0.15); font-weight:800; font-size:0.95rem;">
+                  <td colspan="5" style="text-align:right; padding:0.85rem;">TOTAL GENERAL:</td>
+                  <td style="text-align:right; padding:0.85rem; color:var(--text)">${formatCurrency(totalCost)}</td>
+                </tr>
+              </tfoot>
+            </table>`;
+
+            document.getElementById('rppTable').innerHTML = tableHtml;
+
+            document.getElementById('rppExport').onclick = () => {
+                const rows = [];
+                sortedGroups.forEach(group => {
+                    group.purchases.forEach(p => {
+                        p.items.forEach(i => {
+                            rows.push([
+                                p.providerName || 'Sin proveedor',
+                                p.invoiceNumber ? `FACT Nº ${p.invoiceNumber}` : (p.noInvoice ? 'Sin Factura' : '---'),
+                                formatDate(p.date),
+                                p.paymentMethod === 'CREDITO' ? 'Crédito' : 'Contado',
+                                i.name,
+                                i.forResale !== false ? 'Venta' : 'Uso Interno',
+                                i.quantity,
+                                i.cost,
+                                Math.round(i.cost * i.quantity)
+                            ]);
+                        });
+                    });
+                    rows.push([
+                        `Subtotal ${group.providerName}`,
+                        '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        '',
+                        group.subtotal
+                    ]);
+                });
+                rows.push([
+                    'TOTAL GENERAL',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    '',
+                    totalCost
+                ]);
+
+                exportExcel(
+                    ['Proveedor', 'Nº Factura', 'Fecha', 'Condición / Pago', 'Producto', 'Propósito', 'Cantidad', 'Precio Unitario', 'Total'],
+                    rows,
+                    'reporte_compras_detallado.xlsx'
+                );
+                showToast('Excel exportado');
+            };
+        }
     }
 
     document.getElementById('rppApply').onclick = apply;
