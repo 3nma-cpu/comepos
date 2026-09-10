@@ -21,5 +21,9 @@ yarn-error.log*
 .vscode/
 .idea/
 
+# Backups
+backups/
+
 insert_users.js
 insert_clients.js
+

@@ -84,11 +84,16 @@ router.get('/:id/history', validateUUID, async (req, res) => {
   }
 });
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // POST /api/clients
 router.post('/', async (req, res) => {
   try {
     const { name, cedula, department, position, category, email, phone } = req.body;
     if (!name || !cedula || !category) return res.status(400).json({ error: 'Nombre, cédula y categoría son obligatorios' });
+    if (email && !EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: 'El formato de correo electrónico es inválido' });
+    }
     const dbCategory = CATEGORY_MAP[category] || category;
     const client = await prisma.client.create({
       data: { name, cedula, department, position, category: dbCategory, email, phone }
@@ -110,8 +115,14 @@ router.put('/:id', validateUUID, async (req, res) => {
     if (department !== undefined) data.department = department;
     if (position !== undefined) data.position = position;
     if (category !== undefined) data.category = CATEGORY_MAP[category] || category;
-    if (email !== undefined) data.email = email;
+    if (email !== undefined) {
+      if (email && !EMAIL_REGEX.test(email)) {
+        return res.status(400).json({ error: 'El formato de correo electrónico es inválido' });
+      }
+      data.email = email || null;
+    }
     if (phone !== undefined) data.phone = phone;
+
 
     const client = await prisma.client.update({ where: { id: req.params.id }, data });
     res.json(clientToJSON(client));

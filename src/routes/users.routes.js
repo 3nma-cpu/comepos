@@ -23,12 +23,21 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Helper para validar formato de email
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 // POST /api/users
 router.post('/', async (req, res) => {
   try {
     const { username, password, name, email, roleId } = req.body;
     if (!username || !password || !name || !email || !roleId) {
       return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+    }
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: 'El formato de correo electrónico es inválido' });
+    }
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
     }
     const hashed = await bcrypt.hash(password, 10);
     const user = await prisma.user.create({
@@ -61,10 +70,20 @@ router.put('/:id', validateUUID, async (req, res) => {
     const data = {};
     if (name !== undefined) data.name = name;
     if (username !== undefined) data.username = username;
-    if (email !== undefined) data.email = email;
+    if (email !== undefined) {
+      if (!EMAIL_REGEX.test(email)) {
+        return res.status(400).json({ error: 'El formato de correo electrónico es inválido' });
+      }
+      data.email = email;
+    }
     if (roleId !== undefined) data.roleId = roleId;
-    if (active !== undefined) data.active = active;
-    if (password) data.password = await bcrypt.hash(password, 10);
+    if (active !== undefined) data.active = Boolean(active);
+    if (password) {
+      if (typeof password !== 'string' || password.length < 6) {
+        return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+      }
+      data.password = await bcrypt.hash(password, 10);
+    }
 
     const user = await prisma.user.update({
       where: { id: targetId },

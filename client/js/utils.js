@@ -93,9 +93,63 @@ export function createModal(title, bodyHTML, footerHTML = '') {
             }
         }
     });
+
+    // ─── Keyboard support ───────────────────────────────────
+    // Enter → click the primary save/submit button (btn-primary in footer)
+    // Escape → close the modal
+    function handleModalKeydown(e) {
+        // Ignore if modal is no longer in the DOM
+        if (!document.body.contains(overlay)) {
+            document.removeEventListener('keydown', handleModalKeydown);
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeModal(overlay);
+            return;
+        }
+
+        if (e.key === 'Enter') {
+            // Don't trigger on textarea (allow newlines) or on buttons (native behavior)
+            const active = document.activeElement;
+            if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'BUTTON')) return;
+
+            // Find the primary action button in the modal footer
+            const primaryBtn = overlay.querySelector('.modal-footer .btn-primary');
+            if (primaryBtn && !primaryBtn.disabled) {
+                e.preventDefault();
+                e.stopPropagation();
+                primaryBtn.click();
+            }
+        }
+    }
+    document.addEventListener('keydown', handleModalKeydown);
+
+    // Clean up listener when modal is closed
+    const origClose = closeModal;
+    const modalEl = overlay.querySelector('.modal');
+    if (modalEl) {
+        const observer = new MutationObserver(() => {
+            if (!document.body.contains(overlay)) {
+                document.removeEventListener('keydown', handleModalKeydown);
+                observer.disconnect();
+            }
+        });
+        observer.observe(document.body, { childList: true });
+    }
+
+    // Auto-focus the first visible input/select in the modal
+    requestAnimationFrame(() => {
+        const firstInput = overlay.querySelector('input:not([type="hidden"]):not([disabled]):not([type="checkbox"]), select:not([disabled]), textarea:not([disabled])');
+        if (firstInput) firstInput.focus();
+    });
+
     if (window.lucide) lucide.createIcons();
     return overlay;
 }
+
 
 export function closeModal(overlay) {
     if (!overlay) return;

@@ -22,10 +22,12 @@ import supplierPaymentsRoutes from './routes/supplier-payments.routes.js';
 
 import helmet from 'helmet';
 import compression from 'compression';
+import { apiRateLimiter } from './middleware/rateLimiter.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 const isProduction = process.env.NODE_ENV === 'production';
+
 
 // Security headers
 app.use(helmet({
@@ -93,6 +95,9 @@ app.use((req, res, next) => {
   if (req.path.startsWith('/api')) return next();
   res.sendFile(path.join(clientPath, 'index.html'));
 });
+
+// Global Rate Limiting para la API
+app.use('/api', apiRateLimiter);
 
 // Routes
 app.use('/api/auth', authRoutes);

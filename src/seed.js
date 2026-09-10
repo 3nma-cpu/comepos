@@ -4,7 +4,12 @@ import bcrypt from 'bcryptjs';
 import prisma from './config/db.js';
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('⛔ ERROR: No se puede ejecutar el script de seed con datos demo en entorno de PRODUCCIÓN.');
+    process.exit(1);
+  }
   console.log('🌱 Sembrando datos de demostración...');
+
 
   // Clean existing data (order matters for foreign keys)
   await prisma.saleItem.deleteMany();

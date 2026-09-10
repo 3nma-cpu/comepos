@@ -1235,13 +1235,20 @@ tbody tr:last-child td {
     transition: background .15s;
 }
 
-.pos-client-option:hover {
+.pos-client-option:hover,
+.pos-client-option.kb-active {
     background: var(--bg-card-hover);
+}
+
+.pos-client-option.kb-active {
+    outline: 1px solid var(--border-focus);
+    outline-offset: -1px;
 }
 
 .pos-client-option:last-child {
     border-bottom: none;
 }
+
 
 /* Purchase Module Compact Layout */
 .purchase-form-container {

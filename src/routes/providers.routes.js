@@ -31,13 +31,21 @@ router.post('/', async (req, res) => {
 // PUT /api/providers/:id
 router.put('/:id', async (req, res) => {
   try {
-    const provider = await prisma.provider.update({ where: { id: req.params.id }, data: req.body });
+    const { name, ruc, phone, email } = req.body;
+    const data = {};
+    if (name !== undefined) data.name = name;
+    if (ruc !== undefined) data.ruc = ruc;
+    if (phone !== undefined) data.phone = phone;
+    if (email !== undefined) data.email = email;
+
+    const provider = await prisma.provider.update({ where: { id: req.params.id }, data });
     res.json(provider);
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Proveedor no encontrado' });
     res.status(500).json({ error: 'Error al actualizar proveedor' });
   }
 });
+
 
 // DELETE /api/providers/:id
 router.delete('/:id', async (req, res) => {
