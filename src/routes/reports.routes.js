@@ -51,7 +51,11 @@ router.get('/sales-period', async (req, res) => {
 
     const sales = await prisma.sale.findMany({
       where,
-      include: { client: true, items: { include: { product: true } } },
+      include: {
+        client: true,
+        user: { select: { id: true, name: true, username: true } },
+        items: { include: { product: true } }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
@@ -76,6 +80,7 @@ router.get('/sales-period', async (req, res) => {
         clientCategory: s.client ? (CAT_REVERSE[s.client.category] || s.client.category) : 'General',
         paymentMethod: PAY_REVERSE[s.paymentMethod] || (s.paymentMethod ? s.paymentMethod.toLowerCase() : 'efectivo'),
         total: s.total,
+        userName: s.user?.name || s.user?.username || 'Cajero',
         items: (s.items || []).map(i => ({ name: i.product?.name || 'Producto', quantity: i.quantity, price: i.unitPrice }))
       }))
     });

@@ -506,7 +506,8 @@ export function promptCancellationReason(saleTotal, onConfirm) {
 export function showTicket(sale, onDeleted = null) {
   const payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
   const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
-  const vendorName = sale.userName || user.name || 'Cajero';
+  const isExistingSale = Boolean(sale?.id);
+  const vendorName = sale.userName || sale.user?.name || sale.cashierName || (!isExistingSale ? (user.name || 'Cajero') : 'Cajero');
   const clientName = sale.clientName || sale.client?.name || 'Cliente';
   const saleDate = sale.date || sale.createdAt || new Date();
   const isCancelled = sale.status === 'CANCELLED';
@@ -536,7 +537,7 @@ export function showTicket(sale, onDeleted = null) {
       <div class="ticket-line"><span>Fecha:</span><span>${formatDateTime(saleDate)}</span></div>
       <div class="ticket-line"><span>Cliente:</span><span style="font-weight:700">${escapeHTML(clientName)}</span></div>
       <div class="ticket-line"><span>Pago:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
-      <div class="ticket-line"><span>Cajero:</span><span>${escapeHTML(vendorName)}</span></div>
+      <div class="ticket-line"><span>Cajero:</span><span id="ticketVendorName">${escapeHTML(vendorName)}</span></div>
       <div class="ticket-divider" style="border-color:#000"></div>
 
       <!-- Items -->
@@ -587,6 +588,17 @@ export function showTicket(sale, onDeleted = null) {
   const modal = createModal(isCancelled ? 'Ticket de Venta (ANULADA)' : 'Ticket de Venta', body, footer);
   if (window.lucide) lucide.createIcons();
 
+  // Si es una venta existente y no vino con el nombre del cajero cargado, consultarlo al backend
+  if (sale.id && !sale.userName && !sale.user?.name && !sale.cashierName) {
+    api.get(`/sales/${sale.id}`).then(fullSale => {
+      if (fullSale && fullSale.userName) {
+        sale.userName = fullSale.userName;
+        const cajeroEl = modal.querySelector('#ticketVendorName');
+        if (cajeroEl) cajeroEl.textContent = fullSale.userName;
+      }
+    }).catch(() => {});
+  }
+
   document.getElementById('btnPrintTicket').onclick = () => printTicket(sale);
 
   const btnDelete = document.getElementById('btnDeleteSale');
@@ -612,18 +624,19 @@ export function showTicket(sale, onDeleted = null) {
 export function printTicket(sale, ...rest) {
   let actualSale = sale;
   let ticketId = (sale && sale.id ? sale.id : '').slice(-6).toUpperCase();
-  let vendorName = sale ? sale.userName : null;
+  let vendorName = sale ? (sale.userName || sale.user?.name || sale.cashierName) : null;
   let payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
 
   if (typeof sale === 'string') {
     ticketId = sale;
     actualSale = rest[0];
-    vendorName = rest[1];
+    vendorName = rest[1] || (actualSale ? (actualSale.userName || actualSale.user?.name || actualSale.cashierName) : null);
     payLabels = rest[2] || payLabels;
   }
 
   const user = JSON.parse(localStorage.getItem('comepos_session') || '{}');
-  vendorName = vendorName || (actualSale ? actualSale.userName : null) || user.name || 'Cajero';
+  const isExistingSale = Boolean(actualSale?.id || (typeof sale === 'string' && sale.length > 0));
+  vendorName = vendorName || (actualSale ? (actualSale.userName || actualSale.user?.name || actualSale.cashierName) : null) || (!isExistingSale ? (user.name || 'Cajero') : 'Cajero');
   const payLabel = payLabels[actualSale?.paymentMethod] || actualSale?.paymentMethod || 'Efectivo';
   const clientName = actualSale?.clientName || actualSale?.client?.name || 'Cliente';
   const saleDate = actualSale?.date || actualSale?.createdAt || new Date();

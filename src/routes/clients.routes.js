@@ -58,6 +58,7 @@ router.get('/:id/history', validateUUID, async (req, res) => {
       where: { clientId: req.params.id },
       include: {
         items: { include: { product: true } },
+        user: { select: { id: true, name: true, username: true } },
         cancelledBy: { select: { id: true, name: true, username: true } }
       },
       orderBy: { createdAt: 'desc' }
@@ -73,6 +74,7 @@ router.get('/:id/history', validateUUID, async (req, res) => {
         paymentMethod: s.paymentMethod.toLowerCase(),
         date: s.createdAt.toISOString(),
         status: s.status,
+        userName: s.user?.name || s.user?.username || 'Cajero',
         cancelledAt: s.cancelledAt ? s.cancelledAt.toISOString() : null,
         cancelledByName: s.cancelledBy?.name || null,
         cancellationReason: s.cancellationReason || null,

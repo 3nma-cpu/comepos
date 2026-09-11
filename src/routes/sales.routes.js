@@ -68,6 +68,7 @@ router.get('/', async (req, res) => {
       cancellationReason: s.cancellationReason || null,
       date: s.createdAt.toISOString(),
       userId: s.userId,
+      userName: s.user?.name || s.user?.username || 'Cajero',
       items: s.items.map(i => ({
         productId: i.productId, name: i.product?.name || '', price: i.unitPrice, quantity: i.quantity, unit: i.product?.unit || 'UNI'
       }))
@@ -75,6 +76,49 @@ router.get('/', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Error al obtener ventas' });
+  }
+});
+
+// GET /api/sales/:id
+router.get('/:id', validateUUID, async (req, res) => {
+  try {
+    const sale = await prisma.sale.findUnique({
+      where: { id: req.params.id },
+      include: {
+        client: true,
+        items: { include: { product: true } },
+        user: true,
+        cancelledBy: { select: { id: true, name: true, username: true } }
+      }
+    });
+
+    if (!sale) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    res.json({
+      id: sale.id,
+      clientId: sale.clientId,
+      clientName: sale.client?.name || 'Desconocido',
+      clientCedula: sale.client?.cedula || '',
+      clientCategory: CAT_REVERSE[sale.client?.category] || sale.client?.category || '',
+      total: sale.total,
+      paymentMethod: PAY_REVERSE[sale.paymentMethod] || sale.paymentMethod,
+      status: sale.status,
+      cancelledAt: sale.cancelledAt ? sale.cancelledAt.toISOString() : null,
+      cancelledById: sale.cancelledById,
+      cancelledByName: sale.cancelledBy?.name || null,
+      cancellationReason: sale.cancellationReason || null,
+      date: sale.createdAt.toISOString(),
+      userId: sale.userId,
+      userName: sale.user?.name || sale.user?.username || 'Cajero',
+      items: sale.items.map(i => ({
+        productId: i.productId, name: i.product?.name || '', price: i.unitPrice, quantity: i.quantity, unit: i.product?.unit || 'UNI'
+      }))
+    });
+  } catch (err) {
+    console.error('Error al obtener venta:', err);
+    res.status(500).json({ error: 'Error al obtener venta' });
   }
 });
 
@@ -181,6 +225,8 @@ router.post('/', async (req, res) => {
       total: sale.total,
       paymentMethod: PAY_REVERSE[sale.paymentMethod] || sale.paymentMethod,
       date: sale.createdAt.toISOString(),
+      userId: sale.userId,
+      userName: req.user?.name || req.user?.username || 'Cajero',
       items: sale.items.map(i => ({
         productId: i.productId, name: i.product?.name || '', price: i.unitPrice, quantity: i.quantity, unit: i.product?.unit || 'UNI'
       }))
