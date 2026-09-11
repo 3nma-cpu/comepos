@@ -179,9 +179,17 @@ export function showProductModal(product = null, onSuccess = null) {
         });
     }
 
+    // Track whether the user has manually touched the price field
+    let priceManuallySet = isEdit; // For edits, assume the price is already intentional
+    priceInput.addEventListener('input', () => { priceManuallySet = true; });
+    priceInput.addEventListener('focus', () => { priceManuallySet = true; });
+
     costInput.addEventListener('input', () => {
         const cost = parseFloat(costInput.value) || 0;
-        priceInput.value = Math.round(cost * (1 + markup / 100));
+        // Only auto-calculate price if it's a new product and user hasn't manually set it
+        if (!priceManuallySet) {
+            priceInput.value = Math.round(cost * (1 + markup / 100));
+        }
     });
 
     document.getElementById('btnSaveProduct').onclick = async () => {
