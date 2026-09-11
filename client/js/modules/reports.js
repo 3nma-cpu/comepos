@@ -632,7 +632,10 @@ function reportClientConsumption(area, sales) {
     <div id="rccContent"></div>`;
     if (window.lucide) lucide.createIcons();
 
+    let currentlyOpenClientId = null;
+
     function apply() {
+        currentlyOpenClientId = null;
         const from = document.getElementById('rccFrom').value;
         const to = document.getElementById('rccTo').value;
         const search = document.getElementById('rccSearch').value.toLowerCase();
@@ -657,112 +660,217 @@ function reportClientConsumption(area, sales) {
 
         const sorted = Object.values(clientMap).sort((a, b) => b.total - a.total);
 
+        if (sorted.length === 0) {
+            document.getElementById('rccContent').innerHTML = '<div class="empty-state"><p>No se encontraron registros de consumo en este período.</p></div>';
+            return;
+        }
+
         document.getElementById('rccContent').innerHTML = `
         <div class="table-container">
           <table>
             <thead><tr><th>Cliente</th><th>Categoría</th><th>Compras</th><th>Total</th><th>Acción</th></tr></thead>
             <tbody>${sorted.map(c => `
-              <tr>
-                <td><strong>${c.name}</strong></td>
-                <td><span class="badge badge-primary">${c.category}</span></td>
-                <td>${c.count}</td>
-                <td><strong>${formatCurrency(c.total)}</strong></td>
-                <td><button class="btn btn-sm btn-ghost" data-detail="${c.id}">Ver Detalle</button></td>
+              <tr id="rcc-row-${c.id}">
+                <td><strong>${escapeHTML(c.name)}</strong></td>
+                <td><span class="badge badge-primary">${escapeHTML(c.category)}</span></td>
+                <td class="rcc-count">${c.count}</td>
+                <td class="rcc-total"><strong>${formatCurrency(c.total)}</strong></td>
+                <td>
+                  <button class="btn btn-sm btn-ghost btn-toggle-detail" data-detail="${c.id}">
+                    <i data-lucide="chevron-down" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i>Ver Detalle
+                  </button>
+                </td>
               </tr>`).join('')}
             </tbody>
           </table>
-        </div>
-        <div id="rccDetail" style="margin-top:2rem"></div>`;
+        </div>`;
 
-        document.querySelectorAll('[data-detail]').forEach(btn => {
-            btn.onclick = () => {
-                const client = clientMap[btn.dataset.detail];
-                const sortedSales = [...client.sales].sort((a, b) => new Date(b.date) - new Date(a.date));
-                const payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
-                document.getElementById('rccDetail').innerHTML = `
-                <div class="card fade-in">
-                  <div class="card-header">
-                    <h3 class="card-title">Detalle de Consumo: ${client.name}</h3>
-                    <div class="badge badge-purple">${formatDate(from)} al ${formatDate(to)}</div>
+        if (window.lucide) lucide.createIcons();
+
+        const payLabels = { efectivo: 'Efectivo', transferencia: 'Transferencia', nomina: 'VALE DE COMEDOR' };
+
+        function renderClientSalesRows(clientSales) {
+            const sortedSales = [...clientSales].sort((a, b) => new Date(b.date) - new Date(a.date));
+            return sortedSales.map(sale => `
+              <tr>
+                <td>${formatDateTime(sale.date)}</td>
+                <td><span class="badge ${sale.paymentMethod === 'nomina' ? 'badge-purple' : 'badge-success'}">${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></td>
+                <td style="font-size:.8rem;color:var(--text-secondary)">${sale.items.map(i => `${escapeHTML(i.name)} (x${i.quantity})`).join(', ')}</td>
+                <td style="text-align:right"><strong>${formatCurrency(sale.total)}</strong></td>
+                <td style="text-align:center;white-space:nowrap">
+                  <button class="btn btn-sm btn-ghost btn-reprint" data-sale-id="${sale.id}"><i data-lucide="printer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Ticket</button>
+                  <button class="btn btn-sm btn-ghost text-danger btn-delete-sale" data-sale-id="${sale.id}" title="Eliminar venta"><i data-lucide="trash-2" style="width:14px;height:14px;vertical-align:middle"></i></button>
+                </td>
+              </tr>`).join('');
+        }
+
+        function closeDetail(clientId) {
+            const detailRow = document.getElementById(`rcc-detail-row-${clientId}`);
+            if (detailRow) detailRow.remove();
+
+            const btn = document.querySelector(`[data-detail="${clientId}"]`);
+            if (btn) {
+                btn.className = 'btn btn-sm btn-ghost btn-toggle-detail';
+                btn.innerHTML = '<i data-lucide="chevron-down" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i>Ver Detalle';
+            }
+            if (currentlyOpenClientId === clientId) {
+                currentlyOpenClientId = null;
+            }
+            if (window.lucide) lucide.createIcons();
+        }
+
+        function bindDetailRowEvents(clientId) {
+            const detailRow = document.getElementById(`rcc-detail-row-${clientId}`);
+            if (!detailRow) return;
+
+            const client = clientMap[clientId];
+            if (!client) return;
+
+            const closeBtn = detailRow.querySelector('.btn-close-rcc-detail');
+            if (closeBtn) {
+                closeBtn.onclick = () => closeDetail(clientId);
+            }
+
+            detailRow.querySelectorAll('.btn-reprint').forEach(reprintBtn => {
+                reprintBtn.onclick = () => {
+                    const saleId = reprintBtn.dataset.saleId;
+                    const sale = client.sales.find(s => s.id === saleId);
+                    if (sale) {
+                        showTicket(sale, (deletedId) => handleDeletedSale(deletedId, clientId));
+                    }
+                };
+            });
+
+            detailRow.querySelectorAll('.btn-delete-sale').forEach(delBtn => {
+                delBtn.onclick = () => {
+                    const saleId = delBtn.dataset.saleId;
+                    const sale = client.sales.find(s => s.id === saleId);
+                    if (!sale) return;
+                    promptCancellationReason(sale.total, async (reason) => {
+                        try {
+                            await api.delete(`/sales/${saleId}`, { reason });
+                            showToast('Venta anulada y stock devuelto', 'success');
+                            handleDeletedSale(saleId, clientId);
+                        } catch (err) {
+                            showToast('Error al anular venta: ' + err.message, 'error');
+                            throw err;
+                        }
+                    });
+                };
+            });
+        }
+
+        function handleDeletedSale(saleId, clientId) {
+            const sIdx = sales.findIndex(s => s.id === saleId);
+            if (sIdx >= 0) sales.splice(sIdx, 1);
+
+            const client = clientMap[clientId];
+            if (!client) return;
+
+            const cIdx = client.sales.findIndex(s => s.id === saleId);
+            if (cIdx >= 0) {
+                client.total -= client.sales[cIdx].total;
+                client.count -= 1;
+                client.sales.splice(cIdx, 1);
+            }
+
+            const clientRow = document.getElementById(`rcc-row-${clientId}`);
+            if (clientRow) {
+                const countEl = clientRow.querySelector('.rcc-count');
+                const totalEl = clientRow.querySelector('.rcc-total');
+                if (countEl) countEl.textContent = client.count;
+                if (totalEl) totalEl.innerHTML = `<strong>${formatCurrency(client.total)}</strong>`;
+            }
+
+            if (client.sales.length > 0) {
+                const tbody = document.getElementById(`rcc-detail-tbody-${clientId}`);
+                const totalFooter = document.getElementById(`rcc-detail-total-${clientId}`);
+                if (tbody) tbody.innerHTML = renderClientSalesRows(client.sales);
+                if (totalFooter) totalFooter.innerHTML = `<strong>${formatCurrency(client.total)}</strong>`;
+                bindDetailRowEvents(clientId);
+                if (window.lucide) lucide.createIcons();
+            } else {
+                closeDetail(clientId);
+            }
+        }
+
+        function openDetail(clientId) {
+            if (currentlyOpenClientId && currentlyOpenClientId !== clientId) {
+                closeDetail(currentlyOpenClientId);
+            }
+
+            const client = clientMap[clientId];
+            if (!client) return;
+
+            const clientRow = document.getElementById(`rcc-row-${clientId}`);
+            if (!clientRow) return;
+
+            const btn = document.querySelector(`[data-detail="${clientId}"]`);
+            if (btn) {
+                btn.className = 'btn btn-sm btn-secondary btn-toggle-detail';
+                btn.innerHTML = '<i data-lucide="chevron-up" style="width:14px;height:14px;margin-right:4px;vertical-align:middle"></i>Cerrar Detalle';
+            }
+
+            const detailTr = document.createElement('tr');
+            detailTr.id = `rcc-detail-row-${clientId}`;
+            detailTr.className = 'rcc-detail-row';
+            detailTr.innerHTML = `
+              <td colspan="5" style="padding: 0.75rem 1rem; background: rgba(128, 128, 128, 0.04); border-top: 1px dashed var(--border); border-bottom: 1px solid var(--border);">
+                <div class="card fade-in" style="margin: 0; background: var(--bg-card); border: 1px solid var(--border); box-shadow: var(--shadow);">
+                  <div class="card-header" style="padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(128, 128, 128, 0.03);">
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                      <i data-lucide="receipt" style="width: 16px; height: 16px; color: var(--primary-light);"></i>
+                      <h3 class="card-title" style="font-size: 0.92rem; margin: 0;">Detalle de Salidas / Consumo: <strong>${escapeHTML(client.name)}</strong></h3>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                      <span class="badge badge-purple" style="font-size: 0.75rem;">${formatDate(from)} al ${formatDate(to)}</span>
+                      <button class="btn btn-sm btn-ghost btn-close-rcc-detail" title="Cerrar detalle" style="padding: 2px 6px; font-size: 0.8rem;">
+                        <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+                      </button>
+                    </div>
                   </div>
-                  <div class="table-container" style="border:none">
-                    <table>
-                      <thead><tr><th>Fecha y Hora</th><th>Método Pago</th><th>Productos</th><th style="text-align:right">Total</th><th style="text-align:center">Acción</th></tr></thead>
-                      <tbody>
-                        ${sortedSales.map(sale => `
-                          <tr>
-                            <td>${formatDateTime(sale.date)}</td>
-                            <td><span class="badge ${sale.paymentMethod === 'nomina' ? 'badge-purple' : 'badge-success'}">${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></td>
-                            <td style="font-size:.8rem;color:var(--text-secondary)">${sale.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}</td>
-                            <td style="text-align:right"><strong>${formatCurrency(sale.total)}</strong></td>
-                            <td style="text-align:center;white-space:nowrap">
-                              <button class="btn btn-sm btn-ghost btn-reprint" data-sale-id="${sale.id}"><i data-lucide="printer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Ticket</button>
-                              <button class="btn btn-sm btn-ghost text-danger btn-delete-sale" data-sale-id="${sale.id}" title="Eliminar venta"><i data-lucide="trash-2" style="width:14px;height:14px;vertical-align:middle"></i></button>
-                            </td>
-                          </tr>`).join('')}
+                  <div class="table-container" style="border: none; max-height: 360px; overflow-y: auto;">
+                    <table style="width: 100%; font-size: 0.85rem;">
+                      <thead>
+                        <tr>
+                          <th>Fecha y Hora</th>
+                          <th>Método Pago</th>
+                          <th>Productos</th>
+                          <th style="text-align:right">Total</th>
+                          <th style="text-align:center">Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody id="rcc-detail-tbody-${clientId}">
+                        ${renderClientSalesRows(client.sales)}
                       </tbody>
                       <tfoot>
                         <tr style="background:rgba(128,128,128,0.08);font-weight:700">
                           <td colspan="3">TOTAL GENERAL</td>
-                          <td style="text-align:right">${formatCurrency(client.total)}</td>
+                          <td style="text-align:right" id="rcc-detail-total-${clientId}"><strong>${formatCurrency(client.total)}</strong></td>
                           <td></td>
                         </tr>
                       </tfoot>
                     </table>
                   </div>
-                </div>`;
-                if (window.lucide) lucide.createIcons();
+                </div>
+              </td>
+            `;
 
-                function handleDeletedSale(saleId) {
-                  const sIdx = sales.findIndex(s => s.id === saleId);
-                  if (sIdx >= 0) sales.splice(sIdx, 1);
+            clientRow.insertAdjacentElement('afterend', detailTr);
+            currentlyOpenClientId = clientId;
 
-                  const cIdx = client.sales.findIndex(s => s.id === saleId);
-                  if (cIdx >= 0) {
-                    client.total -= client.sales[cIdx].total;
-                    client.count -= 1;
-                    client.sales.splice(cIdx, 1);
-                  }
+            bindDetailRowEvents(clientId);
+            if (window.lucide) lucide.createIcons();
+        }
 
-                  apply();
-                  if (client.sales.length > 0) {
-                    const freshBtn = document.querySelector(`[data-detail="${client.id}"]`);
-                    if (freshBtn) freshBtn.click();
-                  } else {
-                    const detailArea = document.getElementById('rccDetail');
-                    if (detailArea) detailArea.innerHTML = '';
-                  }
+        document.querySelectorAll('.btn-toggle-detail').forEach(btn => {
+            btn.onclick = () => {
+                const cId = btn.dataset.detail;
+                if (currentlyOpenClientId === cId) {
+                    closeDetail(cId);
+                } else {
+                    openDetail(cId);
                 }
-
-                document.getElementById('rccDetail').querySelectorAll('.btn-reprint').forEach(reprintBtn => {
-                    reprintBtn.onclick = () => {
-                        const saleId = reprintBtn.dataset.saleId;
-                        const sale = client.sales.find(s => s.id === saleId);
-                        if (sale) {
-                            showTicket(sale, (deletedId) => handleDeletedSale(deletedId));
-                        }
-                    };
-                });
-
-                document.getElementById('rccDetail').querySelectorAll('.btn-delete-sale').forEach(delBtn => {
-                    delBtn.onclick = () => {
-                        const saleId = delBtn.dataset.saleId;
-                        const sale = client.sales.find(s => s.id === saleId);
-                        if (!sale) return;
-                        promptCancellationReason(sale.total, async (reason) => {
-                          try {
-                            await api.delete(`/sales/${saleId}`, { reason });
-                            showToast('Venta anulada y stock devuelto', 'success');
-                            handleDeletedSale(saleId);
-                          } catch (err) {
-                            showToast('Error al anular venta: ' + err.message, 'error');
-                            throw err;
-                          }
-                        });
-                    };
-                });
-
-                window.scrollTo({ top: document.getElementById('rccDetail').offsetTop - 100, behavior: 'smooth' });
             };
         });
 
