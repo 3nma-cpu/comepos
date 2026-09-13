@@ -66,4 +66,33 @@ export function validateUUID(req, res, next) {
   next();
 }
 
-export { JWT_ISSUER, JWT_AUDIENCE };
+const JWT_PORTAL_AUDIENCE = 'comepos-portal';
+
+/**
+ * Middleware de autenticación para el portal de funcionarios.
+ * Solo acepta tokens con audience 'comepos-portal'.
+ * Extrae clientId y cedula a req.portalClient.
+ */
+export function portalAuthMiddleware(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Token no proporcionado' });
+  }
+
+  const token = header.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_PORTAL_AUDIENCE
+    });
+    if (decoded.type !== 'portal') {
+      return res.status(403).json({ error: 'Token no válido para el portal' });
+    }
+    req.portalClient = decoded;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Token inválido o expirado' });
+  }
+}
+
+export { JWT_ISSUER, JWT_AUDIENCE, JWT_PORTAL_AUDIENCE };

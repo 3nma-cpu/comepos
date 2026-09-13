@@ -48,6 +48,7 @@ model User {
 enum EmployeeCategory {
   ADM
   CHOFER
+  OTRO
 }
 
 model Client {
@@ -59,6 +60,9 @@ model Client {
   category   EmployeeCategory
   email      String?
   phone      String?
+  pin        String?          // Hash bcrypt del PIN de 4 dígitos (portal funcionario)
+  pinActive  Boolean          @default(false) // Si tiene acceso activo al portal
+  mustChangePin Boolean       @default(false) // Si es un PIN provisorio que debe cambiarse al ingresar
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
   sales Sale[]

@@ -26,7 +26,7 @@ export async function renderClients() {
           </div>
           <div class="table-container">
             <table>
-              <thead><tr><th>Nombre</th><th>Cédula</th><th>Departamento</th><th>Cargo</th><th>Categoría</th><th>Acciones</th></tr></thead>
+              <thead><tr><th>Nombre</th><th>Cédula</th><th>Departamento</th><th>Cargo</th><th>Categoría</th><th>Portal</th><th>Acciones</th></tr></thead>
               <tbody id="clientsTableBody"></tbody>
             </table>
           </div>
@@ -65,12 +65,34 @@ function renderTable(clients, allClients) {
       <td style="color:var(--text-secondary)">${escapeHTML(c.position || '')}</td>
       <td><span class="badge ${CATEGORY_BADGE_COLORS[c.category] || 'badge-primary'}">${c.category}</span></td>
       <td>
+        ${c.pinActive 
+          ? `<span class="badge badge-success" style="font-size:11px;display:inline-flex;align-items:center;gap:3px" title="Portal de funcionario activo con PIN"><i data-lucide="shield-check" style="width:12px;height:12px"></i> Activo</span>` 
+          : `<span class="badge" style="font-size:11px;background:var(--bg-secondary);color:var(--text-muted)">Sin PIN</span>`}
+      </td>
+      <td>
         <button class="btn btn-ghost btn-sm btn-icon" data-history="${c.id}" title="Historial"><i data-lucide="history"></i></button>
+        ${c.pinActive ? `<button class="btn btn-ghost btn-sm btn-icon" data-reset-pin="${c.id}" title="Resetear PIN de Portal" style="color:var(--warning, #f59e0b)"><i data-lucide="key-round"></i></button>` : ''}
         <button class="btn btn-ghost btn-sm btn-icon" data-edit="${c.id}" title="Editar"><i data-lucide="pencil"></i></button>
         <button class="btn btn-ghost btn-sm btn-icon" data-delete="${c.id}" title="Eliminar"><i data-lucide="trash-2"></i></button>
       </td>
     </tr>`).join('');
     if (window.lucide) lucide.createIcons();
+
+    tbody.querySelectorAll('[data-reset-pin]').forEach(btn => {
+        btn.onclick = async () => {
+            const client = allClients.find(c => c.id === btn.dataset.resetPin);
+            if (!client) return;
+            if (confirm(`¿Deseas resetear el PIN del portal para ${client.name}? El funcionario podrá crear una nueva clave validando su teléfono.`)) {
+                try {
+                    await api.post(`/clients/${client.id}/reset-pin`);
+                    showToast('PIN de acceso al portal reseteado');
+                    renderClients();
+                } catch (e) {
+                    showToast(e.message, 'error');
+                }
+            }
+        };
+    });
 
     tbody.querySelectorAll('[data-edit]').forEach(btn => {
         btn.onclick = () => {
@@ -95,6 +117,46 @@ function renderTable(clients, allClients) {
 
     tbody.querySelectorAll('[data-history]').forEach(btn => {
         btn.onclick = () => showClientHistory(btn.dataset.history, allClients);
+    });
+}
+
+function attachParaguayPhoneMask(input) {
+    if (!input) return;
+    input.placeholder = '+595 9XX XXXXXX';
+
+    if (input.value && !input.value.startsWith('+595')) {
+        let digits = input.value.replace(/\D/g, '');
+        if (digits.startsWith('0')) digits = digits.slice(1);
+        if (digits.startsWith('5950')) digits = '595' + digits.slice(4);
+        if (!digits.startsWith('595')) digits = '595' + digits;
+        let rest = digits.slice(3);
+        input.value = '+595' + (rest ? ' ' + rest.slice(0, 3) : '') + (rest.length > 3 ? ' ' + rest.slice(3, 9) : '');
+    }
+
+    input.addEventListener('focus', () => {
+        if (!input.value.trim()) {
+            input.value = '+595 ';
+        }
+    });
+
+    input.addEventListener('input', () => {
+        let raw = input.value;
+        let digits = raw.replace(/\D/g, '');
+        if (digits.startsWith('0')) digits = digits.slice(1);
+        if (digits.startsWith('5950')) digits = '595' + digits.slice(4);
+        if (!digits.startsWith('595')) digits = '595' + digits;
+
+        let formatted = '+595';
+        let rest = digits.slice(3);
+        if (rest.length > 0) formatted += ' ' + rest.slice(0, 3);
+        if (rest.length > 3) formatted += ' ' + rest.slice(3, 9);
+        input.value = formatted;
+    });
+
+    input.addEventListener('blur', () => {
+        if (input.value.trim() === '+595' || input.value.trim() === '+595 ') {
+            input.value = '';
+        }
     });
 }
 
@@ -136,9 +198,10 @@ function openClientModal(client, allClients) {
       </div>
       <div class="form-group"><label>Email</label><input type="email" class="form-control" id="mCliEmail" value="${isEdit ? escapeHTML(c.email || '') : ''}" /></div>
     </div>
-    <div class="form-group"><label>Teléfono</label><input type="text" class="form-control" id="mCliPhone" value="${isEdit ? escapeHTML(c.phone || '') : ''}" /></div>`;
+    <div class="form-group"><label>Teléfono</label><input type="text" class="form-control" id="mCliPhone" value="${isEdit ? escapeHTML(c.phone || '') : ''}" placeholder="+595 9XX XXXXXX" /></div>`;
     const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveClient">${isEdit ? 'Guardar' : 'Crear'}</button>`;
     const overlay = createModal(isEdit ? 'Editar Cliente' : 'Nuevo Cliente', body, footer);
+    attachParaguayPhoneMask(document.getElementById('mCliPhone'));
 
     const btnSave = document.getElementById('btnSaveClient');
     btnSave.onclick = async () => {

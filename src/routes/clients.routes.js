@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import prisma from '../config/db.js';
 import { authMiddleware, requirePermission, validateUUID } from '../middleware/auth.js';
+import { sendProvisionalPin } from '../services/notificationService.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -16,7 +18,18 @@ const CATEGORY_REVERSE = Object.fromEntries(Object.entries(CATEGORY_MAP).map(([k
 const MAX_SEARCH_LENGTH = 100;
 
 function clientToJSON(c) {
-  return { id: c.id, name: c.name, cedula: c.cedula, department: c.department, position: c.position, category: CATEGORY_REVERSE[c.category] || c.category, email: c.email, phone: c.phone };
+  return {
+    id: c.id,
+    name: c.name,
+    cedula: c.cedula,
+    department: c.department,
+    position: c.position,
+    category: CATEGORY_REVERSE[c.category] || c.category,
+    email: c.email,
+    phone: c.phone,
+    pinActive: !!c.pinActive,
+    mustChangePin: !!c.mustChangePin
+  };
 }
 
 // GET /api/clients
@@ -97,8 +110,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'El formato de correo electrónico es inválido' });
     }
     const dbCategory = CATEGORY_MAP[category] || category;
+    const normalizedPhone = phone ? normalizePhoneNumber(phone) : null;
     const client = await prisma.client.create({
-      data: { name, cedula, department, position, category: dbCategory, email, phone }
+      data: { name, cedula, department, position, category: dbCategory, email, phone: normalizedPhone }
     });
     res.status(201).json(clientToJSON(client));
   } catch (err) {
@@ -123,8 +137,7 @@ router.put('/:id', validateUUID, async (req, res) => {
       }
       data.email = email || null;
     }
-    if (phone !== undefined) data.phone = phone;
-
+    if (phone !== undefined) data.phone = phone ? normalizePhoneNumber(phone) : null;
 
     const client = await prisma.client.update({ where: { id: req.params.id }, data });
     res.json(clientToJSON(client));
@@ -142,6 +155,57 @@ router.delete('/:id', validateUUID, async (req, res) => {
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Cliente no encontrado' });
     res.status(500).json({ error: 'Error al eliminar cliente' });
+  }
+});
+
+// POST /api/clients/:id/reset-pin — Resetear PIN del portal del funcionario
+router.post('/:id/reset-pin', validateUUID, async (req, res) => {
+  try {
+    const client = await prisma.client.update({
+      where: { id: req.params.id },
+      data: { pin: null, pinActive: false }
+    });
+    res.json({ message: 'PIN del portal reseteado exitosamente', client: clientToJSON(client) });
+  } catch (err) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'Cliente no encontrado' });
+    res.status(500).json({ error: 'Error al resetear PIN' });
+  }
+});
+
+// POST /api/clients/:id/generate-provisional-pin — Generar PIN provisorio por admin y enviar por WhatsApp
+router.post('/:id/generate-provisional-pin', validateUUID, async (req, res) => {
+  try {
+    const client = await prisma.client.findUnique({ where: { id: req.params.id } });
+    if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
+
+    const rawPin = String(Math.floor(1000 + Math.random() * 9000));
+    const hashedPin = await bcrypt.hash(rawPin, 10);
+
+    const updated = await prisma.client.update({
+      where: { id: client.id },
+      data: { pin: hashedPin, pinActive: true, mustChangePin: true }
+    });
+
+    let notifyResult = null;
+    if (client.phone) {
+      notifyResult = await sendProvisionalPin({
+        phone: client.phone,
+        name: client.name,
+        pin: rawPin
+      });
+    }
+
+    res.json({
+      message: 'PIN provisorio generado exitosamente',
+      pin: rawPin,
+      phone: client.phone,
+      waLink: notifyResult?.waLink || null,
+      apiSent: notifyResult?.apiSent || false,
+      client: clientToJSON(updated)
+    });
+  } catch (err) {
+    console.error('Error generating provisional pin:', err);
+    res.status(500).json({ error: 'Error al generar PIN provisorio' });
   }
 });
 

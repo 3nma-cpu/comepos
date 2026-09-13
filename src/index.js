@@ -19,6 +19,7 @@ import salesRoutes from './routes/sales.routes.js';
 import reportsRoutes from './routes/reports.routes.js';
 import cashregisterRoutes from './routes/cashregister.routes.js';
 import supplierPaymentsRoutes from './routes/supplier-payments.routes.js';
+import portalRoutes from './routes/portal.routes.js';
 
 import helmet from 'helmet';
 import compression from 'compression';
@@ -90,10 +91,11 @@ app.use(express.json({ limit: '1mb' }));
 const clientPath = path.join(__dirname, '../client');
 app.use(express.static(clientPath));
 
-// SPA fallback — serve index.html for any non-API route (Express 5 compatible)
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) return next();
-  res.sendFile(path.join(clientPath, 'index.html'));
+// Portal del funcionario — SPA separada
+app.get(/^\/portal(\/.*)?$/, (req, res, next) => {
+  res.sendFile(path.join(clientPath, 'portal.html'), (err) => {
+    if (err && !res.headersSent) next();
+  });
 });
 
 // Global Rate Limiting para la API
@@ -111,10 +113,18 @@ app.use('/api/sales', salesRoutes);
 app.use('/api/cashregister', cashregisterRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/supplier-payments', supplierPaymentsRoutes);
+app.use('/api/portal', portalRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// SPA fallback — serve index.html for any non-API, non-portal route
+app.get(/^(?!\/api).*/, (req, res, next) => {
+  res.sendFile(path.join(clientPath, 'index.html'), (err) => {
+    if (err && !res.headersSent) next();
+  });
 });
 
 // Error handler global — no exponer stack traces en producción
