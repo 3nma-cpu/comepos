@@ -5,6 +5,7 @@
 import { api } from '../api.js';
 import { formatCurrency, formatDate, formatDateTime, formatDateInput, todayStr, toLocalYMD, exportExcel, showToast, escapeHTML, EMPLOYEE_CATEGORIES, PAYMENT_METHODS } from '../utils.js';
 import { showTicket, promptCancellationReason } from './sales.js';
+import { openEditValeModal } from './clients.js';
 
 let activeChart = null;
 
@@ -699,6 +700,7 @@ function reportClientConsumption(area, sales) {
                 <td style="text-align:right"><strong>${formatCurrency(sale.total)}</strong></td>
                 <td style="text-align:center;white-space:nowrap">
                   <button class="btn btn-sm btn-ghost btn-reprint" data-sale-id="${sale.id}"><i data-lucide="printer" style="width:14px;height:14px;vertical-align:middle;margin-right:4px"></i>Ticket</button>
+                  <button class="btn btn-sm btn-ghost btn-edit-sale" data-sale-id="${sale.id}" title="Editar vale"><i data-lucide="pencil" style="width:14px;height:14px;vertical-align:middle"></i></button>
                   <button class="btn btn-sm btn-ghost text-danger btn-delete-sale" data-sale-id="${sale.id}" title="Eliminar venta"><i data-lucide="trash-2" style="width:14px;height:14px;vertical-align:middle"></i></button>
                 </td>
               </tr>`).join('');
@@ -738,6 +740,39 @@ function reportClientConsumption(area, sales) {
                     if (sale) {
                         showTicket(sale, (deletedId) => handleDeletedSale(deletedId, clientId));
                     }
+                };
+            });
+
+            detailRow.querySelectorAll('.btn-edit-sale').forEach(editBtn => {
+                editBtn.onclick = () => {
+                    const saleId = editBtn.dataset.saleId;
+                    const sale = client.sales.find(s => s.id === saleId);
+                    if (!sale) return;
+                    openEditValeModal(sale, client, (updatedSale) => {
+                        sale.items = updatedSale.items;
+                        sale.total = updatedSale.total;
+
+                        const gSale = sales.find(s => s.id === saleId);
+                        if (gSale) {
+                            gSale.items = updatedSale.items;
+                            gSale.total = updatedSale.total;
+                        }
+
+                        client.total = client.sales.reduce((sum, s) => sum + s.total, 0);
+
+                        const clientRow = document.getElementById(`rcc-row-${clientId}`);
+                        if (clientRow) {
+                            const totalEl = clientRow.querySelector('.rcc-total');
+                            if (totalEl) totalEl.innerHTML = `<strong>${formatCurrency(client.total)}</strong>`;
+                        }
+
+                        const tbody = document.getElementById(`rcc-detail-tbody-${clientId}`);
+                        const totalFooter = document.getElementById(`rcc-detail-total-${clientId}`);
+                        if (tbody) tbody.innerHTML = renderClientSalesRows(client.sales);
+                        if (totalFooter) totalFooter.innerHTML = `<strong>${formatCurrency(client.total)}</strong>`;
+                        bindDetailRowEvents(clientId);
+                        if (window.lucide) lucide.createIcons();
+                    });
                 };
             });
 

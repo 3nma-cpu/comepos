@@ -4,7 +4,7 @@ import { authMiddleware, requirePermission, validateUUID } from '../middleware/a
 
 const router = Router();
 router.use(authMiddleware);
-router.use(requirePermission('sales', 'clients'));
+router.use(requirePermission('sales', 'clients', 'reports'));
 
 const PAY_MAP = { 'efectivo': 'EFECTIVO', 'transferencia': 'TRANSFERENCIA', 'nomina': 'NOMINA' };
 const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TRANSFERENCIA': 'transferencia', 'NOMINA': 'nomina' };
