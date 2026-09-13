@@ -78,7 +78,7 @@ router.get('/:id/history', validateUUID, async (req, res) => {
         cancelledAt: s.cancelledAt ? s.cancelledAt.toISOString() : null,
         cancelledByName: s.cancelledBy?.name || null,
         cancellationReason: s.cancellationReason || null,
-        items: s.items.map(i => ({ name: i.product.name, quantity: i.quantity, price: i.unitPrice }))
+        items: s.items.map(i => ({ productId: i.productId, name: i.product.name, quantity: i.quantity, price: i.unitPrice, unit: i.product.unit || 'UNI' }))
       }))
     });
   } catch (err) {

@@ -4,7 +4,7 @@ import { authMiddleware, requirePermission, validateUUID } from '../middleware/a
 
 const router = Router();
 router.use(authMiddleware);
-router.use(requirePermission('sales'));
+router.use(requirePermission('sales', 'clients'));
 
 const PAY_MAP = { 'efectivo': 'EFECTIVO', 'transferencia': 'TRANSFERENCIA', 'nomina': 'NOMINA' };
 const PAY_REVERSE = { 'EFECTIVO': 'efectivo', 'TRANSFERENCIA': 'transferencia', 'NOMINA': 'nomina' };
@@ -234,6 +234,178 @@ router.post('/', async (req, res) => {
   } catch (err) {
     console.error('Sale error:', err);
     res.status(500).json({ error: err.message || 'Error al registrar venta' });
+  }
+});
+
+// PUT /api/sales/:id (Edición de vale / venta)
+router.put('/:id', validateUUID, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'El vale debe contener al menos un producto' });
+    }
+
+    const sale = await prisma.sale.findUnique({
+      where: { id },
+      include: { items: true, client: true }
+    });
+
+    if (!sale) {
+      return res.status(404).json({ error: 'Venta no encontrada' });
+    }
+
+    if (sale.status === 'CANCELLED') {
+      return res.status(400).json({ error: 'No se puede editar una venta anulada' });
+    }
+
+    // Normalizar items y validar
+    const consolidatedMap = new Map();
+    for (const it of items) {
+      if (!it.productId) {
+        return res.status(400).json({ error: 'Cada item debe tener un producto válido' });
+      }
+      const qty = parseFloat(it.quantity);
+      if (isNaN(qty) || qty <= 0) {
+        return res.status(400).json({ error: 'La cantidad debe ser mayor a cero' });
+      }
+      const unitPrice = (it.unitPrice !== undefined && !isNaN(parseFloat(it.unitPrice))) ? parseFloat(it.unitPrice) : null;
+      if (consolidatedMap.has(it.productId)) {
+        const existing = consolidatedMap.get(it.productId);
+        existing.quantity += qty;
+        if (unitPrice !== null && existing.unitPrice === null) {
+          existing.unitPrice = unitPrice;
+        }
+      } else {
+        consolidatedMap.set(it.productId, { productId: it.productId, quantity: qty, unitPrice });
+      }
+    }
+
+    const finalItems = Array.from(consolidatedMap.values());
+    const allProdIds = Array.from(new Set([
+      ...sale.items.map(i => i.productId),
+      ...finalItems.map(i => i.productId)
+    ]));
+
+    // Consultar todos los productos involucrados
+    const products = await prisma.product.findMany({
+      where: { id: { in: allProdIds } }
+    });
+    const prodMap = new Map(products.map(p => [p.id, p]));
+
+    // Validar existencia de productos y asignar unitPrice si no vino definido
+    for (const it of finalItems) {
+      const prod = prodMap.get(it.productId);
+      if (!prod) {
+        return res.status(400).json({ error: `Producto no encontrado: ${it.productId}` });
+      }
+      if (it.unitPrice === null) {
+        const original = sale.items.find(i => i.productId === it.productId);
+        it.unitPrice = original ? original.unitPrice : prod.price;
+      }
+    }
+
+    // Validar disponibilidad de stock antes de iniciar la transacción
+    for (const prodId of allProdIds) {
+      const oldQty = sale.items.filter(i => i.productId === prodId).reduce((s, i) => s + i.quantity, 0);
+      const newQty = finalItems.filter(i => i.productId === prodId).reduce((s, i) => s + i.quantity, 0);
+      const delta = newQty - oldQty; // > 0 requiere más stock
+
+      if (delta > 0) {
+        const prod = prodMap.get(prodId);
+        if ((prod?.stock || 0) < delta) {
+          return res.status(400).json({
+            error: `Stock insuficiente para ${prod?.name || 'producto'}. Se requieren ${delta} adicional(es), disponible actual: ${prod?.stock ?? 0}`
+          });
+        }
+      }
+    }
+
+    const newTotal = Math.round(finalItems.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0));
+
+    // Transacción atómica
+    const updatedSale = await prisma.$transaction(async (tx) => {
+      // 1. Ajustar stock de cada producto involucrado
+      for (const prodId of allProdIds) {
+        const oldQty = sale.items.filter(i => i.productId === prodId).reduce((s, i) => s + i.quantity, 0);
+        const newQty = finalItems.filter(i => i.productId === prodId).reduce((s, i) => s + i.quantity, 0);
+        const delta = newQty - oldQty;
+
+        if (delta > 0) {
+          // Requiere más stock -> dar salida (decrementar)
+          const updated = await tx.product.updateMany({
+            where: { id: prodId, stock: { gte: delta } },
+            data: { stock: { decrement: delta } }
+          });
+          if (updated.count === 0) {
+            const p = prodMap.get(prodId);
+            throw new Error(`Stock insuficiente para ${p?.name || 'un producto'}`);
+          }
+        } else if (delta < 0) {
+          // Se redujo la cantidad o se eliminó el producto -> devolver stock (incrementar)
+          await tx.product.update({
+            where: { id: prodId },
+            data: { stock: { increment: Math.abs(delta) } }
+          });
+        }
+      }
+
+      // 2. Eliminar los items antiguos
+      await tx.saleItem.deleteMany({
+        where: { saleId: sale.id }
+      });
+
+      // 3. Crear los nuevos items
+      await tx.saleItem.createMany({
+        data: finalItems.map(it => ({
+          saleId: sale.id,
+          productId: it.productId,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice
+        }))
+      });
+
+      // 4. Actualizar total de la venta
+      return await tx.sale.update({
+        where: { id: sale.id },
+        data: { total: newTotal },
+        include: {
+          client: true,
+          items: { include: { product: true } },
+          user: true,
+          cancelledBy: { select: { id: true, name: true, username: true } }
+        }
+      });
+    }, { maxWait: 10000, timeout: 30000 });
+
+    res.json({
+      id: updatedSale.id,
+      clientId: updatedSale.clientId,
+      clientName: updatedSale.client?.name || 'Desconocido',
+      clientCedula: updatedSale.client?.cedula || '',
+      clientCategory: CAT_REVERSE[updatedSale.client?.category] || updatedSale.client?.category || '',
+      total: updatedSale.total,
+      paymentMethod: PAY_REVERSE[updatedSale.paymentMethod] || updatedSale.paymentMethod,
+      status: updatedSale.status,
+      cancelledAt: updatedSale.cancelledAt ? updatedSale.cancelledAt.toISOString() : null,
+      cancelledById: updatedSale.cancelledById,
+      cancelledByName: updatedSale.cancelledBy?.name || null,
+      cancellationReason: updatedSale.cancellationReason || null,
+      date: updatedSale.createdAt.toISOString(),
+      userId: updatedSale.userId,
+      userName: updatedSale.user?.name || updatedSale.user?.username || 'Cajero',
+      items: updatedSale.items.map(i => ({
+        productId: i.productId,
+        name: i.product?.name || '',
+        price: i.unitPrice,
+        quantity: i.quantity,
+        unit: i.product?.unit || 'UNI'
+      }))
+    });
+  } catch (err) {
+    console.error('Error updating sale:', err);
+    res.status(500).json({ error: err.message || 'Error al editar venta' });
   }
 });
 
