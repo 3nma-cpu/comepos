@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../config/db.js';
 import { authMiddleware, requirePermission, validateUUID } from '../middleware/auth.js';
-import { sendProvisionalPin } from '../services/notificationService.js';
+import { sendProvisionalPin, normalizePhoneNumber } from '../services/notificationService.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -142,7 +142,9 @@ router.put('/:id', validateUUID, async (req, res) => {
     const client = await prisma.client.update({ where: { id: req.params.id }, data });
     res.json(clientToJSON(client));
   } catch (err) {
+    console.error('Error al actualizar cliente:', err);
     if (err.code === 'P2025') return res.status(404).json({ error: 'Cliente no encontrado' });
+    if (err.code === 'P2002') return res.status(409).json({ error: 'La cédula ya está registrada' });
     res.status(500).json({ error: 'Error al actualizar cliente' });
   }
 });
