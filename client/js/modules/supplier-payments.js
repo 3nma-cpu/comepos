@@ -490,6 +490,7 @@ async function renderReporte() {
             <option value="fechaPago" selected>Día de Pago (Entrega)</option>
             <option value="fechaCobro">Día de Cobro (Cheque)</option>
             <option value="mesPago">Mes que se Paga (Imputado)</option>
+            <option value="comparativo">Comparativo</option>
           </select>
         </div>
 
@@ -575,11 +576,12 @@ async function renderReporte() {
 
     async function loadReport() {
         const filtroFecha = document.getElementById('rpDateFilterField').value;
+        const apiFiltroFecha = filtroFecha === 'comparativo' ? 'fechaPago' : filtroFecha;
         const periodType = periodSelect.value;
         const proveedorId = document.getElementById('rpProv').value;
         const formaPagoId = document.getElementById('rpForma').value;
 
-        let queryParams = `filtroFecha=${filtroFecha}`;
+        let queryParams = `filtroFecha=${apiFiltroFecha}`;
         let isSingleMonth = false;
         let isSingleDay = false;
         let singleMonthLabel = '';
@@ -747,8 +749,8 @@ function renderReportTable(result, meta = {}) {
         </div>`;
     }
 
-    // Detailed List of Payments
-    if (pagos.length > 0) {
+    // Detailed List of Payments (hidden when filtroFecha is 'comparativo')
+    if (pagos.length > 0 && meta.filtroFecha !== 'comparativo') {
         html += `
         <div style="margin-top:1.5rem">
           <h4 style="font-size:.9rem;font-weight:700;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
@@ -797,13 +799,32 @@ function renderReportTable(result, meta = {}) {
 
 function exportReport() {
     if (!lastReportData || (!lastReportData.data.length && !lastReportData.pagos?.length)) return showToast('No hay datos para exportar', 'error');
-    const { data, pagos = [] } = lastReportData;
+    const { meses = [], data, pagos = [] } = lastReportData;
     const meta = lastReportMeta || {};
 
-    let headers = ['Día de Pago (Entrega)', 'Día de Cobro (Cheque)', 'Mes Imputado', 'Proveedor', 'Forma de Pago', 'Monto (₲)', 'Observación'];
+    let headers = [];
     let rows = [];
 
-    if (pagos.length > 0) {
+    // If 'Comparativo' is selected, export the pivot table
+    if (meta.filtroFecha === 'comparativo' && meses.length > 0) {
+        const monthLabels = meses.map(m => {
+            const [y, mo] = m.split('-');
+            const date = new Date(parseInt(y), parseInt(mo) - 1);
+            return date.toLocaleDateString('es-PY', { month: 'short', year: '2-digit' }).toUpperCase();
+        });
+
+        headers = ['Proveedor', ...monthLabels, 'Total Pagado'];
+        rows = data.map(row => {
+            const monthValues = meses.map(m => row.meses[m] || 0);
+            return [row.proveedor, ...monthValues, row.total];
+        });
+
+        // Totals row
+        const totalsPorMes = meses.map(m => data.reduce((s, r) => s + (r.meses[m] || 0), 0));
+        const totalGeneral = data.reduce((s, r) => s + r.total, 0);
+        rows.push(['TOTAL', ...totalsPorMes, totalGeneral]);
+    } else if (pagos.length > 0) {
+        headers = ['Día de Pago (Entrega)', 'Día de Cobro (Cheque)', 'Mes Imputado', 'Proveedor', 'Forma de Pago', 'Monto (₲)', 'Observación'];
         rows = pagos.map(p => [
             formatDate(p.fechaPago),
             p.fechaCobro ? formatDate(p.fechaCobro) : '—',
