@@ -106,6 +106,7 @@ model Provider {
   ruc       String?
   phone     String?
   email     String?
+  markup    Float    @default(40)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   purchases Purchase[]

@@ -19,9 +19,11 @@ router.get('/', async (req, res) => {
 // POST /api/providers
 router.post('/', async (req, res) => {
   try {
-    const { name, ruc, phone, email } = req.body;
+    const { name, ruc, phone, email, markup } = req.body;
     if (!name) return res.status(400).json({ error: 'Nombre es obligatorio' });
-    const provider = await prisma.provider.create({ data: { name, ruc, phone, email } });
+    const data = { name, ruc, phone, email };
+    if (markup !== undefined) data.markup = parseFloat(markup) || 40;
+    const provider = await prisma.provider.create({ data });
     res.status(201).json(provider);
   } catch (err) {
     res.status(500).json({ error: 'Error al crear proveedor' });
@@ -31,12 +33,13 @@ router.post('/', async (req, res) => {
 // PUT /api/providers/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { name, ruc, phone, email } = req.body;
+    const { name, ruc, phone, email, markup } = req.body;
     const data = {};
     if (name !== undefined) data.name = name;
     if (ruc !== undefined) data.ruc = ruc;
     if (phone !== undefined) data.phone = phone;
     if (email !== undefined) data.email = email;
+    if (markup !== undefined) data.markup = parseFloat(markup) || 40;
 
     const provider = await prisma.provider.update({ where: { id: req.params.id }, data });
     res.json(provider);

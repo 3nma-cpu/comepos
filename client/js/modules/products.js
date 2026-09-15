@@ -166,7 +166,7 @@ export function showProductModal(product = null, onSuccess = null) {
 
     const modal = createModal(isEdit ? 'Editar Producto' : 'Nuevo Producto', body, footer);
 
-    const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+    const markup = 40;
     const costInput = document.getElementById('mpCost');
     const priceInput = document.getElementById('mpPrice');
     const autoBarcode = document.getElementById('mpAutoBarcode');
@@ -179,16 +179,14 @@ export function showProductModal(product = null, onSuccess = null) {
         });
     }
 
-    // Track whether the user has manually touched the price field
-    let priceManuallySet = isEdit; // For edits, assume the price is already intentional
-    priceInput.addEventListener('input', () => { priceManuallySet = true; });
-    priceInput.addEventListener('focus', () => { priceManuallySet = true; });
-
-    costInput.addEventListener('input', () => {
+    // Click-to-apply: clicking the price field applies markup from cost
+    priceInput.addEventListener('click', () => {
         const cost = parseFloat(costInput.value) || 0;
-        // Only auto-calculate price if it's a new product and user hasn't manually set it
-        if (!priceManuallySet) {
+        if (cost > 0) {
             priceInput.value = Math.round(cost * (1 + markup / 100));
+            priceInput.style.transition = 'box-shadow 0.3s';
+            priceInput.style.boxShadow = '0 0 0 2px var(--success)';
+            setTimeout(() => { priceInput.style.boxShadow = ''; }, 600);
         }
     });
 

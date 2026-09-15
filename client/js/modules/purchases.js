@@ -49,10 +49,6 @@ async function renderPurchasesList() {
 
   content.innerHTML = `
     <div class="filters-bar">
-      <div style="display:flex;align-items:center;gap:.5rem">
-        <label style="font-size:.85rem;color:var(--text-secondary)">% Margen de Ganancia:</label>
-        <input type="number" class="form-control" id="globalMarkup" value="${localStorage.getItem('purchMarkup') || 40}" style="width:80px" />
-      </div>
       <div style="flex:1"></div>
       <button class="btn btn-primary" id="btnAddPurchase"><i data-lucide="plus"></i>Nueva Compra</button>
     </div>
@@ -83,9 +79,7 @@ async function renderPurchasesList() {
     } catch (e) { showToast(e.message, 'error'); }
   });
 
-  document.getElementById('globalMarkup')?.addEventListener('input', e => {
-    localStorage.setItem('purchMarkup', e.target.value);
-  });
+
 
   // View button — open modal with product details
   content.querySelectorAll('[data-view]').forEach(btn => {
@@ -307,7 +301,13 @@ function renderEditPurchaseView(purchase, providers, products) {
   const totalInp = document.getElementById('epTotal');
   const priceInp = document.getElementById('epPrice');
   const forResaleInp = document.getElementById('epForResale');
-  const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+  const provSelect = document.getElementById('ePurchProv');
+
+  // Get markup from selected provider
+  function getProviderMarkup() {
+    const prov = providers.find(p => p.id === provSelect.value);
+    return prov?.markup || 40;
+  }
 
   function togglePriceInput() {
     if (forResaleInp.checked) {
@@ -379,7 +379,6 @@ function renderEditPurchaseView(purchase, providers, products) {
     const q = parseFloat(qtyInp.value) || 0;
     const c = parseFloat(costInp.value) || 0;
     totalInp.value = Math.round(q * c);
-    if (c > 0 && forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
   }
 
   function calcFromTotal() {
@@ -388,9 +387,20 @@ function renderEditPurchaseView(purchase, providers, products) {
     if (q > 0) {
       const c = t / q;
       costInp.value = c % 1 === 0 ? c : c.toFixed(2);
-      if (forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
     }
   }
+
+  // Click-to-apply: clicking the price field applies provider markup
+  priceInp.addEventListener('click', () => {
+    const c = parseFloat(costInp.value) || 0;
+    if (c > 0 && forResaleInp.checked) {
+      const m = getProviderMarkup();
+      priceInp.value = Math.round(c * (1 + m / 100));
+      priceInp.style.transition = 'box-shadow 0.3s';
+      priceInp.style.boxShadow = '0 0 0 2px var(--success)';
+      setTimeout(() => { priceInp.style.boxShadow = ''; }, 600);
+    }
+  });
 
   qtyInp.addEventListener('input', calcFromUnit);
   costInp.addEventListener('input', calcFromUnit);
@@ -403,7 +413,9 @@ function renderEditPurchaseView(purchase, providers, products) {
       priceInp.value = prod.price;
       forResaleInp.checked = prod.forResale !== false;
       togglePriceInput();
-      calcFromUnit();
+      const q = parseFloat(qtyInp.value) || 0;
+      const c = parseFloat(costInp.value) || 0;
+      totalInp.value = Math.round(q * c);
       qtyInp.focus();
       qtyInp.select();
     } else {
@@ -681,7 +693,13 @@ function renderNewPurchaseView(providers, products) {
   const totalInp = document.getElementById('npTotal');
   const priceInp = document.getElementById('npPrice');
   const forResaleInp = document.getElementById('npForResale');
-  const markup = parseFloat(localStorage.getItem('purchMarkup')) || 30;
+  const provSelect = document.getElementById('mPurchProv');
+
+  // Get markup from selected provider
+  function getProviderMarkup() {
+    const prov = providers.find(p => p.id === provSelect.value);
+    return prov?.markup || 40;
+  }
 
   function togglePriceInput() {
     if (forResaleInp.checked) {
@@ -758,7 +776,6 @@ function renderNewPurchaseView(providers, products) {
     const q = parseFloat(qtyInp.value) || 0;
     const c = parseFloat(costInp.value) || 0;
     totalInp.value = Math.round(q * c);
-    if (c > 0 && forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
   }
 
   function calcFromTotal() {
@@ -767,9 +784,20 @@ function renderNewPurchaseView(providers, products) {
     if (q > 0) {
       const c = t / q;
       costInp.value = c % 1 === 0 ? c : c.toFixed(2);
-      if (forResaleInp.checked) priceInp.value = Math.round(c * (1 + markup / 100));
     }
   }
+
+  // Click-to-apply: clicking the price field applies provider markup
+  priceInp.addEventListener('click', () => {
+    const c = parseFloat(costInp.value) || 0;
+    if (c > 0 && forResaleInp.checked) {
+      const m = getProviderMarkup();
+      priceInp.value = Math.round(c * (1 + m / 100));
+      priceInp.style.transition = 'box-shadow 0.3s';
+      priceInp.style.boxShadow = '0 0 0 2px var(--success)';
+      setTimeout(() => { priceInp.style.boxShadow = ''; }, 600);
+    }
+  });
 
   qtyInp.addEventListener('input', calcFromUnit);
   costInp.addEventListener('input', calcFromUnit);
@@ -786,7 +814,8 @@ function renderNewPurchaseView(providers, products) {
       priceInp.value = prod.price;
       forResaleInp.checked = prod.forResale !== false;
       togglePriceInput();
-      calcFromUnit();
+      const q = parseFloat(qtyInp.value) || 0;
+      totalInp.value = Math.round(q * prod.cost);
       qtyInp.focus();
       qtyInp.select();
       return true;
@@ -817,7 +846,8 @@ function renderNewPurchaseView(providers, products) {
       priceInp.value = prod.price;
       forResaleInp.checked = prod.forResale !== false;
       togglePriceInput();
-      calcFromUnit();
+      const q = parseFloat(qtyInp.value) || 0;
+      totalInp.value = Math.round(q * prod.cost);
       qtyInp.focus();
       qtyInp.select();
     } else {
@@ -1002,13 +1032,14 @@ async function renderProvidersList() {
     <div class="filters-bar"><div style="flex:1"></div><button class="btn btn-primary" id="btnAddProv"><i data-lucide="plus"></i>Nuevo Proveedor</button></div>
     <div class="table-container">
       <table>
-        <thead><tr><th>Nombre</th><th>RUC</th><th>Teléfono</th><th>Email</th><th>Acciones</th></tr></thead>
+        <thead><tr><th>Nombre</th><th>RUC</th><th>Teléfono</th><th>Email</th><th style="text-align:center">% Margen</th><th>Acciones</th></tr></thead>
         <tbody>${providers.map(p => `
           <tr>
             <td><strong>${escapeHTML(p.name)}</strong></td>
             <td>${escapeHTML(p.ruc || '')}</td>
             <td style="color:var(--text-secondary)">${escapeHTML(p.phone || '')}</td>
             <td style="color:var(--text-secondary)">${escapeHTML(p.email || '')}</td>
+            <td style="text-align:center"><span class="badge badge-info">${p.markup != null ? p.markup : 40}%</span></td>
             <td>
               <button class="btn btn-ghost btn-sm btn-icon" data-edit-prov="${p.id}"><i data-lucide="pencil"></i></button>
               <button class="btn btn-ghost btn-sm btn-icon" data-del-prov="${p.id}"><i data-lucide="trash-2"></i></button>
@@ -1044,7 +1075,10 @@ function openProviderModal(provider) {
       <div class="form-group"><label>RUC</label><input type="text" class="form-control" id="mProvRuc" value="${isEdit ? escapeHTML(p.ruc || '') : ''}" /></div>
       <div class="form-group"><label>Teléfono</label><input type="text" class="form-control" id="mProvPhone" value="${isEdit ? escapeHTML(p.phone || '') : ''}" /></div>
     </div>
-    <div class="form-group"><label>Email</label><input type="email" class="form-control" id="mProvEmail" value="${isEdit ? escapeHTML(p.email || '') : ''}" /></div>`;
+    <div class="form-row">
+      <div class="form-group"><label>Email</label><input type="email" class="form-control" id="mProvEmail" value="${isEdit ? escapeHTML(p.email || '') : ''}" /></div>
+      <div class="form-group"><label>% Margen de Ganancia</label><input type="number" class="form-control" id="mProvMarkup" value="${p.markup != null ? p.markup : 40}" min="0" step="any" /></div>
+    </div>`;
   const footer = `<button class="btn btn-secondary modal-close">Cancelar</button><button class="btn btn-primary" id="btnSaveProv">${isEdit ? 'Guardar' : 'Crear'}</button>`;
   const overlay = createModal(isEdit ? 'Editar Proveedor' : 'Nuevo Proveedor', body, footer);
 
@@ -1054,7 +1088,8 @@ function openProviderModal(provider) {
       name: document.getElementById('mProvName').value.trim(),
       ruc: document.getElementById('mProvRuc').value.trim(),
       phone: document.getElementById('mProvPhone').value.trim(),
-      email: document.getElementById('mProvEmail').value.trim()
+      email: document.getElementById('mProvEmail').value.trim(),
+      markup: parseFloat(document.getElementById('mProvMarkup').value) || 40
     };
     if (!data.name) return showToast('Ingrese el nombre', 'error');
 
