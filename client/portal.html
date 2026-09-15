@@ -6,6 +6,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mi Consumo — Comedor TTA S.A.</title>
     <meta name="description" content="Portal de consulta de consumo para funcionarios del Comedor TTA S.A." />
+    <meta name="theme-color" content="#f59e0b" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Mi Consumo" />
+    <link rel="manifest" href="/manifest-portal.json" />
+    <link rel="apple-touch-icon" href="/img/icon-512.jpg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
@@ -16,6 +22,12 @@
 <body>
     <div id="portal-app"></div>
     <script type="module" src="/js/portal.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+        }
+    </script>
 </body>
 
 </html>
+
