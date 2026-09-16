@@ -5,7 +5,7 @@
   "start_url": "/portal",
   "display": "standalone",
   "background_color": "#0f0f1a",
-  "theme_color": "#f59e0b",
+  "theme_color": "#1a2e8a",
   "orientation": "any",
   "icons": [
     {
