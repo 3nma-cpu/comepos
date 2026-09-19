@@ -84,20 +84,69 @@ function fmtTime(iso) {
   return d.toLocaleTimeString('es-PY', { hour: '2-digit', minute: '2-digit' });
 }
 
-function todayISO() {
-  return new Date().toISOString().split('T')[0];
+function toLocalYMD(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
-function weekAgoISO() {
-  const d = new Date();
-  d.setDate(d.getDate() - (d.getDay() === 0 ? 6 : d.getDay() - 1));
-  d.setHours(0, 0, 0, 0);
-  return d.toISOString().split('T')[0];
+function todayISO() {
+  return toLocalYMD(new Date());
+}
+
+/**
+ * Semana laboral de jueves a miércoles:
+ * Desde el jueves más reciente (hace 0 a 6 días) hasta el próximo miércoles.
+ */
+function getWeekRange() {
+  const now = new Date();
+  const day = now.getDay(); // 0: Dom, 1: Lun, 2: Mar, 3: Mié, 4: Jue, 5: Vie, 6: Sáb
+  const diffToThursday = (day - 4 + 7) % 7;
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToThursday);
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
+  return {
+    from: toLocalYMD(start),
+    to: toLocalYMD(end)
+  };
+}
+
+/**
+ * Quincena laboral:
+ * - Del 01 al 15 si estamos entre el día 1 y 15.
+ * - Del 16 al último día del mes si estamos en día 16 o posterior.
+ */
+function getFortnightRange() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const monthStr = String(month + 1).padStart(2, '0');
+  const day = now.getDate();
+
+  if (day <= 15) {
+    return {
+      from: `${year}-${monthStr}-01`,
+      to: `${year}-${monthStr}-15`
+    };
+  } else {
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    return {
+      from: `${year}-${monthStr}-16`,
+      to: `${year}-${monthStr}-${String(lastDay).padStart(2, '0')}`
+    };
+  }
 }
 
 function monthStartISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+function fmtDateShort(ymd) {
+  if (!ymd) return '';
+  const parts = ymd.split('-');
+  if (parts.length !== 3) return ymd;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
 // Autocompletado y máscara de teléfono paraguayo (+595)
@@ -638,6 +687,7 @@ async function renderPortalApp() {
         <div class="portal-filters" id="portalFilters">
           <button class="p-btn-outline" data-filter="today">Hoy</button>
           <button class="p-btn-outline" data-filter="week">Esta semana</button>
+          <button class="p-btn-outline" data-filter="fortnight">Esta quincena</button>
           <button class="p-btn-outline active" data-filter="month">Este mes</button>
           <button class="p-btn-outline" data-filter="all">Todo el historial</button>
           <button class="p-btn-outline" data-filter="custom">Personalizado</button>
@@ -651,7 +701,10 @@ async function renderPortalApp() {
       </div>
 
       <div class="portal-period-total" id="portalPeriodTotal" style="display:none">
-        <span class="label">Total del período</span>
+        <div>
+          <span class="label">Total del período</span>
+          <div id="periodDateRange" style="font-size:0.75rem;color:var(--p-text-muted);margin-top:2px"></div>
+        </div>
         <span class="value" id="periodTotalValue">0 Gs</span>
       </div>
 
@@ -720,10 +773,18 @@ async function loadSales(filter) {
       from = today;
       to = today;
       break;
-    case 'week':
-      from = weekAgoISO();
-      to = today;
+    case 'week': {
+      const range = getWeekRange();
+      from = range.from;
+      to = range.to;
       break;
+    }
+    case 'fortnight': {
+      const range = getFortnightRange();
+      from = range.from;
+      to = range.to;
+      break;
+    }
     case 'month':
       from = monthStartISO();
       to = today;
@@ -748,8 +809,23 @@ async function loadSales(filter) {
 
     portalSalesCache = data.sales || [];
 
+    let rangeLabel = '';
+    if (from && to) {
+      rangeLabel = from === to ? fmtDateShort(from) : `${fmtDateShort(from)} al ${fmtDateShort(to)}`;
+    } else if (from) {
+      rangeLabel = `Desde ${fmtDateShort(from)}`;
+    } else if (to) {
+      rangeLabel = `Hasta ${fmtDateShort(to)}`;
+    }
+
     const periodTotalEl = document.getElementById('portalPeriodTotal');
     const periodTotalValue = document.getElementById('periodTotalValue');
+    const periodDateRange = document.getElementById('periodDateRange');
+
+    if (periodDateRange) {
+      periodDateRange.textContent = rangeLabel;
+    }
+
     if (portalSalesCache.length > 0) {
       periodTotalEl.style.display = 'flex';
       periodTotalValue.textContent = fmtGs(data.totalSpent);
@@ -757,13 +833,13 @@ async function loadSales(filter) {
       periodTotalEl.style.display = 'none';
     }
 
-    renderTickets(portalSalesCache);
+    renderTickets(portalSalesCache, rangeLabel);
   } catch (err) {
     ticketsEl.innerHTML = `<div class="portal-empty"><p>Error al cargar: ${err.message}</p></div>`;
   }
 }
 
-function renderTickets(sales) {
+function renderTickets(sales, rangeLabel = '') {
   const container = document.getElementById('portalTickets');
 
   if (!sales || sales.length === 0) {
@@ -771,7 +847,7 @@ function renderTickets(sales) {
       <div class="portal-empty">
         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
         <p style="font-size:0.9rem;font-weight:600;margin-bottom:0.25rem;color:var(--p-text)">Sin vales registrados</p>
-        <p style="font-size:0.8rem">No se encontraron consumos en el período seleccionado</p>
+        <p style="font-size:0.8rem">No se encontraron consumos en el período seleccionado${rangeLabel ? ` (${rangeLabel})` : ''}</p>
       </div>`;
     return;
   }
