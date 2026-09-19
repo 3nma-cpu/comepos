@@ -14,6 +14,8 @@ import { renderSales } from './modules/sales.js';
 import { renderReports } from './modules/reports.js';
 import { renderCashRegister } from './modules/cashregister.js';
 import { renderSupplierPayments } from './modules/supplier-payments.js';
+import { showProfileModal } from './modules/profile.js';
+import { escapeHTML } from './utils.js';
 
 // Navigation items
 const NAV_ITEMS = [
@@ -348,10 +350,14 @@ function renderApp(user, defaultRoute = null) {
         </nav>
         <div class="sidebar-footer">
           <div class="sidebar-user">
-            <div class="sidebar-user-avatar">${user.name.split(' ').map(w => w[0]).join('').slice(0, 2)}</div>
-            <div class="sidebar-user-info">
-              <div class="name">${user.name}</div>
-              <div class="role">${user.roleName}</div>
+            <div class="sidebar-user-clickable" id="btnSidebarProfile" title="Ver mi perfil" role="button" tabindex="0">
+              <div class="sidebar-user-avatar" id="sidebarAvatar">
+                ${user.avatarUrl ? `<img src="${user.avatarUrl}" alt="Avatar" />` : escapeHTML((user.name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase())}
+              </div>
+              <div class="sidebar-user-info">
+                <div class="name" id="sidebarUserName">${escapeHTML(user.name || '')}</div>
+                <div class="role">${escapeHTML(user.roleName || '')}</div>
+              </div>
             </div>
             <button class="btn-logout" id="btnLogout" title="Cerrar sesión"><i data-lucide="log-out"></i></button>
           </div>
@@ -399,6 +405,35 @@ function renderApp(user, defaultRoute = null) {
     }
     updateClock();
     setInterval(updateClock, 30000);
+
+    // Profile modal
+    const btnProfile = document.getElementById('btnSidebarProfile');
+    if (btnProfile) {
+        const handleOpenProfile = () => {
+            showProfileModal(() => {
+                const updatedUser = getCurrentUser();
+                if (updatedUser) {
+                    const avatarEl = document.getElementById('sidebarAvatar');
+                    const nameEl = document.getElementById('sidebarUserName');
+                    if (avatarEl) {
+                        avatarEl.innerHTML = updatedUser.avatarUrl
+                            ? `<img src="${updatedUser.avatarUrl}" alt="Avatar" />`
+                            : escapeHTML((updatedUser.name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase());
+                    }
+                    if (nameEl) {
+                        nameEl.textContent = updatedUser.name;
+                    }
+                }
+            });
+        };
+        btnProfile.addEventListener('click', handleOpenProfile);
+        btnProfile.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleOpenProfile();
+            }
+        });
+    }
 
     // Logout — now with confirmation modal
     document.getElementById('btnLogout').addEventListener('click', () => {

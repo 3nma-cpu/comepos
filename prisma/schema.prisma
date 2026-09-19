@@ -33,6 +33,7 @@ model User {
   password  String
   name      String
   email     String   @unique
+  avatarUrl String?  @db.Text
   roleId    String
   active    Boolean  @default(true)
   createdAt DateTime @default(now())

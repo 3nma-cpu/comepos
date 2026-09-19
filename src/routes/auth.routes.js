@@ -48,6 +48,7 @@ router.post('/login', loginRateLimiter, async (req, res) => {
         username: user.username,
         name: user.name,
         email: user.email,
+        avatarUrl: user.avatarUrl || null,
         roleId: user.roleId,
         roleName: user.role.name,
         permissions
@@ -86,6 +87,7 @@ router.get('/me', authMiddleware, async (req, res) => {
         username: user.username,
         name: user.name,
         email: user.email,
+        avatarUrl: user.avatarUrl || null,
         roleId: user.roleId,
         roleName: user.role.name,
         permissions

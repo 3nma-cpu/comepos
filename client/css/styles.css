@@ -398,9 +398,27 @@ select:focus:not(:focus-visible) {
     gap: .65rem
 }
 
+.sidebar-user-clickable {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+    padding: .35rem .5rem;
+    margin: -.35rem -.5rem;
+    border-radius: var(--radius);
+    transition: background var(--transition);
+    user-select: none;
+}
+
+.sidebar-user-clickable:hover {
+    background: var(--bg-hover);
+}
+
 .sidebar-user-avatar {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     background: var(--text);
     color: var(--bg-body);
@@ -409,7 +427,16 @@ select:focus:not(:focus-visible) {
     justify-content: center;
     font-weight: 600;
     font-size: .75rem;
-    flex-shrink: 0
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.sidebar-user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 .sidebar-user-info {
@@ -2471,4 +2498,94 @@ tbody tr:last-child td {
     .sp-month-col {
         min-width: 90px;
     }
+}
+
+/* ============================================
+   User Profile Modal
+   ============================================ */
+.profile-modal-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.profile-avatar-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: .5rem 0;
+}
+
+.profile-avatar-wrapper {
+    position: relative;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    cursor: pointer;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border: 3px solid var(--border);
+    transition: transform var(--transition), border-color var(--transition);
+}
+
+.profile-avatar-wrapper:hover {
+    transform: scale(1.03);
+    border-color: var(--primary, #3b82f6);
+}
+
+.profile-avatar {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.profile-avatar-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity var(--transition);
+    font-size: 1.25rem;
+}
+
+.profile-avatar-wrapper:hover .profile-avatar-overlay {
+    opacity: 1;
+}
+
+.profile-form {
+    display: flex;
+    flex-direction: column;
+    gap: .85rem;
+}
+
+.profile-password-section {
+    border-top: 1px solid var(--border);
+    padding-top: .75rem;
+    margin-top: .25rem;
+}
+
+.profile-password-fields {
+    margin-top: .75rem;
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    animation: fadeIn .2s ease-in-out;
 }

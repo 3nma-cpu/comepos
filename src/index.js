@@ -20,6 +20,7 @@ import reportsRoutes from './routes/reports.routes.js';
 import cashregisterRoutes from './routes/cashregister.routes.js';
 import supplierPaymentsRoutes from './routes/supplier-payments.routes.js';
 import portalRoutes from './routes/portal.routes.js';
+import profileRoutes from './routes/profile.routes.js';
 
 import helmet from 'helmet';
 import compression from 'compression';
@@ -114,6 +115,7 @@ app.use('/api/cashregister', cashregisterRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/supplier-payments', supplierPaymentsRoutes);
 app.use('/api/portal', portalRoutes);
+app.use('/api/profile', profileRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
