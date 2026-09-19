@@ -67,6 +67,16 @@ export function showToast(message, type = 'success') {
 }
 
 export function createModal(title, bodyHTML, footerHTML = '') {
+    // Automatically close mobile sidebar if open
+    const sidebar = document.getElementById('mainSidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    if (sidebar && sidebar.classList.contains('active')) {
+        sidebar.classList.remove('active');
+    }
+    if (sidebarOverlay && sidebarOverlay.classList.contains('active')) {
+        sidebarOverlay.classList.remove('active');
+    }
+
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `

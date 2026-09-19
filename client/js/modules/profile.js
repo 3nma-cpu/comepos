@@ -6,7 +6,7 @@ import { api } from '../api.js';
 import { createModal, closeModal, showToast, escapeHTML } from '../utils.js';
 
 /**
- * Resize an image file to a max dimension and return as data URL.
+ * Resize an image file to a max dimension and return as data URL (JPEG 0.85).
  */
 function resizeImage(file, maxSize = 128) {
   return new Promise((resolve, reject) => {
@@ -14,20 +14,30 @@ function resizeImage(file, maxSize = 128) {
     reader.onload = (e) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let w = img.width, h = img.height;
-        if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
-        else { w = Math.round(w * maxSize / h); h = maxSize; }
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/webp', 0.85));
+        try {
+          const canvas = document.createElement('canvas');
+          let w = img.width, h = img.height;
+          if (w > h) { h = Math.round(h * maxSize / w); w = maxSize; }
+          else { w = Math.round(w * maxSize / h); h = maxSize; }
+          canvas.width = Math.max(1, w);
+          canvas.height = Math.max(1, h);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          let dataUrl;
+          try {
+            dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          } catch (err) {
+            dataUrl = canvas.toDataURL('image/png');
+          }
+          resolve(dataUrl);
+        } catch (err) {
+          reject(err);
+        }
       };
-      img.onerror = reject;
+      img.onerror = () => reject(new Error('No se pudo cargar la imagen seleccionada'));
       img.src = e.target.result;
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
     reader.readAsDataURL(file);
   });
 }
@@ -59,16 +69,24 @@ export async function showProfileModal(refreshSidebar) {
   const body = `
     <div class="profile-modal-content">
       <div class="profile-avatar-section">
-        <div class="profile-avatar-wrapper" id="profileAvatarWrapper">
+        <label for="profileAvatarInput" class="profile-avatar-wrapper" id="profileAvatarWrapper" role="button" tabindex="0" title="Toca o haz clic para cambiar foto">
           <div class="profile-avatar" id="profileAvatarDisplay">
             ${avatarDisplay}
           </div>
           <div class="profile-avatar-overlay" id="profileAvatarOverlay">
             <i data-lucide="camera"></i>
           </div>
+          <div class="profile-avatar-badge" title="Cambiar foto">
+            <i data-lucide="camera"></i>
+          </div>
+        </label>
+        <input type="file" id="profileAvatarInput" accept="image/*,image/jpeg,image/png,image/webp" class="visually-hidden-file-input" />
+        <div class="profile-avatar-actions">
+          <label for="profileAvatarInput" class="btn btn-secondary btn-sm" id="profileUploadBtn" role="button" style="cursor:pointer">
+            <i data-lucide="camera"></i> <span>${pendingAvatarUrl ? 'Cambiar foto' : 'Subir foto'}</span>
+          </label>
+          ${pendingAvatarUrl ? '<button type="button" class="btn btn-ghost btn-sm" id="profileRemoveAvatar" style="color:var(--danger)"><i data-lucide="trash-2"></i> Quitar</button>' : ''}
         </div>
-        <input type="file" id="profileAvatarInput" accept="image/*" style="display:none" />
-        ${pendingAvatarUrl ? '<button class="btn btn-ghost btn-sm" id="profileRemoveAvatar" style="margin-top:6px;font-size:.75rem;color:var(--danger)">Quitar foto</button>' : ''}
       </div>
 
       <div class="profile-form">
@@ -121,53 +139,84 @@ export async function showProfileModal(refreshSidebar) {
   const modal = createModal('Mi Perfil', body, footer);
   if (window.lucide) lucide.createIcons();
 
-  // Avatar click → open file picker
   const avatarWrapper = document.getElementById('profileAvatarWrapper');
   const avatarInput = document.getElementById('profileAvatarInput');
-  avatarWrapper.addEventListener('click', () => avatarInput.click());
+
+  function updateAvatarDisplay(url) {
+    const avatarEl = document.getElementById('profileAvatarDisplay');
+    if (!avatarEl) return;
+    if (url) {
+      avatarEl.innerHTML = `<img src="${url}" alt="Avatar" />`;
+    } else {
+      const name = document.getElementById('profileName').value || profile.name;
+      avatarEl.innerHTML = `<span class="profile-avatar-initials">${getInitials(name)}</span>`;
+    }
+  }
+
+  function onRemoveAvatar() {
+    pendingAvatarUrl = null;
+    avatarChanged = true;
+    updateAvatarDisplay(null);
+    const removeBtn = document.getElementById('profileRemoveAvatar');
+    if (removeBtn) removeBtn.remove();
+    const uploadText = document.querySelector('#profileUploadBtn span');
+    if (uploadText) uploadText.textContent = 'Subir foto';
+  }
+
+  // Keyboard support on the avatar label
+  if (avatarWrapper) {
+    avatarWrapper.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        avatarInput.click();
+      }
+    });
+  }
 
   avatarInput.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
+
+    if (file.type && !file.type.startsWith('image/')) {
       showToast('Seleccione un archivo de imagen válido', 'error');
+      avatarInput.value = '';
       return;
     }
+
     try {
+      showToast('Procesando foto...', 'info');
       pendingAvatarUrl = await resizeImage(file, 128);
       avatarChanged = true;
-      const avatarEl = document.getElementById('profileAvatarDisplay');
-      avatarEl.innerHTML = `<img src="${pendingAvatarUrl}" alt="Avatar" />`;
-      // Add remove button if not present
-      if (!document.getElementById('profileRemoveAvatar')) {
-        const removeBtn = document.createElement('button');
+      updateAvatarDisplay(pendingAvatarUrl);
+
+      const uploadText = document.querySelector('#profileUploadBtn span');
+      if (uploadText) uploadText.textContent = 'Cambiar foto';
+
+      let removeBtn = document.getElementById('profileRemoveAvatar');
+      if (!removeBtn) {
+        removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
         removeBtn.className = 'btn btn-ghost btn-sm';
         removeBtn.id = 'profileRemoveAvatar';
-        removeBtn.style.cssText = 'margin-top:6px;font-size:.75rem;color:var(--danger)';
-        removeBtn.textContent = 'Quitar foto';
-        removeBtn.onclick = () => {
-          pendingAvatarUrl = null;
-          avatarChanged = true;
-          avatarEl.innerHTML = `<span class="profile-avatar-initials">${getInitials(document.getElementById('profileName').value || profile.name)}</span>`;
-          removeBtn.remove();
-        };
-        document.querySelector('.profile-avatar-section').appendChild(removeBtn);
+        removeBtn.style.color = 'var(--danger)';
+        removeBtn.innerHTML = '<i data-lucide="trash-2"></i> Quitar';
+        removeBtn.onclick = onRemoveAvatar;
+        const actions = document.querySelector('.profile-avatar-actions');
+        if (actions) actions.appendChild(removeBtn);
+        if (window.lucide) lucide.createIcons();
       }
+      showToast('Foto cargada (guarde cambios para confirmar)', 'success');
     } catch (err) {
-      showToast('Error al procesar la imagen', 'error');
+      console.error('Error al procesar foto:', err);
+      showToast('Error al procesar la foto: ' + (err.message || 'Desconocido'), 'error');
+    } finally {
+      avatarInput.value = '';
     }
   });
 
-  // Remove avatar button (if exists on initial render)
   const removeBtn = document.getElementById('profileRemoveAvatar');
   if (removeBtn) {
-    removeBtn.addEventListener('click', () => {
-      pendingAvatarUrl = null;
-      avatarChanged = true;
-      const avatarEl = document.getElementById('profileAvatarDisplay');
-      avatarEl.innerHTML = `<span class="profile-avatar-initials">${getInitials(document.getElementById('profileName').value || profile.name)}</span>`;
-      removeBtn.remove();
-    });
+    removeBtn.addEventListener('click', onRemoveAvatar);
   }
 
   // Toggle password section

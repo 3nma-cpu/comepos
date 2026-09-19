@@ -410,6 +410,9 @@ function renderApp(user, defaultRoute = null) {
     const btnProfile = document.getElementById('btnSidebarProfile');
     if (btnProfile) {
         const handleOpenProfile = () => {
+            if (sidebar.classList.contains('active')) {
+                toggleMobileSidebar();
+            }
             showProfileModal(() => {
                 const updatedUser = getCurrentUser();
                 if (updatedUser) {
@@ -437,6 +440,9 @@ function renderApp(user, defaultRoute = null) {
 
     // Logout — now with confirmation modal
     document.getElementById('btnLogout').addEventListener('click', () => {
+        if (sidebar.classList.contains('active')) {
+            toggleMobileSidebar();
+        }
         confirmLogout();
     });
 
