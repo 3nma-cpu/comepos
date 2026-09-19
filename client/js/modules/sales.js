@@ -535,10 +535,10 @@ export function showTicket(sale, onDeleted = null) {
       <!-- Datos de venta -->
       <div class="ticket-line"><span>Ticket #:</span><span style="font-weight:800">${ticketId}</span></div>
       <div class="ticket-line"><span>Fecha:</span><span>${formatDateTime(saleDate)}</span></div>
-      <div class="ticket-line"><span>Cliente:</span><span style="font-weight:700">${escapeHTML(clientName)}</span></div>
-      <div class="ticket-line"><span>Pago:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
-      <div class="ticket-line"><span>Cajero:</span><span id="ticketVendorName">${escapeHTML(vendorName)}</span></div>
-      <div class="ticket-divider" style="border-color:#000"></div>
+      <div class="ticket-line" style="margin-top:6px"><span>Cliente:</span><span style="font-weight:700">${escapeHTML(clientName)}</span></div>
+      <div class="ticket-line" style="margin-top:6px"><span>Pago:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
+      <div class="ticket-line" style="margin-top:6px"><span>Cajero:</span><span id="ticketVendorName">${escapeHTML(vendorName)}</span></div>
+      <div class="ticket-divider" style="border-color:#000;margin-top:6px"></div>
 
       <!-- Items -->
       <div style="font-size:.8rem">
@@ -708,7 +708,7 @@ export function printTicket(sale, ...rest) {
       justify-content: space-between;
       align-items: flex-start;
       gap: 6px;
-      margin: 2px 0;
+      margin: 3px 0;
       font-size: 8.5pt;
       font-weight: 600;
       color: #000000;
@@ -809,19 +809,19 @@ export function printTicket(sale, ...rest) {
     <span>Fecha:</span>
     <span>${formatDateTime(saleDate)}</span>
   </div>
-  <div class="ticket-line">
+  <div class="ticket-line" style="margin-top:5px">
     <span>Cliente:</span>
     <span>${escapeHTML(clientName)}</span>
   </div>
-  <div class="ticket-line">
+  <div class="ticket-line" style="margin-top:5px">
     <span>Pago:</span>
     <span>${payLabel}</span>
   </div>
-  <div class="ticket-line">
+  <div class="ticket-line" style="margin-top:5px">
     <span>Cajero:</span>
     <span>${escapeHTML(vendorName)}</span>
   </div>
-  <hr class="divider-dash"/>
+  <hr class="divider-dash" style="margin-top:5px"/>
 
   <!-- Items -->
   <div>
