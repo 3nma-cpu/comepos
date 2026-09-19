@@ -1687,11 +1687,11 @@ tbody tr:last-child td {
 
     .pos-cart {
         max-height: 500px;
-        order: 2;
+        order: 1;
     }
     
     .pos-products {
-        order: 1;
+        order: 2;
     }
 
     /* Purchase grids: collapse to 2x2 */
@@ -2008,11 +2008,19 @@ tbody tr:last-child td {
 
     /* POS cart adjustments */
     .pos-cart {
-        max-height: 400px;
+        max-height: 420px;
     }
 
     .pos-cart-header h3 {
         font-size: .9rem !important;
+    }
+
+    .pos-cart-items {
+        max-height: 160px;
+    }
+
+    .pos-cart-items .empty-state {
+        padding: .75rem 1rem !important;
     }
 
     /* Table min-width less aggressive */
