@@ -149,63 +149,6 @@ function fmtDateShort(ymd) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-// Autocompletado y máscara de teléfono paraguayo (+595)
-function attachParaguayPhoneMask(input) {
-  if (!input) return;
-  input.placeholder = '+595 9XX XXXXXX';
-
-  // Si ya tiene valor al cargar, formatearlo con +595
-  if (input.value && !input.value.startsWith('+595')) {
-    let digits = input.value.replace(/\D/g, '');
-    if (digits.startsWith('0')) digits = digits.slice(1);
-    if (digits.startsWith('5950')) digits = '595' + digits.slice(4);
-    if (!digits.startsWith('595')) digits = '595' + digits;
-    let rest = digits.slice(3);
-    input.value = '+595' + (rest ? ' ' + rest.slice(0, 3) : '') + (rest.length > 3 ? ' ' + rest.slice(3, 9) : '');
-  }
-
-  // Al hacer foco, si está vacío autocompletar +595
-  input.addEventListener('focus', () => {
-    if (!input.value.trim()) {
-      input.value = '+595 ';
-    }
-  });
-
-  input.addEventListener('input', () => {
-    let raw = input.value;
-    let digits = raw.replace(/\D/g, '');
-
-    // Si comienza con 0 (ej: 0992...), omitir el 0
-    if (digits.startsWith('0')) {
-      digits = digits.slice(1);
-    }
-    // Si empieza con 5950... (ej: +595 09...), quitar el 0 después de 595
-    if (digits.startsWith('5950')) {
-      digits = '595' + digits.slice(4);
-    }
-    // Autocompletar siempre el prefijo de Paraguay 595
-    if (!digits.startsWith('595')) {
-      digits = '595' + digits;
-    }
-
-    let formatted = '+595';
-    let rest = digits.slice(3);
-    if (rest.length > 0) {
-      formatted += ' ' + rest.slice(0, 3);
-    }
-    if (rest.length > 3) {
-      formatted += ' ' + rest.slice(3, 9);
-    }
-    input.value = formatted;
-  });
-
-  input.addEventListener('blur', () => {
-    if (input.value.trim() === '+595' || input.value.trim() === '+595 ') {
-      input.value = '';
-    }
-  });
-}
-
 // ---- Componente PIN ----
 function createPinInput(id = 'pinFields') {
   return `
@@ -262,72 +205,41 @@ function getPinValue(containerId = 'pinFields') {
 let currentCedula = '';
 let checkData = null;
 
-// Paso 1: Ingreso de Cédula
-function renderCedulaScreen(initialMsg = '') {
+// Pantalla de bienvenida: Registrarse o Iniciar Sesión
+function renderWelcomeScreen(initialMsg = '') {
   const app = document.getElementById('portal-app');
   app.innerHTML = `
     <div class="portal-login-screen">
       <div class="portal-login-card">
         <div class="portal-login-header">
           <div class="portal-login-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
           </div>
           <h1>Mi Consumo</h1>
           <p>Comedor TTA S.A. — Portal de Funcionarios</p>
           <div class="portal-badge-system">Acceso Seguro</div>
         </div>
 
-        <div class="portal-error" id="portalError"></div>
         ${initialMsg ? `<div class="portal-success" style="display:block">${initialMsg}</div>` : ''}
 
-        <form id="cedulaForm">
-          <div class="p-form-group">
-            <label for="inputCedula">Número de Cédula de Identidad</label>
-            <input type="text" id="inputCedula" class="p-form-control" placeholder="Ej: 4743230" value="${currentCedula}" autocomplete="username" required autofocus />
-          </div>
-          <button type="submit" class="p-btn p-btn-primary" id="btnCheckCedula">Continuar</button>
-        </form>
+        <div class="portal-welcome-actions">
+          <button class="p-btn p-btn-primary" id="btnGoLogin">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Iniciar Sesión
+          </button>
+          <button class="p-btn p-btn-outline-welcome" id="btnGoRegister">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            Registrarse (primera vez)
+          </button>
+        </div>
       </div>
     </div>`;
 
-  document.getElementById('cedulaForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const cedula = document.getElementById('inputCedula').value.trim();
-    const btn = document.getElementById('btnCheckCedula');
-    const errEl = document.getElementById('portalError');
-
-    errEl.style.display = 'none';
-    if (!cedula) {
-      errEl.textContent = 'Ingresa tu número de cédula';
-      errEl.style.display = 'block';
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Verificando...';
-
-    try {
-      currentCedula = cedula;
-      checkData = await portalFetch('/check', {
-        method: 'POST',
-        body: JSON.stringify({ cedula })
-      });
-
-      if (checkData.hasPin) {
-        renderLoginScreen();
-      } else {
-        renderRegisterScreen();
-      }
-    } catch (err) {
-      errEl.textContent = err.message;
-      errEl.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Continuar';
-    }
-  });
+  document.getElementById('btnGoLogin').addEventListener('click', () => renderLoginScreen());
+  document.getElementById('btnGoRegister').addEventListener('click', () => renderRegisterScreen());
 }
 
-// Paso 2a: Login con PIN
+// Pantalla de Login: Cédula + PIN
 function renderLoginScreen(infoMsg = '') {
   const app = document.getElementById('portal-app');
   app.innerHTML = `
@@ -337,16 +249,20 @@ function renderLoginScreen(infoMsg = '') {
           <div class="portal-login-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
           </div>
-          <h1>Ingresar PIN</h1>
-          <p>${checkData?.name || 'Funcionario'} (C.I. ${currentCedula})</p>
+          <h1>Iniciar Sesión</h1>
+          <p>Ingresa tu cédula y PIN de acceso</p>
         </div>
 
         <div class="portal-error" id="portalError"></div>
         ${infoMsg ? `<div class="portal-success" style="display:block">${infoMsg}</div>` : ''}
 
         <form id="loginForm">
+          <div class="p-form-group">
+            <label for="loginCedula">Número de Cédula de Identidad</label>
+            <input type="text" id="loginCedula" class="p-form-control" placeholder="Ej: 4743230" value="${currentCedula}" autocomplete="username" required autofocus />
+          </div>
           <div class="p-form-group" style="text-align:center">
-            <label>Ingresa tu PIN de 4 dígitos</label>
+            <label>PIN de 4 dígitos</label>
             ${createPinInput('loginPin')}
           </div>
           <button type="submit" class="p-btn p-btn-primary" id="btnLogin">Ingresar</button>
@@ -354,7 +270,7 @@ function renderLoginScreen(infoMsg = '') {
 
         <div style="text-align:center;margin-top:1.25rem;display:flex;flex-direction:column;gap:0.5rem">
           <span class="portal-link" id="linkRecoverPin">¿Olvidaste tu PIN? Recuperar clave</span>
-          <span class="portal-link" id="linkBackCedula" style="color:var(--p-text-muted)">← Cambiar de cédula</span>
+          <span class="portal-link" id="linkBackWelcome" style="color:var(--p-text-muted)">← Volver al inicio</span>
         </div>
       </div>
     </div>`;
@@ -363,24 +279,23 @@ function renderLoginScreen(infoMsg = '') {
 
   document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const cedula = document.getElementById('loginCedula').value.trim();
     const pin = getPinValue('loginPin');
     const btn = document.getElementById('btnLogin');
     const errEl = document.getElementById('portalError');
 
     errEl.style.display = 'none';
-    if (pin.length !== 4) {
-      errEl.textContent = 'Ingresa los 4 dígitos de tu PIN';
-      errEl.style.display = 'block';
-      return;
-    }
+    if (!cedula) { errEl.textContent = 'Ingresa tu número de cédula'; errEl.style.display = 'block'; return; }
+    if (pin.length !== 4) { errEl.textContent = 'Ingresa los 4 dígitos de tu PIN'; errEl.style.display = 'block'; return; }
 
     btn.disabled = true;
     btn.textContent = 'Verificando...';
 
     try {
+      currentCedula = cedula;
       const data = await portalFetch('/login', {
         method: 'POST',
-        body: JSON.stringify({ cedula: currentCedula, pin })
+        body: JSON.stringify({ cedula, pin })
       });
 
       savePortalSession(data.token, data.client);
@@ -393,13 +308,15 @@ function renderLoginScreen(infoMsg = '') {
     }
   });
 
-  document.getElementById('linkRecoverPin').addEventListener('click', () => renderRecoverScreen());
-  document.getElementById('linkBackCedula').addEventListener('click', () => renderCedulaScreen());
+  document.getElementById('linkRecoverPin').addEventListener('click', () => {
+    currentCedula = document.getElementById('loginCedula').value.trim();
+    renderRecoverScreen();
+  });
+  document.getElementById('linkBackWelcome').addEventListener('click', () => renderWelcomeScreen());
 }
 
-// Paso 2b: Primer Acceso — Crear PIN validando teléfono registrado
+// Pantalla de Registro: Cédula + Crear PIN (solo si la cédula existe en el sistema)
 function renderRegisterScreen() {
-  const phoneHint = checkData?.phoneHint || '****';
   const app = document.getElementById('portal-app');
   app.innerHTML = `
     <div class="portal-login-screen">
@@ -408,62 +325,112 @@ function renderRegisterScreen() {
           <div class="portal-login-icon">
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
           </div>
-          <h1>Primer Acceso</h1>
-          <p>${checkData?.name || 'Funcionario'} (C.I. ${currentCedula})</p>
+          <h1>Crear Cuenta</h1>
+          <p>Primera vez en el portal</p>
         </div>
 
         <div class="portal-info-box">
-          Para activar tu acceso por primera vez, valida tu número de teléfono registrado (<strong>${phoneHint}</strong>) y define tu clave PIN de 4 dígitos.
+          Ingresa tu número de cédula registrado en el sistema y crea un PIN de 4 dígitos para acceder al portal. Solo los funcionarios registrados pueden crear cuenta.
         </div>
 
         <div class="portal-error" id="portalError"></div>
+        <div class="portal-success" id="portalSuccess"></div>
 
         <form id="registerForm">
           <div class="p-form-group">
-            <label for="regPhone">Confirma tu teléfono (${phoneHint})</label>
-            <input type="tel" id="regPhone" class="p-form-control" placeholder="+595 9XX XXXXXX" required autofocus />
+            <label for="regCedula">Número de Cédula de Identidad</label>
+            <input type="text" id="regCedula" class="p-form-control" placeholder="Ej: 4743230" value="${currentCedula}" autocomplete="username" required autofocus />
           </div>
-          <div class="p-form-group" style="text-align:center">
-            <label>Crea tu PIN de 4 dígitos</label>
-            ${createPinInput('regPin')}
+
+          <div id="registerPinSection" style="display:none">
+            <div class="portal-info-box" id="regWelcomeMsg" style="background:var(--p-accent-bg,rgba(59,130,246,0.1));border-color:var(--p-accent-border,rgba(59,130,246,0.2))"></div>
+            <div class="p-form-group" style="text-align:center">
+              <label>Crea tu PIN de 4 dígitos</label>
+              ${createPinInput('regPin')}
+            </div>
+            <div class="p-form-group" style="text-align:center">
+              <label>Confirma tu PIN</label>
+              ${createPinInput('regConfirmPin')}
+            </div>
           </div>
-          <div class="p-form-group" style="text-align:center">
-            <label>Confirma tu PIN</label>
-            ${createPinInput('regConfirmPin')}
-          </div>
-          <button type="submit" class="p-btn p-btn-primary" id="btnRegister">Crear PIN y Acceder</button>
+
+          <button type="submit" class="p-btn p-btn-primary" id="btnRegister">Verificar Cédula</button>
         </form>
 
         <div style="text-align:center;margin-top:1.25rem">
-          <span class="portal-link" id="linkBackCedula" style="color:var(--p-text-muted)">← Volver</span>
+          <span class="portal-link" id="linkBackWelcome" style="color:var(--p-text-muted)">← Volver al inicio</span>
         </div>
       </div>
     </div>`;
 
-  initPinInputListeners('regPin');
-  initPinInputListeners('regConfirmPin');
-  attachParaguayPhoneMask(document.getElementById('regPhone'));
+  let cedulaVerified = false;
 
   document.getElementById('registerForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const verificationPhone = document.getElementById('regPhone').value.trim();
-    const pin = getPinValue('regPin');
-    const confirmPin = getPinValue('regConfirmPin');
+    const cedula = document.getElementById('regCedula').value.trim();
     const btn = document.getElementById('btnRegister');
     const errEl = document.getElementById('portalError');
+    const successEl = document.getElementById('portalSuccess');
 
     errEl.style.display = 'none';
-    if (!verificationPhone) { errEl.textContent = 'Ingresa tu teléfono de verificación'; errEl.style.display = 'block'; return; }
+    successEl.style.display = 'none';
+
+    if (!cedula) { errEl.textContent = 'Ingresa tu número de cédula'; errEl.style.display = 'block'; return; }
+
+    // Paso 1: Verificar cédula
+    if (!cedulaVerified) {
+      btn.disabled = true;
+      btn.textContent = 'Verificando...';
+
+      try {
+        currentCedula = cedula;
+        checkData = await portalFetch('/check', {
+          method: 'POST',
+          body: JSON.stringify({ cedula })
+        });
+
+        if (checkData.hasPin) {
+          errEl.textContent = 'Ya tienes una cuenta activa. Usa la opción de Iniciar Sesión.';
+          errEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Verificar Cédula';
+          return;
+        }
+
+        // Mostrar la sección de PIN
+        cedulaVerified = true;
+        document.getElementById('regCedula').readOnly = true;
+        document.getElementById('regCedula').style.opacity = '0.7';
+        document.getElementById('regWelcomeMsg').innerHTML = `¡Hola <strong>${checkData.name}</strong>! Cédula verificada. Ahora crea tu PIN de acceso.`;
+        document.getElementById('registerPinSection').style.display = 'block';
+        btn.textContent = 'Crear Cuenta';
+        btn.disabled = false;
+
+        initPinInputListeners('regPin');
+        initPinInputListeners('regConfirmPin');
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Verificar Cédula';
+      }
+      return;
+    }
+
+    // Paso 2: Crear PIN
+    const pin = getPinValue('regPin');
+    const confirmPin = getPinValue('regConfirmPin');
+
     if (pin.length !== 4) { errEl.textContent = 'El PIN debe ser exactamente de 4 dígitos'; errEl.style.display = 'block'; return; }
     if (pin !== confirmPin) { errEl.textContent = 'Los PINs ingresados no coinciden'; errEl.style.display = 'block'; return; }
 
     btn.disabled = true;
-    btn.textContent = 'Creando PIN...';
+    btn.textContent = 'Creando cuenta...';
 
     try {
       const data = await portalFetch('/register', {
         method: 'POST',
-        body: JSON.stringify({ cedula: currentCedula, pin, verificationPhone })
+        body: JSON.stringify({ cedula: currentCedula, pin })
       });
 
       savePortalSession(data.token, data.client);
@@ -472,16 +439,15 @@ function renderRegisterScreen() {
       errEl.textContent = err.message;
       errEl.style.display = 'block';
       btn.disabled = false;
-      btn.textContent = 'Crear PIN y Acceder';
+      btn.textContent = 'Crear Cuenta';
     }
   });
 
-  document.getElementById('linkBackCedula').addEventListener('click', () => renderCedulaScreen());
+  document.getElementById('linkBackWelcome').addEventListener('click', () => renderWelcomeScreen());
 }
 
-// Paso 2c: Recuperar PIN olvidado
+// Pantalla: Recuperar PIN olvidado (solo cédula + nuevo PIN)
 function renderRecoverScreen() {
-  const phoneHint = checkData?.phoneHint || '****';
   const app = document.getElementById('portal-app');
   app.innerHTML = `
     <div class="portal-login-screen">
@@ -491,19 +457,19 @@ function renderRecoverScreen() {
             <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
           </div>
           <h1>Recuperar PIN</h1>
-          <p>${checkData?.name || 'Funcionario'} (C.I. ${currentCedula})</p>
+          <p>Restablece tu clave de acceso</p>
         </div>
 
         <div class="portal-info-box">
-          Valida tu número de teléfono registrado (<strong>${phoneHint}</strong>) para definir un nuevo PIN de 4 dígitos.
+          Ingresa tu número de cédula y define un nuevo PIN de 4 dígitos.
         </div>
 
         <div class="portal-error" id="portalError"></div>
 
         <form id="recoverForm">
           <div class="p-form-group">
-            <label for="recoverPhone">Confirma tu teléfono (${phoneHint})</label>
-            <input type="tel" id="recoverPhone" class="p-form-control" placeholder="+595 9XX XXXXXX" required autofocus />
+            <label for="recoverCedula">Número de Cédula de Identidad</label>
+            <input type="text" id="recoverCedula" class="p-form-control" placeholder="Ej: 4743230" value="${currentCedula}" autocomplete="username" required autofocus />
           </div>
           <div class="p-form-group" style="text-align:center">
             <label>Nuevo PIN (4 dígitos)</label>
@@ -517,25 +483,24 @@ function renderRecoverScreen() {
         </form>
 
         <div style="text-align:center;margin-top:1.25rem">
-          <span class="portal-link" id="linkBackLogin" style="color:var(--p-text-muted)">← Volver</span>
+          <span class="portal-link" id="linkBackLogin" style="color:var(--p-text-muted)">← Volver a Iniciar Sesión</span>
         </div>
       </div>
     </div>`;
 
   initPinInputListeners('recPin');
   initPinInputListeners('recConfirmPin');
-  attachParaguayPhoneMask(document.getElementById('recoverPhone'));
 
   document.getElementById('recoverForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const verificationPhone = document.getElementById('recoverPhone').value.trim();
+    const cedula = document.getElementById('recoverCedula').value.trim();
     const pin = getPinValue('recPin');
     const confirmPin = getPinValue('recConfirmPin');
     const btn = document.getElementById('btnRecover');
     const errEl = document.getElementById('portalError');
 
     errEl.style.display = 'none';
-    if (!verificationPhone) { errEl.textContent = 'Ingresa tu teléfono de verificación'; errEl.style.display = 'block'; return; }
+    if (!cedula) { errEl.textContent = 'Ingresa tu número de cédula'; errEl.style.display = 'block'; return; }
     if (pin.length !== 4) { errEl.textContent = 'El PIN debe ser exactamente de 4 dígitos'; errEl.style.display = 'block'; return; }
     if (pin !== confirmPin) { errEl.textContent = 'Los PINs ingresados no coinciden'; errEl.style.display = 'block'; return; }
 
@@ -543,9 +508,10 @@ function renderRecoverScreen() {
     btn.textContent = 'Restableciendo...';
 
     try {
+      currentCedula = cedula;
       const data = await portalFetch('/recover', {
         method: 'POST',
-        body: JSON.stringify({ cedula: currentCedula, pin, verificationPhone })
+        body: JSON.stringify({ cedula, pin })
       });
 
       savePortalSession(data.token, data.client);
@@ -640,7 +606,7 @@ let currentFilter = 'month';
 
 async function renderPortalApp() {
   const session = getPortalSession();
-  if (!session?.token) return renderCedulaScreen();
+  if (!session?.token) return renderWelcomeScreen();
 
   const app = document.getElementById('portal-app');
   app.innerHTML = `
@@ -899,7 +865,7 @@ function portalBoot() {
   if (session?.token) {
     renderPortalApp();
   } else {
-    renderCedulaScreen();
+    renderWelcomeScreen();
   }
 }
 

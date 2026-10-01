@@ -4,7 +4,6 @@ import jwt from 'jsonwebtoken';
 import prisma from '../config/db.js';
 import { portalAuthMiddleware, JWT_ISSUER, JWT_PORTAL_AUDIENCE } from '../middleware/auth.js';
 import { loginRateLimiter } from '../middleware/rateLimiter.js';
-import { sendProvisionalPin, normalizePhoneNumber, formatParaguayPhone } from '../services/notificationService.js';
 
 const router = Router();
 
@@ -20,7 +19,7 @@ function generatePortalToken(client) {
   );
 }
 
-// POST /api/portal/check — Verifica si la cédula existe y si ya tiene PIN
+// POST /api/portal/check — Verifica si la cédula existe y si ya tiene PIN (cuenta creada)
 router.post('/check', loginRateLimiter, async (req, res) => {
   try {
     const { cedula } = req.body;
@@ -30,15 +29,13 @@ router.post('/check', loginRateLimiter, async (req, res) => {
 
     const client = await prisma.client.findUnique({ where: { cedula: cedula.trim() } });
     if (!client) {
-      return res.status(404).json({ error: 'No se encontró un funcionario con esa cédula' });
+      return res.status(404).json({ error: 'No se encontró un funcionario con esa cédula. Solo los funcionarios registrados en el sistema pueden crear una cuenta.' });
     }
 
     res.json({
       exists: true,
       hasPin: client.pinActive && !!client.pin,
-      name: client.name,
-      phoneHint: client.phone ? '+595 ...' + normalizePhoneNumber(client.phone).slice(-4) : null,
-      emailHint: client.email ? client.email.replace(/(.{2})(.*)(@.*)/, '$1***$3') : null
+      name: client.name
     });
   } catch (err) {
     console.error('Portal check error:', err);
@@ -46,10 +43,10 @@ router.post('/check', loginRateLimiter, async (req, res) => {
   }
 });
 
-// POST /api/portal/register — Registro: crear PIN por primera vez
+// POST /api/portal/register — Registro: crear cuenta (PIN) por primera vez. Solo si la cédula existe en el sistema.
 router.post('/register', loginRateLimiter, async (req, res) => {
   try {
-    const { cedula, pin, verificationPhone } = req.body;
+    const { cedula, pin } = req.body;
 
     if (!cedula || !pin) {
       return res.status(400).json({ error: 'Cédula y PIN son obligatorios' });
@@ -61,22 +58,11 @@ router.post('/register', loginRateLimiter, async (req, res) => {
 
     const client = await prisma.client.findUnique({ where: { cedula: cedula.trim() } });
     if (!client) {
-      return res.status(404).json({ error: 'Funcionario no encontrado' });
+      return res.status(404).json({ error: 'No se encontró un funcionario con esa cédula. Solo los funcionarios registrados pueden crear cuenta.' });
     }
 
     if (client.pinActive && client.pin) {
-      return res.status(400).json({ error: 'Ya tienes un PIN activo. Usa la opción de recuperación si lo olvidaste.' });
-    }
-
-    if (!client.phone) {
-      return res.status(400).json({ error: 'No tienes un teléfono registrado en el sistema. Contacta al administrador.' });
-    }
-
-    const clientPhone = normalizePhoneNumber(client.phone);
-    const inputPhone = normalizePhoneNumber(verificationPhone || '');
-
-    if (!inputPhone || clientPhone !== inputPhone) {
-      return res.status(400).json({ error: 'El teléfono ingresado no coincide con el registrado en el sistema' });
+      return res.status(400).json({ error: 'Ya tienes una cuenta activa. Usa la opción de iniciar sesión.' });
     }
 
     const hashedPin = await bcrypt.hash(pin, 10);
@@ -88,7 +74,7 @@ router.post('/register', loginRateLimiter, async (req, res) => {
     const token = generatePortalToken(client);
 
     res.json({
-      message: 'PIN creado exitosamente',
+      message: 'Cuenta creada exitosamente',
       token,
       client: {
         id: client.id,
@@ -101,7 +87,7 @@ router.post('/register', loginRateLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error('Portal register error:', err);
-    res.status(500).json({ error: 'Error al registrar PIN' });
+    res.status(500).json({ error: 'Error al crear cuenta' });
   }
 });
 
@@ -144,13 +130,13 @@ router.post('/login', loginRateLimiter, async (req, res) => {
   }
 });
 
-// POST /api/portal/recover — Recuperar PIN (re-verificar identidad + nuevo PIN)
+// POST /api/portal/recover — Recuperar PIN (solo cédula + nuevo PIN)
 router.post('/recover', loginRateLimiter, async (req, res) => {
   try {
-    const { cedula, pin, verificationPhone } = req.body;
+    const { cedula, pin } = req.body;
 
-    if (!cedula || !pin || !verificationPhone) {
-      return res.status(400).json({ error: 'Cédula, teléfono de verificación y nuevo PIN son obligatorios' });
+    if (!cedula || !pin) {
+      return res.status(400).json({ error: 'Cédula y nuevo PIN son obligatorios' });
     }
 
     if (typeof pin !== 'string' || !/^\d{4}$/.test(pin)) {
@@ -159,18 +145,7 @@ router.post('/recover', loginRateLimiter, async (req, res) => {
 
     const client = await prisma.client.findUnique({ where: { cedula: cedula.trim() } });
     if (!client) {
-      return res.status(404).json({ error: 'Funcionario no encontrado' });
-    }
-
-    if (!client.phone) {
-      return res.status(400).json({ error: 'No tienes un teléfono registrado. Contacta al administrador.' });
-    }
-
-    const clientPhone = normalizePhoneNumber(client.phone);
-    const inputPhone = normalizePhoneNumber(verificationPhone);
-
-    if (clientPhone !== inputPhone) {
-      return res.status(400).json({ error: 'El teléfono no coincide con el registrado' });
+      return res.status(404).json({ error: 'No se encontró un funcionario con esa cédula' });
     }
 
     const hashedPin = await bcrypt.hash(pin, 10);
@@ -196,53 +171,6 @@ router.post('/recover', loginRateLimiter, async (req, res) => {
   } catch (err) {
     console.error('Portal recover error:', err);
     res.status(500).json({ error: 'Error al restablecer PIN' });
-  }
-});
-
-// POST /api/portal/request-provisional-pin — Genera y envía un PIN provisorio por WhatsApp / SMS
-router.post('/request-provisional-pin', loginRateLimiter, async (req, res) => {
-  try {
-    const { cedula, verificationPhone } = req.body;
-    if (!cedula) return res.status(400).json({ error: 'La cédula es obligatoria' });
-
-    const client = await prisma.client.findUnique({ where: { cedula: cedula.trim() } });
-    if (!client) return res.status(404).json({ error: 'Funcionario no encontrado' });
-
-    if (!client.phone) {
-      return res.status(400).json({ error: 'No tienes un número de teléfono registrado en el sistema. Contacta con administración.' });
-    }
-
-    if (verificationPhone) {
-      if (normalizePhoneNumber(client.phone) !== normalizePhoneNumber(verificationPhone)) {
-        return res.status(400).json({ error: 'El número no coincide con el registrado' });
-      }
-    }
-
-    // Generar PIN numérico aleatorio de 4 dígitos
-    const rawPin = String(Math.floor(1000 + Math.random() * 9000));
-    const hashedPin = await bcrypt.hash(rawPin, 10);
-
-    await prisma.client.update({
-      where: { id: client.id },
-      data: { pin: hashedPin, pinActive: true, mustChangePin: true }
-    });
-
-    const notifyResult = await sendProvisionalPin({
-      phone: client.phone,
-      name: client.name,
-      pin: rawPin
-    });
-
-    res.json({
-      message: 'PIN provisorio generado exitosamente',
-      phoneHint: '***' + client.phone.slice(-4),
-      waLink: notifyResult.waLink,
-      apiSent: notifyResult.apiSent,
-      rawPin: process.env.NODE_ENV !== 'production' ? rawPin : undefined // Solo en desarrollo para facilidad de prueba
-    });
-  } catch (err) {
-    console.error('Request provisional pin error:', err);
-    res.status(500).json({ error: 'Error al generar PIN provisorio' });
   }
 });
 
