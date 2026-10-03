@@ -1397,11 +1397,67 @@ tbody tr:last-child td {
 }
 
 /* Reports */
+.report-selector-bar {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    padding: .65rem 1.15rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.report-select-label {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.report-select-label svg {
+    width: 18px;
+    height: 18px;
+    color: var(--accent-light, #60a5fa);
+    flex-shrink: 0;
+}
+
+.report-select-wrapper {
+    flex: 1;
+    max-width: 360px;
+}
+
+.report-select-dropdown {
+    width: 100%;
+    padding: .5rem .85rem;
+    font-size: .88rem;
+    font-weight: 600;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    cursor: pointer;
+    transition: all var(--transition);
+}
+
+.report-select-dropdown:hover {
+    border-color: var(--text-muted);
+}
+
+.report-select-dropdown:focus {
+    border-color: var(--text);
+    outline: none;
+}
+
+/* Fallback for card view if needed */
 .report-selector {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    display: flex;
     gap: .65rem;
-    margin-bottom: 1.25rem
+    margin-bottom: 1.25rem;
 }
 
 .report-type-card {
@@ -1411,7 +1467,7 @@ tbody tr:last-child td {
     padding: .85rem;
     cursor: pointer;
     transition: all var(--transition);
-    text-align: center
+    text-align: center;
 }
 
 .report-type-card:hover {
@@ -1427,12 +1483,12 @@ tbody tr:last-child td {
     width: 24px;
     height: 24px;
     margin: 0 auto .4rem;
-    color: var(--text-secondary)
+    color: var(--text-secondary);
 }
 
 .report-type-card .report-name {
     font-size: .8rem;
-    font-weight: 600
+    font-weight: 600;
 }
 
 .report-filters {

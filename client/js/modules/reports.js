@@ -26,23 +26,33 @@ export function renderReports() {
     const container = document.getElementById('module-content');
     container.innerHTML = `
     <div class="fade-in">
-      <div class="report-selector" id="reportSelector">
-        ${REPORT_TYPES.map((r, i) => `
-          <div class="report-type-card ${i === 0 ? 'active' : ''}" data-report="${r.id}">
-            <i data-lucide="${r.icon}"></i>
-            <div class="report-name">${r.name}</div>
-          </div>`).join('')}
+      <div class="report-selector-bar">
+        <label for="reportSelect" class="report-select-label">
+          <i id="reportCurrentIcon" data-lucide="${REPORT_TYPES[0].icon}"></i>
+          <span>Seleccionar Reporte:</span>
+        </label>
+        <div class="report-select-wrapper">
+          <select id="reportSelect" class="report-select-dropdown">
+            ${REPORT_TYPES.map((r, i) => `
+              <option value="${r.id}" ${i === 0 ? 'selected' : ''}>${r.name}</option>
+            `).join('')}
+          </select>
+        </div>
       </div>
       <div id="reportArea"></div>
     </div>`;
     if (window.lucide) lucide.createIcons();
 
-    document.getElementById('reportSelector').addEventListener('click', e => {
-        const card = e.target.closest('.report-type-card');
-        if (!card) return;
-        document.querySelectorAll('.report-type-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        loadReport(card.dataset.report);
+    const selectEl = document.getElementById('reportSelect');
+    selectEl.addEventListener('change', e => {
+        const selectedId = e.target.value;
+        const currentReport = REPORT_TYPES.find(r => r.id === selectedId);
+        const iconEl = document.getElementById('reportCurrentIcon');
+        if (iconEl && currentReport) {
+            iconEl.setAttribute('data-lucide', currentReport.icon);
+            if (window.lucide) lucide.createIcons();
+        }
+        loadReport(selectedId);
     });
 
     loadReport('sales-period');
