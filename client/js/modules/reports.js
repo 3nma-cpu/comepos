@@ -13,6 +13,7 @@ function destroyChart() { if (activeChart) { activeChart.destroy(); activeChart 
 
 const REPORT_TYPES = [
     { id: 'sales-period', name: 'Ventas por Período', icon: 'calendar' },
+    { id: 'loans-report', name: 'Préstamos y Utilidades', icon: 'wallet' },
     { id: 'purchases-period', name: 'Compras por Período', icon: 'package-check' },
     { id: 'top-products', name: 'Productos Vendidos', icon: 'bar-chart-3' },
     { id: 'client-consumption', name: 'Consumo por Cliente', icon: 'users' },
@@ -70,6 +71,11 @@ async function loadReport(type) {
 
         if (type === 'cancelled-sales') {
             await reportCancelledSales(area);
+            return;
+        }
+
+        if (type === 'loans-report') {
+            await reportLoansPeriod(area);
             return;
         }
 
@@ -1183,6 +1189,358 @@ async function reportCancelledSales(area) {
             showToast('Excel exportado', 'success');
         };
     }
+
+    await loadData();
+}
+
+async function reportLoansPeriod(area) {
+    destroyChart();
+    const d30 = new Date(); d30.setDate(d30.getDate() - 30);
+
+    let motivos = [];
+    try {
+        motivos = await api.get('/deudas/motivos');
+    } catch { motivos = []; }
+
+    area.innerHTML = `
+    <div class="report-filters" style="flex-wrap:wrap;gap:.75rem;align-items:flex-end">
+      <div class="form-group"><label>Desde</label><input type="date" class="form-control" id="rloanFrom" value="${formatDateInput(d30)}" /></div>
+      <div class="form-group"><label>Hasta</label><input type="date" class="form-control" id="rloanTo" value="${todayStr()}" /></div>
+      <div class="form-group">
+        <label>Categoría</label>
+        <select class="form-control" id="rloanCat">
+          <option value="">Todas</option>
+          <option value="CHOFER">CHOFER</option>
+          <option value="ADM">ADM</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Motivo</label>
+        <select class="form-control" id="rloanMotivo">
+          <option value="">Todos</option>
+          ${motivos.map(m => `<option value="${m.id}">${escapeHTML(m.nombre)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Estado</label>
+        <select class="form-control" id="rloanStatus">
+          <option value="">Todos</option>
+          <option value="ACTIVA" selected>Activas</option>
+          <option value="SALDADA">Saldadas</option>
+          <option value="ANULADA">Anuladas</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="rloanApply"><i data-lucide="filter"></i>Aplicar</button>
+      <button class="btn btn-secondary" id="rloanExport"><i data-lucide="download"></i>Exportar Excel</button>
+    </div>
+
+    <div class="kpi-grid" id="rloanKpis" style="margin-bottom:1.25rem"></div>
+
+    <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1rem;margin-bottom:1.25rem" class="rloan-grids">
+      <div class="card" style="padding:1.25rem">
+        <h4 style="margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;font-size:.95rem">
+          <i data-lucide="users"></i>Resumen por Categoría (CHOFER vs ADM)
+        </h4>
+        <div class="table-container" id="rloanCategoryTable"></div>
+      </div>
+      <div class="card" style="padding:1.25rem">
+        <h4 style="margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;font-size:.95rem">
+          <i data-lucide="bar-chart-2"></i>Capital vs Utilidad Ganada por Categoría
+        </h4>
+        <div style="height:230px;position:relative">
+          <canvas id="rloanChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:1.25rem;margin-bottom:1.25rem">
+      <h4 style="margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;font-size:.95rem">
+        <i data-lucide="tag"></i>Rendimiento por Motivo de Préstamo
+      </h4>
+      <div class="table-container" id="rloanMotivoTable"></div>
+    </div>
+
+    <div class="card" style="padding:1.25rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+        <h4 style="margin:0;display:flex;align-items:center;gap:.5rem;font-size:.95rem">
+          <i data-lucide="list"></i>Listado Detallado de Préstamos
+        </h4>
+        <div class="search-bar" style="min-width:220px">
+          <i data-lucide="search"></i>
+          <input type="text" class="form-control" id="rloanSearch" placeholder="Buscar funcionario o CI..." />
+        </div>
+      </div>
+      <div class="table-container" id="rloanDetailTable"></div>
+    </div>`;
+    if (window.lucide) lucide.createIcons();
+
+    let currentLoansData = null;
+
+    async function loadData() {
+        const from = document.getElementById('rloanFrom').value;
+        const to = document.getElementById('rloanTo').value;
+        const category = document.getElementById('rloanCat').value;
+        const motivoId = document.getElementById('rloanMotivo').value;
+        const status = document.getElementById('rloanStatus').value;
+
+        const params = new URLSearchParams();
+        if (from) params.set('from', from);
+        if (to) params.set('to', to);
+        if (category) params.set('category', category);
+        if (motivoId) params.set('motivoId', motivoId);
+        if (status) params.set('status', status);
+
+        try {
+            const data = await api.get(`/reports/loans-period?${params.toString()}`);
+            currentLoansData = data;
+            renderLoanMetrics(data);
+        } catch (err) {
+            showToast('Error al cargar reporte de préstamos', 'error');
+        }
+    }
+
+    function renderLoanMetrics(data) {
+        const { summary, byCategory, byMotivo, loans } = data;
+
+        // 1. KPIs
+        document.getElementById('rloanKpis').innerHTML = `
+          <div class="kpi-card">
+            <div class="kpi-icon blue"><i data-lucide="wallet"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">Capital Bruto Prestado</div>
+              <div class="kpi-value">${formatCurrency(summary.totalBruto)}</div>
+              <div class="kpi-sub" style="color:var(--text-muted);font-size:.78rem">${summary.totalCount} préstamos</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon green"><i data-lucide="trending-up"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">Utilidad Total Ganada</div>
+              <div class="kpi-value" style="color:var(--success)">+${formatCurrency(summary.totalUtilidad)}</div>
+              <div class="kpi-sub" style="color:var(--success);font-weight:600;font-size:.78rem">+${summary.avgMargin}% de margen</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon purple"><i data-lucide="receipt"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">Total a Cobrar</div>
+              <div class="kpi-value">${formatCurrency(summary.totalOriginal)}</div>
+              <div class="kpi-sub" style="color:var(--text-muted);font-size:.78rem">Capital + Utilidad</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon green"><i data-lucide="check-circle-2"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">Total Recuperado</div>
+              <div class="kpi-value" style="color:var(--success)">${formatCurrency(summary.totalDescontado)}</div>
+            </div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-icon orange"><i data-lucide="clock"></i></div>
+            <div class="kpi-content">
+              <div class="kpi-label">Saldo Pendiente</div>
+              <div class="kpi-value" style="color:var(--danger)">${formatCurrency(summary.totalSaldo)}</div>
+            </div>
+          </div>`;
+
+        // 2. Tabla por Categoría (CHOFER vs ADM)
+        const catArea = document.getElementById('rloanCategoryTable');
+        if (!byCategory.length) {
+            catArea.innerHTML = '<div style="padding:1rem;color:var(--text-muted);text-align:center">Sin datos en el período</div>';
+        } else {
+            catArea.innerHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>Categoría</th>
+                  <th style="text-align:center">Cant.</th>
+                  <th style="text-align:right">Capital Bruto</th>
+                  <th style="text-align:right">Utilidad Ganada</th>
+                  <th style="text-align:right">% Margen</th>
+                  <th style="text-align:right">Cobrado</th>
+                  <th style="text-align:right">Saldo</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${byCategory.map(c => `
+                <tr>
+                  <td><span class="badge ${c.category === 'CHOFER' ? 'badge-warning' : 'badge-primary'}">${escapeHTML(c.category)}</span></td>
+                  <td style="text-align:center;font-weight:600">${c.count}</td>
+                  <td style="text-align:right">${formatCurrency(c.totalBruto)}</td>
+                  <td style="text-align:right;color:var(--success);font-weight:600">+${formatCurrency(c.totalUtilidad)}</td>
+                  <td style="text-align:right;font-weight:600">${c.avgMargin}%</td>
+                  <td style="text-align:right;color:var(--success)">${formatCurrency(c.totalDescontado)}</td>
+                  <td style="text-align:right;color:var(--danger);font-weight:600">${formatCurrency(c.totalSaldo)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`;
+        }
+
+        // 3. Gráfico (Chart.js)
+        destroyChart();
+        const ctx = document.getElementById('rloanChart');
+        if (ctx && byCategory.length) {
+            const labels = byCategory.map(c => c.category);
+            const brutoData = byCategory.map(c => c.totalBruto);
+            const utilidadData = byCategory.map(c => c.totalUtilidad);
+
+            activeChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Capital Bruto (Gs.)',
+                            data: brutoData,
+                            backgroundColor: '#3b82f6',
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Utilidad Ganada (Gs.)',
+                            data: utilidadData,
+                            backgroundColor: '#10b981',
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: {
+                            ticks: {
+                                callback: v => (v >= 1000000 ? (v / 1000000).toFixed(1) + 'M' : v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v)
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12 } }
+                    }
+                }
+            });
+        }
+
+        // 4. Tabla por Motivo
+        const motArea = document.getElementById('rloanMotivoTable');
+        if (!byMotivo.length) {
+            motArea.innerHTML = '<div style="padding:1rem;color:var(--text-muted);text-align:center">Sin datos</div>';
+        } else {
+            motArea.innerHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>Motivo</th>
+                  <th style="text-align:center">Cant.</th>
+                  <th style="text-align:right">Capital Bruto</th>
+                  <th style="text-align:right">Utilidad Ganada</th>
+                  <th style="text-align:right">% Margen Promedio</th>
+                  <th style="text-align:right">Total a Cobrar</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${byMotivo.map(m => `
+                <tr>
+                  <td><strong>${escapeHTML(m.motivo)}</strong></td>
+                  <td style="text-align:center;font-weight:600">${m.count}</td>
+                  <td style="text-align:right">${formatCurrency(m.totalBruto)}</td>
+                  <td style="text-align:right;color:var(--success);font-weight:600">+${formatCurrency(m.totalUtilidad)}</td>
+                  <td style="text-align:right;font-weight:600">${m.avgMargin}%</td>
+                  <td style="text-align:right;font-weight:600">${formatCurrency(m.totalOriginal)}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>`;
+        }
+
+        // 5. Tabla Detallada con filtro local de búsqueda
+        renderDetailedLoanTable(loans);
+
+        if (window.lucide) lucide.createIcons();
+    }
+
+    function renderDetailedLoanTable(loans) {
+        const query = (document.getElementById('rloanSearch')?.value || '').toLowerCase().trim();
+        const filtered = query
+            ? loans.filter(l => (l.clientName || '').toLowerCase().includes(query) || (l.clientCedula || '').includes(query))
+            : loans;
+
+        const tableArea = document.getElementById('rloanDetailTable');
+        if (!filtered.length) {
+            tableArea.innerHTML = '<div style="padding:1.5rem;color:var(--text-muted);text-align:center">No se encontraron préstamos</div>';
+            return;
+        }
+
+        tableArea.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Funcionario</th>
+              <th>Cat</th>
+              <th>CI</th>
+              <th>Motivo</th>
+              <th>Descripción</th>
+              <th style="text-align:right">Capital Bruto</th>
+              <th style="text-align:right">Utilidad (%)</th>
+              <th style="text-align:right">Total Deuda</th>
+              <th style="text-align:right">Descontado</th>
+              <th style="text-align:right">Saldo</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filtered.map(l => `
+            <tr>
+              <td>${formatDate(l.date)}</td>
+              <td><strong>${escapeHTML(l.clientName)}</strong></td>
+              <td><span class="badge ${l.clientCategory === 'CHOFER' ? 'badge-warning' : 'badge-primary'}">${escapeHTML(l.clientCategory)}</span></td>
+              <td>${escapeHTML(l.clientCedula)}</td>
+              <td>${escapeHTML(l.motivoNombre)}</td>
+              <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(l.descripcion)}">${escapeHTML(l.descripcion)}</td>
+              <td style="text-align:right">${formatCurrency(l.montoBruto)}</td>
+              <td style="text-align:right">
+                <span style="color:var(--success);font-weight:600">+${formatCurrency(l.montoInteres)}</span>
+                <small style="color:var(--text-muted);display:block;font-size:.72rem">(${l.porcentajeInteres}%)</small>
+              </td>
+              <td style="text-align:right;font-weight:600">${formatCurrency(l.montoOriginal)}</td>
+              <td style="text-align:right;color:var(--success)">${formatCurrency(l.totalDescontado)}</td>
+              <td style="text-align:right;font-weight:600;color:${l.saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${formatCurrency(l.saldo)}</td>
+              <td><span class="badge ${l.estado === 'ACTIVA' ? 'badge-success' : l.estado === 'SALDADA' ? 'badge-primary' : 'badge-danger'}">${l.estado}</span></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+
+    document.getElementById('rloanApply').addEventListener('click', loadData);
+    document.getElementById('rloanSearch').addEventListener('input', () => {
+        if (currentLoansData?.loans) {
+            renderDetailedLoanTable(currentLoansData.loans);
+        }
+    });
+
+    document.getElementById('rloanExport').addEventListener('click', () => {
+        if (!currentLoansData || !currentLoansData.loans.length) {
+            return showToast('No hay datos para exportar', 'info');
+        }
+        const headers = ['Fecha', 'Funcionario', 'Categoría', 'CI', 'Departamento', 'Motivo', 'Descripción', 'Capital Bruto', '% Utilidad', 'Utilidad Ganada', 'Total a Cobrar', 'Total Descontado', 'Saldo Pendiente', 'Estado'];
+        const rows = currentLoansData.loans.map(l => [
+            formatDate(l.date),
+            l.clientName,
+            l.clientCategory,
+            l.clientCedula,
+            l.clientDepartment || '',
+            l.motivoNombre,
+            l.descripcion,
+            l.montoBruto,
+            `${l.porcentajeInteres}%`,
+            l.montoInteres,
+            l.montoOriginal,
+            l.totalDescontado,
+            l.saldo,
+            l.estado
+        ]);
+        exportExcel(headers, rows, 'Reporte_Prestamos_Utilidades.xlsx', 'Préstamos y Utilidades');
+    });
 
     await loadData();
 }

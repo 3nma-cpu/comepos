@@ -262,4 +262,138 @@ router.get('/cancelled-sales', async (req, res) => {
   }
 });
 
+// GET /api/reports/loans-period?from=&to=&category=&motivoId=&status=
+router.get('/loans-period', async (req, res) => {
+  try {
+    const { from, to, category, motivoId, status } = req.query;
+    const where = {};
+    if (status) where.estado = status;
+    if (motivoId) where.motivoId = motivoId;
+
+    if (category) {
+      where.funcionario = { category };
+    }
+
+    const dateFilter = buildDateFilter(from, to);
+    if (dateFilter) {
+      where.fecha = dateFilter;
+    }
+
+    const deudas = await prisma.deuda.findMany({
+      where,
+      include: {
+        funcionario: true,
+        motivo: true,
+        descuentos: true,
+        planDescuento: true
+      },
+      orderBy: { fecha: 'desc' }
+    });
+
+    const loans = deudas.map(d => {
+      const montoBruto = d.montoBruto ?? d.montoOriginal;
+      const porcentajeInteres = d.porcentajeInteres ?? 0;
+      const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
+      const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      const saldo = d.montoOriginal - totalDescontado;
+      return {
+        id: d.id,
+        date: d.fecha.toISOString(),
+        clientName: d.funcionario?.name || 'Funcionario',
+        clientCedula: d.funcionario?.cedula || '',
+        clientDepartment: d.funcionario?.department || '',
+        clientCategory: d.funcionario ? (CAT_REVERSE[d.funcionario.category] || d.funcionario.category) : 'OTRO',
+        motivoId: d.motivoId,
+        motivoNombre: d.motivo?.nombre || 'General',
+        descripcion: d.descripcion,
+        montoBruto,
+        porcentajeInteres,
+        montoInteres,
+        montoOriginal: d.montoOriginal,
+        totalDescontado,
+        saldo,
+        estado: d.estado
+      };
+    });
+
+    const totalCount = loans.length;
+    const totalBruto = loans.reduce((s, x) => s + x.montoBruto, 0);
+    const totalUtilidad = loans.reduce((s, x) => s + x.montoInteres, 0);
+    const totalOriginal = loans.reduce((s, x) => s + x.montoOriginal, 0);
+    const totalDescontado = loans.reduce((s, x) => s + x.totalDescontado, 0);
+    const totalSaldo = loans.filter(x => x.estado !== 'ANULADA').reduce((s, x) => s + x.saldo, 0);
+    const avgMargin = totalBruto > 0 ? Number(((totalUtilidad / totalBruto) * 100).toFixed(1)) : 0;
+
+    // Agrupación por categoría (CHOFER vs ADM vs OTRO)
+    const categoryMap = {};
+    loans.forEach(l => {
+      const cat = l.clientCategory || 'OTRO';
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = {
+          category: cat,
+          count: 0,
+          totalBruto: 0,
+          totalUtilidad: 0,
+          totalOriginal: 0,
+          totalDescontado: 0,
+          totalSaldo: 0
+        };
+      }
+      categoryMap[cat].count++;
+      categoryMap[cat].totalBruto += l.montoBruto;
+      categoryMap[cat].totalUtilidad += l.montoInteres;
+      categoryMap[cat].totalOriginal += l.montoOriginal;
+      categoryMap[cat].totalDescontado += l.totalDescontado;
+      if (l.estado !== 'ANULADA') categoryMap[cat].totalSaldo += l.saldo;
+    });
+
+    const byCategory = Object.values(categoryMap).map(c => ({
+      ...c,
+      avgMargin: c.totalBruto > 0 ? Number(((c.totalUtilidad / c.totalBruto) * 100).toFixed(1)) : 0
+    }));
+
+    // Agrupación por motivo
+    const motivoMap = {};
+    loans.forEach(l => {
+      const m = l.motivoNombre;
+      if (!motivoMap[m]) {
+        motivoMap[m] = {
+          motivo: m,
+          count: 0,
+          totalBruto: 0,
+          totalUtilidad: 0,
+          totalOriginal: 0
+        };
+      }
+      motivoMap[m].count++;
+      motivoMap[m].totalBruto += l.montoBruto;
+      motivoMap[m].totalUtilidad += l.montoInteres;
+      motivoMap[m].totalOriginal += l.montoOriginal;
+    });
+
+    const byMotivo = Object.values(motivoMap).map(m => ({
+      ...m,
+      avgMargin: m.totalBruto > 0 ? Number(((m.totalUtilidad / m.totalBruto) * 100).toFixed(1)) : 0
+    }));
+
+    res.json({
+      summary: {
+        totalCount,
+        totalBruto,
+        totalUtilidad,
+        totalOriginal,
+        totalDescontado,
+        totalSaldo,
+        avgMargin
+      },
+      byCategory,
+      byMotivo,
+      loans
+    });
+  } catch (err) {
+    console.error('Error en reporte de préstamos:', err);
+    res.status(500).json({ error: 'Error al generar reporte de préstamos' });
+  }
+});
+
 export default router;

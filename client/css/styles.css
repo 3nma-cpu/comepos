@@ -2818,3 +2818,36 @@ tbody tr:last-child td {
         justify-content: center;
     }
 }
+
+/* Préstamos: Utilidades & Cálculo */
+.deuda-calc-box {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .85rem 1.1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .75rem;
+}
+
+.deuda-calc-box .calc-stat {
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+
+.deuda-calc-box .calc-stat span {
+    font-size: .78rem;
+    color: var(--text-muted);
+}
+
+.deuda-calc-box .calc-stat strong {
+    font-size: 1.05rem;
+}
+
+.deuda-calc-box .calc-stat.total strong {
+    font-size: 1.25rem;
+    color: var(--text);
+}

@@ -271,26 +271,30 @@ enum FrecuenciaDescuento {
 }
 
 model MotivoDeuda {
-  id        String   @id @default(cuid())
-  nombre    String   @unique
-  activo    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  deudas    Deuda[]
+  id                String   @id @default(cuid())
+  nombre            String   @unique
+  porcentajeInteres Float    @default(0)
+  activo            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  deudas            Deuda[]
 
   @@map("motivos_deuda")
 }
 
 model Deuda {
-  id             String      @id @default(cuid())
-  funcionarioId  String
-  motivoId       String
-  descripcion    String
-  fecha          DateTime    @db.Date
-  montoOriginal  Int
-  estado         DeudaEstado @default(ACTIVA)
+  id              String      @id @default(cuid())
+  funcionarioId   String
+  motivoId        String
+  descripcion     String
+  fecha           DateTime    @db.Date
+  montoBruto      Int?
+  porcentajeInteres Float?    @default(0)
+  montoInteres    Int?        @default(0)
+  montoOriginal   Int
+  estado          DeudaEstado @default(ACTIVA)
   motivoAnulacion String?
-  createdBy      String
-  createdAt      DateTime    @default(now())
+  createdBy       String
+  createdAt       DateTime    @default(now())
 
   funcionario    Client       @relation(fields: [funcionarioId], references: [id])
   motivo         MotivoDeuda  @relation(fields: [motivoId], references: [id])

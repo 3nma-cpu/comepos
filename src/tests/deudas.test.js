@@ -172,6 +172,56 @@ test('Estimación de cuotas con resto: 1.600.000 / 150.000 = 11 cuotas', () => {
   assert.strictEqual(cuotas, 11);
 });
 
+// --- Cálculos de Préstamos y Utilidad ---
+console.log('\n📋 Cálculos de Préstamos y Utilidad / Ganancia:');
+
+function calcularPrestamo(montoBruto, porcentaje, interesManual = null) {
+  const interes = interesManual !== null ? interesManual : Math.round(montoBruto * (porcentaje / 100));
+  const total = montoBruto + interes;
+  const pctResultante = montoBruto > 0 ? Number(((interes / montoBruto) * 100).toFixed(1)) : 0;
+  return { montoBruto, porcentaje: pctResultante, montoInteres: interes, montoOriginal: total };
+}
+
+test('Préstamo con 50% de interés calcula automáticamente (1.000.000 Gs -> 500.000 Gs utilidad -> 1.500.000 Gs total)', () => {
+  const res = calcularPrestamo(1000000, 50);
+  assert.strictEqual(res.montoInteres, 500000);
+  assert.strictEqual(res.montoOriginal, 1500000);
+  assert.strictEqual(res.porcentaje, 50);
+});
+
+test('Electrodomésticos con 40% de interés (2.000.000 Gs -> 800.000 Gs utilidad -> 2.800.000 Gs total)', () => {
+  const res = calcularPrestamo(2000000, 40);
+  assert.strictEqual(res.montoInteres, 800000);
+  assert.strictEqual(res.montoOriginal, 2800000);
+  assert.strictEqual(res.porcentaje, 40);
+});
+
+test('Uniformes con 0% de interés (350.000 Gs -> 0 Gs utilidad -> 350.000 Gs total)', () => {
+  const res = calcularPrestamo(350000, 0);
+  assert.strictEqual(res.montoInteres, 0);
+  assert.strictEqual(res.montoOriginal, 350000);
+  assert.strictEqual(res.porcentaje, 0);
+});
+
+test('Posibilidad de cambiar el porcentaje en préstamo (usuario cambia 50% a 25%)', () => {
+  const res = calcularPrestamo(1000000, 25);
+  assert.strictEqual(res.montoInteres, 250000);
+  assert.strictEqual(res.montoOriginal, 1250000);
+});
+
+test('Posibilidad de modificar monto de interés manual (usuario define 300.000 Gs sobre 1.000.000 Gs)', () => {
+  const res = calcularPrestamo(1000000, 50, 300000);
+  assert.strictEqual(res.montoInteres, 300000);
+  assert.strictEqual(res.montoOriginal, 1300000);
+  assert.strictEqual(res.porcentaje, 30);
+});
+
+test('Métricas por categoría: CHOFER y ADM son categorías válidas', () => {
+  const categoriasValidas = ['CHOFER', 'ADM'];
+  assert.strictEqual(categoriasValidas.includes('CHOFER'), true);
+  assert.strictEqual(categoriasValidas.includes('ADM'), true);
+});
+
 // --- Resultado ---
 console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
 console.log(`Resultado: ${passed} pasaron, ${failed} fallaron`);

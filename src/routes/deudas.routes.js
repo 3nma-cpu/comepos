@@ -50,8 +50,9 @@ router.get('/motivos', async (req, res) => {
     if (motivos.length === 0) {
       await prisma.motivoDeuda.createMany({
         data: [
-          { nombre: 'Electrodoméstico' },
-          { nombre: 'Préstamo en efectivo' }
+          { nombre: 'Préstamo en efectivo', porcentajeInteres: 50 },
+          { nombre: 'Electrodoméstico', porcentajeInteres: 40 },
+          { nombre: 'Uniformes', porcentajeInteres: 0 }
         ]
       });
       motivos = await prisma.motivoDeuda.findMany({
@@ -69,9 +70,17 @@ router.get('/motivos', async (req, res) => {
 // POST /api/deudas/motivos — Crear motivo
 router.post('/motivos', async (req, res) => {
   try {
-    const { nombre } = req.body;
+    const { nombre, porcentajeInteres } = req.body;
     if (!nombre?.trim()) return res.status(400).json({ error: 'Nombre es obligatorio' });
-    const motivo = await prisma.motivoDeuda.create({ data: { nombre: nombre.trim() } });
+    const pct = (porcentajeInteres !== undefined && porcentajeInteres !== null && !isNaN(Number(porcentajeInteres)))
+      ? Math.max(0, Number(porcentajeInteres))
+      : 0;
+    const motivo = await prisma.motivoDeuda.create({
+      data: {
+        nombre: nombre.trim(),
+        porcentajeInteres: pct
+      }
+    });
     res.status(201).json(motivo);
   } catch (err) {
     if (err.code === 'P2002') return res.status(409).json({ error: 'Ya existe un motivo con ese nombre' });
@@ -82,9 +91,12 @@ router.post('/motivos', async (req, res) => {
 // PUT /api/deudas/motivos/:id — Editar motivo
 router.put('/motivos/:id', async (req, res) => {
   try {
-    const { nombre, activo } = req.body;
+    const { nombre, porcentajeInteres, activo } = req.body;
     const data = {};
     if (nombre !== undefined) data.nombre = nombre.trim();
+    if (porcentajeInteres !== undefined && porcentajeInteres !== null && !isNaN(Number(porcentajeInteres))) {
+      data.porcentajeInteres = Math.max(0, Number(porcentajeInteres));
+    }
     if (activo !== undefined) data.activo = activo;
     const motivo = await prisma.motivoDeuda.update({
       where: { id: req.params.id },
@@ -106,15 +118,13 @@ router.put('/motivos/:id', async (req, res) => {
 // POST /api/deudas — Crear deuda con plan de descuento
 router.post('/', async (req, res) => {
   try {
-    const { funcionarioId, motivoId, descripcion, fecha, montoOriginal, plan } = req.body;
+    const { funcionarioId, motivoId, descripcion, fecha, montoBruto, porcentajeInteres, montoInteres, montoOriginal, plan } = req.body;
 
     // Validaciones
     if (!funcionarioId) return res.status(400).json({ error: 'Funcionario es obligatorio' });
     if (!motivoId) return res.status(400).json({ error: 'Motivo es obligatorio' });
     if (!descripcion?.trim()) return res.status(400).json({ error: 'Descripción es obligatoria' });
     if (!fecha) return res.status(400).json({ error: 'Fecha es obligatoria' });
-    if (!montoOriginal || montoOriginal <= 0) return res.status(400).json({ error: 'Monto debe ser mayor a 0' });
-    if (!Number.isInteger(montoOriginal)) return res.status(400).json({ error: 'Monto debe ser un número entero' });
 
     // Verificar existencia
     const funcionario = await prisma.client.findUnique({ where: { id: funcionarioId } });
@@ -124,12 +134,48 @@ router.post('/', async (req, res) => {
     if (!motivo) return res.status(404).json({ error: 'Motivo no encontrado' });
     if (!motivo.activo) return res.status(400).json({ error: 'El motivo seleccionado está desactivado' });
 
+    // Cálculo y normalización de montos
+    let finalBruto;
+    let finalPct;
+    let finalInteres;
+    let finalTotal;
+
+    if (montoBruto !== undefined && montoBruto !== null && !isNaN(parseInt(montoBruto))) {
+      finalBruto = parseInt(montoBruto);
+      finalPct = (porcentajeInteres !== undefined && porcentajeInteres !== null && !isNaN(Number(porcentajeInteres)))
+        ? Math.max(0, Number(porcentajeInteres))
+        : (motivo.porcentajeInteres || 0);
+
+      const interesCalculado = Math.round(finalBruto * (finalPct / 100));
+      finalInteres = (montoInteres !== undefined && montoInteres !== null && !isNaN(parseInt(montoInteres)))
+        ? parseInt(montoInteres)
+        : interesCalculado;
+
+      finalTotal = (montoOriginal !== undefined && montoOriginal !== null && !isNaN(parseInt(montoOriginal)))
+        ? parseInt(montoOriginal)
+        : (finalBruto + finalInteres);
+    } else if (montoOriginal !== undefined && montoOriginal !== null && !isNaN(parseInt(montoOriginal))) {
+      finalTotal = parseInt(montoOriginal);
+      finalBruto = finalTotal;
+      finalPct = 0;
+      finalInteres = 0;
+    } else {
+      return res.status(400).json({ error: 'Monto debe ser mayor a 0' });
+    }
+
+    if (finalBruto <= 0 || finalTotal <= 0) {
+      return res.status(400).json({ error: 'Los montos deben ser mayores a 0' });
+    }
+
     const deudaData = {
       funcionarioId,
       motivoId,
       descripcion: descripcion.trim(),
       fecha: new Date(fecha),
-      montoOriginal,
+      montoBruto: finalBruto,
+      porcentajeInteres: finalPct,
+      montoInteres: finalInteres,
+      montoOriginal: finalTotal,
       createdBy: req.user?.id || req.user?.userId || 'sistema'
     };
 
@@ -181,16 +227,27 @@ router.get('/funcionario/:id', async (req, res) => {
       orderBy: { fecha: 'asc' }
     });
 
-    // Calcular saldos
-    const deudasConSaldo = deudas.map(d => ({
-      ...d,
-      saldo: calcSaldo(d),
-      totalDescontado: d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0)
-    }));
+    // Calcular saldos y valores brutos / intereses
+    const deudasConSaldo = deudas.map(d => {
+      const montoBruto = d.montoBruto ?? d.montoOriginal;
+      const porcentajeInteres = d.porcentajeInteres ?? 0;
+      const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
+      const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      return {
+        ...d,
+        montoBruto,
+        porcentajeInteres,
+        montoInteres,
+        saldo: calcSaldo(d),
+        totalDescontado
+      };
+    });
 
     res.json({
       funcionario,
       deudas: deudasConSaldo,
+      totalBruto: deudasConSaldo.reduce((s, d) => s + d.montoBruto, 0),
+      totalUtilidad: deudasConSaldo.reduce((s, d) => s + d.montoInteres, 0),
       totalDeuda: deudasConSaldo.reduce((s, d) => s + d.montoOriginal, 0),
       totalDescontado: deudasConSaldo.reduce((s, d) => s + d.totalDescontado, 0),
       saldoTotal: deudasConSaldo.reduce((s, d) => s + (d.estado !== 'ANULADA' ? d.saldo : 0), 0)
@@ -345,13 +402,17 @@ router.put('/:id/anular', async (req, res) => {
 
 router.get('/deudores', async (req, res) => {
   try {
-    const { estado, motivoId, search } = req.query;
+    const { estado, motivoId, search, categoria } = req.query;
 
     const where = {};
     if (estado) where.estado = estado;
     if (motivoId) where.motivoId = motivoId;
+    if (categoria) {
+      where.funcionario = { category: categoria };
+    }
     if (search) {
       where.funcionario = {
+        ...(where.funcionario || {}),
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { cedula: { contains: search } }
@@ -370,11 +431,20 @@ router.get('/deudores', async (req, res) => {
       orderBy: { fecha: 'desc' }
     });
 
-    const deudasConSaldo = deudas.map(d => ({
-      ...d,
-      saldo: calcSaldo(d),
-      totalDescontado: d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0)
-    }));
+    const deudasConSaldo = deudas.map(d => {
+      const montoBruto = d.montoBruto ?? d.montoOriginal;
+      const porcentajeInteres = d.porcentajeInteres ?? 0;
+      const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
+      const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      return {
+        ...d,
+        montoBruto,
+        porcentajeInteres,
+        montoInteres,
+        saldo: calcSaldo(d),
+        totalDescontado
+      };
+    });
 
     res.json(deudasConSaldo);
   } catch (err) {
@@ -389,7 +459,7 @@ router.get('/deudores', async (req, res) => {
 
 router.get('/planilla', async (req, res) => {
   try {
-    const { frecuencia, estado, motivoId, search, tipo } = req.query;
+    const { frecuencia, estado, motivoId, search, tipo, categoria, from, to } = req.query;
 
     // Modo específico de nómina periódica agrupada por funcionario
     if (tipo === 'periodo') {
@@ -397,14 +467,19 @@ router.get('/planilla', async (req, res) => {
         return res.status(400).json({ error: 'Frecuencia inválida (SEMANAL o QUINCENAL)' });
       }
 
+      const where = {
+        estado: 'ACTIVA',
+        planDescuento: {
+          activo: true,
+          frecuencia
+        }
+      };
+      if (categoria) {
+        where.funcionario = { category: categoria };
+      }
+
       const deudas = await prisma.deuda.findMany({
-        where: {
-          estado: 'ACTIVA',
-          planDescuento: {
-            activo: true,
-            frecuencia
-          }
-        },
+        where,
         include: {
           funcionario: true,
           motivo: true,
@@ -417,12 +492,18 @@ router.get('/planilla', async (req, res) => {
       const planilla = deudas.map(d => {
         const saldo = calcSaldo(d);
         const montoDescuento = Math.min(d.planDescuento?.montoPorDescuento || 0, saldo);
+        const montoBruto = d.montoBruto ?? d.montoOriginal;
+        const porcentajeInteres = d.porcentajeInteres ?? 0;
+        const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
         return {
           funcionario: d.funcionario,
           deuda: {
             id: d.id,
             motivo: d.motivo.nombre,
             descripcion: d.descripcion,
+            montoBruto,
+            porcentajeInteres,
+            montoInteres,
             montoOriginal: d.montoOriginal,
             saldo,
             montoDescuento
@@ -453,8 +534,12 @@ router.get('/planilla', async (req, res) => {
     const where = {};
     if (estado) where.estado = estado;
     if (motivoId) where.motivoId = motivoId;
+    if (categoria) {
+      where.funcionario = { category: categoria };
+    }
     if (search) {
       where.funcionario = {
+        ...(where.funcionario || {}),
         OR: [
           { name: { contains: search, mode: 'insensitive' } },
           { cedula: { contains: search } }
@@ -463,6 +548,15 @@ router.get('/planilla', async (req, res) => {
     }
     if (frecuencia && ['SEMANAL', 'QUINCENAL'].includes(frecuencia)) {
       where.planDescuento = { frecuencia };
+    }
+    if (from || to) {
+      where.fecha = {};
+      if (from) where.fecha.gte = new Date(from);
+      if (to) {
+        const toDate = new Date(to);
+        toDate.setUTCHours(23, 59, 59, 999);
+        where.fecha.lte = toDate;
+      }
     }
 
     let deudas = await prisma.deuda.findMany({
@@ -486,6 +580,9 @@ router.get('/planilla', async (req, res) => {
     const reporte = deudas.map(d => {
       const saldo = calcSaldo(d);
       const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      const montoBruto = d.montoBruto ?? d.montoOriginal;
+      const porcentajeInteres = d.porcentajeInteres ?? 0;
+      const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
       return {
         id: d.id,
         funcionarioId: d.funcionarioId,
@@ -493,6 +590,9 @@ router.get('/planilla', async (req, res) => {
         fecha: d.fecha,
         motivo: d.motivo,
         descripcion: d.descripcion,
+        montoBruto,
+        porcentajeInteres,
+        montoInteres,
         montoOriginal: d.montoOriginal,
         totalDescontado,
         saldo,
@@ -530,12 +630,23 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
       orderBy: { fecha: 'asc' }
     });
 
-    const deudasConSaldo = deudas.map(d => ({
-      ...d,
-      saldo: calcSaldo(d),
-      totalDescontado: d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0)
-    }));
+    const deudasConSaldo = deudas.map(d => {
+      const montoBruto = d.montoBruto ?? d.montoOriginal;
+      const porcentajeInteres = d.porcentajeInteres ?? 0;
+      const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
+      const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      return {
+        ...d,
+        montoBruto,
+        porcentajeInteres,
+        montoInteres,
+        saldo: calcSaldo(d),
+        totalDescontado
+      };
+    });
 
+    const totalBruto = deudasConSaldo.reduce((s, d) => s + d.montoBruto, 0);
+    const totalUtilidad = deudasConSaldo.reduce((s, d) => s + d.montoInteres, 0);
     const totalDeuda = deudasConSaldo.reduce((s, d) => s + d.montoOriginal, 0);
     const totalDescontado = deudasConSaldo.reduce((s, d) => s + d.totalDescontado, 0);
     const saldoTotal = deudasConSaldo.filter(d => d.estado !== 'ANULADA').reduce((s, d) => s + d.saldo, 0);
@@ -552,38 +663,48 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
     .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 20px; }
     .header h1 { font-size: 16pt; font-weight: 700; margin-bottom: 2px; }
     .header p { font-size: 10pt; color: #555; }
-    .funcionario-info { background: #f5f5f5; padding: 10px 14px; border-radius: 4px; margin-bottom: 20px; font-size: 12pt; font-weight: 600; }
+    .funcionario-info { background: #f5f5f5; padding: 10px 14px; border-radius: 4px; margin-bottom: 20px; font-size: 12pt; font-weight: 600; display:flex; justify-content:space-between; align-items:center; }
+    .cat-badge { display:inline-block; font-size:9.5pt; font-weight:700; padding:3px 10px; border-radius:12px; background:#e0e7ef; color:#1a365d; }
     .deuda-block { margin-bottom: 18px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
     .deuda-header { background: #f0f0f0; padding: 8px 14px; font-weight: 600; font-size: 10.5pt; display: flex; justify-content: space-between; align-items: center; }
     .deuda-header .estado { font-size: 9pt; padding: 2px 8px; border-radius: 3px; font-weight: 600; }
     .estado-ACTIVA { background: #e3f2e8; color: #2d8a4e; }
     .estado-SALDADA { background: #e0e7ef; color: #2c5f8a; }
     .estado-ANULADA { background: #fde8e5; color: #c0392b; }
+    .deuda-sub { background:#fafafa; padding:6px 14px; font-size:9.5pt; border-bottom:1px solid #eee; display:flex; gap:16px; color:#555; }
     .deuda-body { padding: 8px 14px; }
     .descuento-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10pt; border-bottom: 1px dotted #eee; }
     .descuento-row.anulado { text-decoration: line-through; color: #999; }
     .saldo-line { font-weight: 700; font-size: 11pt; text-align: right; padding: 8px 14px; background: #fafafa; border-top: 1px solid #ddd; }
     .totals { margin-top: 24px; border-top: 2px solid #333; padding-top: 14px; }
-    .total-row { display: flex; justify-content: space-between; font-size: 12pt; padding: 4px 0; }
-    .total-row.final { font-weight: 700; font-size: 14pt; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 6px; }
+    .total-row { display: flex; justify-content: space-between; font-size: 11pt; padding: 3px 0; }
+    .total-row.final { font-weight: 700; font-size: 13pt; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 6px; }
     .fecha-gen { text-align: right; font-size: 8.5pt; color: #999; margin-top: 30px; }
     @media print { body { padding: 10mm; } }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>TARJETA DE DEUDAS</h1>
+    <h1>TARJETA DE DEUDAS / PRÉSTAMOS</h1>
     <p>Comedor TTA S.A.</p>
   </div>
   <div class="funcionario-info">
-    ${funcionario.name} &mdash; CI: ${funcionario.cedula}
-    ${funcionario.department ? ` &mdash; ${funcionario.department}` : ''}
+    <div>
+      ${funcionario.name} &mdash; CI: ${funcionario.cedula}
+      ${funcionario.department ? ` &mdash; ${funcionario.department}` : ''}
+    </div>
+    <span class="cat-badge">${funcionario.category || 'GENERAL'}</span>
   </div>
   ${deudasConSaldo.map((d, i) => `
   <div class="deuda-block">
     <div class="deuda-header">
-      <span>Deuda ${i + 1}: ${d.motivo.nombre} - ${d.descripcion} (${formatFecha(d.fecha)}), Gs. ${formatGs(d.montoOriginal)}</span>
+      <span>Deuda ${i + 1}: ${d.motivo.nombre} - ${d.descripcion} (${formatFecha(d.fecha)})</span>
       <span class="estado estado-${d.estado}">${d.estado}</span>
+    </div>
+    <div class="deuda-sub">
+      <span>Préstamo Bruto: <strong>Gs. ${formatGs(d.montoBruto)}</strong></span>
+      <span>Interés / Utilidad (${d.porcentajeInteres}%): <strong>Gs. ${formatGs(d.montoInteres)}</strong></span>
+      <span>Total a Cobrar: <strong>Gs. ${formatGs(d.montoOriginal)}</strong></span>
     </div>
     <div class="deuda-body">
       ${d.descuentos.length === 0 ? '<p style="font-size:9.5pt;color:#888;font-style:italic">Sin descuentos registrados</p>' :
@@ -596,9 +717,11 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
     <div class="saldo-line">Saldo: Gs. ${formatGs(d.saldo)}</div>
   </div>`).join('')}
   <div class="totals">
-    <div class="total-row"><span>TOTAL DEUDAS:</span><span>Gs. ${formatGs(totalDeuda)}</span></div>
-    <div class="total-row"><span>TOTAL DESCONTADO:</span><span>Gs. ${formatGs(totalDescontado)}</span></div>
-    <div class="total-row final"><span>SALDO ACTUAL:</span><span>Gs. ${formatGs(saldoTotal)}</span></div>
+    <div class="total-row"><span>TOTAL CAPITAL BRUTO:</span><span>Gs. ${formatGs(totalBruto)}</span></div>
+    <div class="total-row"><span>TOTAL UTILIDAD / GANANCIA:</span><span>Gs. ${formatGs(totalUtilidad)}</span></div>
+    <div class="total-row"><span>TOTAL DEUDAS A COBRAR:</span><span>Gs. ${formatGs(totalDeuda)}</span></div>
+    <div class="total-row"><span>TOTAL DESCONTADO / COBRADO:</span><span>Gs. ${formatGs(totalDescontado)}</span></div>
+    <div class="total-row final"><span>SALDO PENDIENTE ACTUAL:</span><span>Gs. ${formatGs(saldoTotal)}</span></div>
   </div>
   <div class="fecha-gen">Generado: ${new Date().toLocaleString('es-PY')}</div>
 </body>
