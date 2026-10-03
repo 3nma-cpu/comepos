@@ -2647,3 +2647,174 @@ tbody tr:last-child td {
     gap: .75rem;
     animation: fadeIn .2s ease-in-out;
 }
+
+/* ============================================
+   Deudas Module
+   ============================================ */
+
+.deuda-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lg);
+    max-height: 250px;
+    overflow-y: auto;
+    z-index: 100;
+}
+
+.deuda-search-item {
+    padding: .6rem .85rem;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: .1rem;
+    transition: background var(--transition);
+    border-bottom: 1px solid var(--border);
+}
+
+.deuda-search-item:last-child {
+    border-bottom: none;
+}
+
+.deuda-search-item:hover {
+    background: var(--bg-card-hover);
+}
+
+.deuda-selected-func {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .6rem .85rem;
+    margin-top: .4rem;
+}
+
+.deuda-plan-preview {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .75rem 1rem;
+    margin-top: .5rem;
+}
+
+.deuda-totals-bar {
+    display: flex;
+    gap: .75rem;
+    flex-wrap: wrap;
+}
+
+.deuda-stat {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .65rem 1rem;
+    flex: 1;
+    min-width: 140px;
+    display: flex;
+    flex-direction: column;
+    gap: .15rem;
+}
+
+.deuda-stat span {
+    font-size: .78rem;
+    color: var(--text-muted);
+}
+
+.deuda-stat strong {
+    font-size: 1.05rem;
+}
+
+.deuda-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.deuda-card:hover {
+    border-color: var(--border-focus);
+    box-shadow: var(--shadow);
+}
+
+.deuda-card-header {
+    padding: .85rem 1rem;
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-secondary);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.deuda-progress-bar {
+    height: 6px;
+    background: var(--bg-secondary);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: .5rem;
+}
+
+.deuda-progress-fill {
+    height: 100%;
+    background: var(--success);
+    border-radius: 3px;
+    transition: width .5s ease;
+    min-width: 0;
+}
+
+.deuda-descuentos-list {
+    border-top: 1px solid var(--border);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.deuda-descuento-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .4rem 1rem;
+    font-size: .85rem;
+    border-bottom: 1px solid var(--border);
+    transition: background var(--transition);
+}
+
+.deuda-descuento-row:last-child {
+    border-bottom: none;
+}
+
+.deuda-descuento-row:hover {
+    background: var(--bg-table-row-hover);
+}
+
+.deuda-descuento-row.anulado {
+    opacity: .55;
+    text-decoration: line-through;
+}
+
+.deuda-card-actions {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .6rem 1rem;
+    border-top: 1px solid var(--border);
+    background: var(--bg-secondary);
+    border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .deuda-totals-bar {
+        flex-direction: column;
+    }
+
+    .deuda-card-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .deuda-card-actions .btn {
+        justify-content: center;
+    }
+}

@@ -14,6 +14,7 @@ import { renderSales } from './modules/sales.js';
 import { renderReports } from './modules/reports.js';
 import { renderCashRegister } from './modules/cashregister.js';
 import { renderSupplierPayments } from './modules/supplier-payments.js';
+import { renderDeudas } from './modules/deudas.js';
 import { showProfileModal } from './modules/profile.js';
 import { escapeHTML } from './utils.js';
 
@@ -46,7 +47,8 @@ const NAV_ITEMS = [
     },
     {
         section: 'Finanzas', items: [
-            { route: 'pagos-proveedores', label: 'Pagos a Proveedores', icon: 'receipt', perm: 'supplier-payments' }
+            { route: 'pagos-proveedores', label: 'Pagos a Proveedores', icon: 'receipt', perm: 'supplier-payments' },
+            { route: 'deudas', label: 'Deudas Funcionarios', icon: 'wallet', perm: 'deudas' }
         ]
     }
 ];
@@ -62,7 +64,8 @@ const ROUTE_TITLES = {
     sales: 'Punto de Venta',
     reports: 'Reportes',
     'pagos-proveedores': 'Pagos a Proveedores',
-    'supplier-payments': 'Pagos a Proveedores'
+    'supplier-payments': 'Pagos a Proveedores',
+    'deudas': 'Deudas de Funcionarios'
 };
 
 const ROUTE_PERMS = {
@@ -76,7 +79,8 @@ const ROUTE_PERMS = {
     sales: 'sales',
     reports: 'reports',
     'pagos-proveedores': 'supplier-payments',
-    'supplier-payments': 'supplier-payments'
+    'supplier-payments': 'supplier-payments',
+    'deudas': 'deudas'
 };
 
 const ROUTE_HANDLERS = {
@@ -90,7 +94,8 @@ const ROUTE_HANDLERS = {
     sales: renderSales,
     reports: renderReports,
     'pagos-proveedores': renderSupplierPayments,
-    'supplier-payments': renderSupplierPayments
+    'supplier-payments': renderSupplierPayments,
+    'deudas': renderDeudas
 };
 
 // ============================================
@@ -458,11 +463,11 @@ function renderApp(user, defaultRoute = null) {
 
     // Register routes
     Object.entries(ROUTE_HANDLERS).forEach(([path, handler]) => {
-        registerRoute(path, () => {
+        registerRoute(path, (subRoute) => {
             document.getElementById('pageTitle').textContent = ROUTE_TITLES[path] || path;
             const requiredPerm = ROUTE_PERMS[path] || path;
             if (hasPermission(requiredPerm)) {
-                handler();
+                handler(subRoute);
             } else {
                 document.getElementById('module-content').innerHTML = `
           <div class="empty-state" style="padding:4rem"><i data-lucide="lock"></i><h3>Acceso Denegado</h3><p>No tiene permisos para acceder a este módulo.</p></div>`;

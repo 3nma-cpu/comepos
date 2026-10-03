@@ -1,0 +1,1049 @@
+// ============================================
+// Deudas Module — Deudas de Funcionarios
+// Tabs: Motivos | Cargar Deuda | Deudores | Planilla
+// ============================================
+
+import { api } from '../api.js';
+import { showToast, createModal, closeModal, escapeHTML, formatCurrency, formatDate, todayStr, exportExcel, debounce } from '../utils.js';
+import { navigate } from '../router.js';
+
+let currentTab = 'deudores';
+let cachedMotivos = [];
+
+// ============================================
+// Formateo
+// ============================================
+function fmtGs(n) {
+  return 'Gs. ' + Math.round(Number(n)).toLocaleString('es-PY');
+}
+
+function fmtGsPlain(n) {
+  return Math.round(Number(n)).toLocaleString('es-PY');
+}
+
+function estadoBadge(estado) {
+  const map = {
+    ACTIVA: '<span class="badge badge-success">ACTIVA</span>',
+    SALDADA: '<span class="badge badge-primary">SALDADA</span>',
+    ANULADA: '<span class="badge badge-danger">ANULADA</span>'
+  };
+  return map[estado] || estado;
+}
+
+// ============================================
+// Main render
+// ============================================
+export async function renderDeudas(subRoute) {
+  const container = document.getElementById('module-content');
+
+  // Si viene con subruta /deudas/funcionario/<id>
+  if (subRoute && subRoute.startsWith('funcionario/')) {
+    const funcId = subRoute.replace('funcionario/', '');
+    await renderFichaFuncionario(funcId);
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="fade-in">
+      <div class="sp-tabs" id="deudaTabs">
+        <button class="sp-tab${currentTab === 'deudores' ? ' active' : ''}" data-tab="deudores"><i data-lucide="users"></i>Deudores</button>
+        <button class="sp-tab${currentTab === 'cargar' ? ' active' : ''}" data-tab="cargar"><i data-lucide="plus-circle"></i>Cargar Deuda</button>
+        <button class="sp-tab${currentTab === 'planilla' ? ' active' : ''}" data-tab="planilla"><i data-lucide="calendar-check"></i>Planilla</button>
+        <button class="sp-tab${currentTab === 'motivos' ? ' active' : ''}" data-tab="motivos"><i data-lucide="settings"></i>Motivos</button>
+      </div>
+      <div id="deudaContent"></div>
+    </div>`;
+  if (window.lucide) lucide.createIcons();
+
+  // Preload motivos
+  try {
+    cachedMotivos = await api.get('/deudas/motivos');
+  } catch { cachedMotivos = []; }
+
+  document.getElementById('deudaTabs').addEventListener('click', e => {
+    const tab = e.target.closest('.sp-tab');
+    if (!tab) return;
+    document.querySelectorAll('.sp-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentTab = tab.dataset.tab;
+    loadTab(currentTab);
+  });
+
+  loadTab(currentTab);
+}
+
+function loadTab(tab) {
+  switch (tab) {
+    case 'motivos': renderMotivos(); break;
+    case 'cargar': renderCargarDeuda(); break;
+    case 'deudores': renderDeudores(); break;
+    case 'planilla': renderPlanilla(); break;
+  }
+}
+
+// ============================================
+// Tab: Motivos de Deuda
+// ============================================
+async function renderMotivos() {
+  const area = document.getElementById('deudaContent');
+  try {
+    cachedMotivos = await api.get('/deudas/motivos');
+    area.innerHTML = `
+    <div class="fade-in" style="margin-top:1rem">
+      <div class="filters-bar">
+        <div class="search-bar">
+          <i data-lucide="search"></i>
+          <input type="text" class="form-control" id="motivoSearch" placeholder="Buscar motivo..." />
+        </div>
+        <button class="btn btn-primary" id="btnAddMotivo"><i data-lucide="plus"></i>Nuevo Motivo</button>
+      </div>
+      <div class="table-container">
+        <table>
+          <thead><tr><th>Nombre</th><th>Estado</th><th>Deudas</th><th>Acciones</th></tr></thead>
+          <tbody id="motivoTableBody"></tbody>
+        </table>
+      </div>
+    </div>`;
+    if (window.lucide) lucide.createIcons();
+
+    function applyFilter() {
+      const q = document.getElementById('motivoSearch').value.toLowerCase();
+      const filtered = cachedMotivos.filter(m => m.nombre.toLowerCase().includes(q));
+      renderMotivoTable(filtered);
+    }
+
+    document.getElementById('motivoSearch').addEventListener('input', debounce(applyFilter));
+    document.getElementById('btnAddMotivo').addEventListener('click', () => showMotivoModal());
+    applyFilter();
+  } catch (err) {
+    area.innerHTML = `<div class="empty-state"><p>Error al cargar motivos</p></div>`;
+  }
+}
+
+function renderMotivoTable(motivos) {
+  const tbody = document.getElementById('motivoTableBody');
+  if (!motivos.length) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--text-muted);padding:2rem">No se encontraron motivos</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = motivos.map(m => `
+    <tr>
+      <td><strong>${escapeHTML(m.nombre)}</strong></td>
+      <td>${m.activo ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-danger">Inactivo</span>'}</td>
+      <td>${m._count?.deudas || 0}</td>
+      <td>
+        <div style="display:flex;gap:.25rem">
+          <button class="btn btn-ghost btn-sm" data-edit="${m.id}" title="Editar"><i data-lucide="pencil"></i></button>
+          <button class="btn btn-ghost btn-sm" data-toggle="${m.id}" title="${m.activo ? 'Desactivar' : 'Activar'}">
+            <i data-lucide="${m.activo ? 'toggle-right' : 'toggle-left'}"></i>
+          </button>
+        </div>
+      </td>
+    </tr>`).join('');
+  if (window.lucide) lucide.createIcons();
+
+  tbody.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const m = cachedMotivos.find(x => x.id === btn.dataset.edit);
+      if (m) showMotivoModal(m);
+    });
+  });
+
+  tbody.querySelectorAll('[data-toggle]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const m = cachedMotivos.find(x => x.id === btn.dataset.toggle);
+      if (!m) return;
+      try {
+        await api.put(`/deudas/motivos/${m.id}`, { activo: !m.activo });
+        showToast(`Motivo ${m.activo ? 'desactivado' : 'activado'}`);
+        renderMotivos();
+      } catch (err) {
+        showToast(err.message || 'Error', 'error');
+      }
+    });
+  });
+}
+
+function showMotivoModal(motivo = null) {
+  const isEdit = !!motivo;
+  const overlay = createModal(
+    isEdit ? 'Editar Motivo' : 'Nuevo Motivo',
+    `<div class="form-group">
+       <label for="motivoNombre">Nombre del motivo</label>
+       <input type="text" class="form-control" id="motivoNombre" value="${isEdit ? escapeHTML(motivo.nombre) : ''}" placeholder="Ej: Electrodoméstico" maxlength="100" />
+     </div>`,
+    `<button class="btn btn-secondary modal-close">Cancelar</button>
+     <button class="btn btn-primary" id="btnSaveMotivo"><i data-lucide="save"></i>${isEdit ? 'Guardar' : 'Crear'}</button>`
+  );
+
+  document.getElementById('btnSaveMotivo').addEventListener('click', async () => {
+    const nombre = document.getElementById('motivoNombre').value.trim();
+    if (!nombre) return showToast('Nombre es obligatorio', 'error');
+    try {
+      if (isEdit) {
+        await api.put(`/deudas/motivos/${motivo.id}`, { nombre });
+      } else {
+        await api.post('/deudas/motivos', { nombre });
+      }
+      showToast(isEdit ? 'Motivo actualizado' : 'Motivo creado');
+      closeModal(overlay);
+      renderMotivos();
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  });
+}
+
+// ============================================
+// Tab: Cargar Deuda
+// ============================================
+async function renderCargarDeuda() {
+  const area = document.getElementById('deudaContent');
+  const motivosActivos = cachedMotivos.filter(m => m.activo);
+
+  area.innerHTML = `
+  <div class="fade-in" style="margin-top:1rem;max-width:720px">
+    <div class="card" style="padding:1.5rem">
+      <h3 style="margin-bottom:1rem;display:flex;align-items:center;gap:.5rem"><i data-lucide="file-plus"></i>Cargar nueva deuda</h3>
+
+      <div class="form-group">
+        <label>Funcionario *</label>
+        <div style="position:relative">
+          <input type="text" class="form-control" id="deudaFuncSearch" placeholder="Buscar por CI o nombre..." autocomplete="off" />
+          <div id="deudaFuncResults" class="deuda-search-results" style="display:none"></div>
+        </div>
+        <div id="deudaFuncSelected" style="display:none" class="deuda-selected-func"></div>
+        <input type="hidden" id="deudaFuncId" />
+      </div>
+
+      <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div class="form-group">
+          <label>Motivo *</label>
+          <div style="display:flex;gap:.5rem">
+            <select class="form-control" id="deudaMotivo" style="flex:1">
+              <option value="">Seleccionar...</option>
+              ${motivosActivos.map(m => `<option value="${m.id}">${escapeHTML(m.nombre)}</option>`).join('')}
+            </select>
+            <button class="btn btn-ghost btn-icon" id="btnNuevoMotivoInline" title="Crear nuevo motivo"><i data-lucide="plus"></i></button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Fecha *</label>
+          <input type="date" class="form-control" id="deudaFecha" value="${todayStr()}" />
+        </div>
+      </div>
+
+      <div class="form-row" style="display:grid;grid-template-columns:2fr 1fr;gap:1rem">
+        <div class="form-group">
+          <label>Descripción *</label>
+          <input type="text" class="form-control" id="deudaDesc" placeholder="Ej: Heladera Philco 320L" maxlength="200" />
+        </div>
+        <div class="form-group">
+          <label>Monto (Gs.) *</label>
+          <input type="text" class="form-control" id="deudaMonto" placeholder="1.500.000" />
+        </div>
+      </div>
+
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:.5rem">
+        <h4 style="margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;font-size:.92rem"><i data-lucide="calendar-range"></i>Plan de Descuento (opcional)</h4>
+        <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+          <div class="form-group">
+            <label>Monto por descuento (Gs.)</label>
+            <input type="text" class="form-control" id="planMonto" placeholder="150.000" />
+          </div>
+          <div class="form-group">
+            <label>Frecuencia</label>
+            <select class="form-control" id="planFrecuencia">
+              <option value="">Seleccionar...</option>
+              <option value="SEMANAL">Semanal</option>
+              <option value="QUINCENAL">Quincenal</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Fecha inicio</label>
+            <input type="date" class="form-control" id="planFechaInicio" value="${todayStr()}" />
+          </div>
+        </div>
+        <div id="planEstimacion" style="display:none" class="deuda-plan-preview"></div>
+      </div>
+
+      <div style="margin-top:1.25rem;display:flex;justify-content:flex-end;gap:.5rem">
+        <button class="btn btn-primary btn-lg" id="btnGuardarDeuda"><i data-lucide="save"></i>Guardar Deuda</button>
+      </div>
+    </div>
+  </div>`;
+  if (window.lucide) lucide.createIcons();
+
+  // === Búsqueda de funcionario ===
+  const searchInput = document.getElementById('deudaFuncSearch');
+  const resultsDiv = document.getElementById('deudaFuncResults');
+  let searchTimeout;
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimeout);
+    const q = searchInput.value.trim();
+    if (q.length < 2) { resultsDiv.style.display = 'none'; return; }
+    searchTimeout = setTimeout(async () => {
+      try {
+        const results = await api.get(`/deudas/buscar-funcionarios?q=${encodeURIComponent(q)}`);
+        if (!results.length) {
+          resultsDiv.innerHTML = `<div class="deuda-search-item" style="color:var(--text-muted)">No se encontraron resultados</div>`;
+        } else {
+          resultsDiv.innerHTML = results.map(f => `
+            <div class="deuda-search-item" data-id="${f.id}" data-name="${escapeHTML(f.name)}" data-cedula="${escapeHTML(f.cedula)}" data-dept="${escapeHTML(f.department || '')}">
+              <strong>${escapeHTML(f.name)}</strong>
+              <span style="color:var(--text-muted);font-size:.82rem">CI: ${escapeHTML(f.cedula)}${f.department ? ` — ${escapeHTML(f.department)}` : ''}</span>
+            </div>`).join('');
+        }
+        resultsDiv.style.display = 'block';
+      } catch { resultsDiv.style.display = 'none'; }
+    }, 300);
+  });
+
+  resultsDiv.addEventListener('click', e => {
+    const item = e.target.closest('.deuda-search-item');
+    if (!item || !item.dataset.id) return;
+    document.getElementById('deudaFuncId').value = item.dataset.id;
+    searchInput.style.display = 'none';
+    resultsDiv.style.display = 'none';
+    const selectedDiv = document.getElementById('deudaFuncSelected');
+    selectedDiv.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <strong>${item.dataset.name}</strong>
+          <span style="color:var(--text-muted);font-size:.82rem;margin-left:.5rem">CI: ${item.dataset.cedula}${item.dataset.dept ? ` — ${item.dataset.dept}` : ''}</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnClearFunc"><i data-lucide="x"></i></button>
+      </div>`;
+    selectedDiv.style.display = 'block';
+    if (window.lucide) lucide.createIcons();
+    document.getElementById('btnClearFunc').addEventListener('click', () => {
+      document.getElementById('deudaFuncId').value = '';
+      searchInput.style.display = '';
+      searchInput.value = '';
+      selectedDiv.style.display = 'none';
+      searchInput.focus();
+    });
+  });
+
+  // Click fuera cierra resultados
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#deudaFuncSearch') && !e.target.closest('#deudaFuncResults')) {
+      resultsDiv.style.display = 'none';
+    }
+  });
+
+  // === Crear motivo inline ===
+  document.getElementById('btnNuevoMotivoInline').addEventListener('click', () => {
+    showMotivoModal();
+    // Refresh motivos después de cerrar
+    const observer = new MutationObserver(async () => {
+      if (!document.querySelector('.modal-overlay')) {
+        observer.disconnect();
+        try {
+          cachedMotivos = await api.get('/deudas/motivos');
+          const sel = document.getElementById('deudaMotivo');
+          if (sel) {
+            const currentVal = sel.value;
+            sel.innerHTML = `<option value="">Seleccionar...</option>${cachedMotivos.filter(m => m.activo).map(m => `<option value="${m.id}">${escapeHTML(m.nombre)}</option>`).join('')}`;
+            sel.value = currentVal || cachedMotivos[cachedMotivos.length - 1]?.id || '';
+          }
+        } catch { }
+      }
+    });
+    observer.observe(document.body, { childList: true });
+  });
+
+  // === Formateo de monto con separador de miles ===
+  function setupMontoInput(inputId) {
+    const input = document.getElementById(inputId);
+    input.addEventListener('input', () => {
+      const raw = input.value.replace(/\D/g, '');
+      input.value = raw ? Number(raw).toLocaleString('es-PY') : '';
+    });
+  }
+  setupMontoInput('deudaMonto');
+  setupMontoInput('planMonto');
+
+  // === Estimación del plan ===
+  function updateEstimacion() {
+    const montoDeuda = parseInt((document.getElementById('deudaMonto').value || '').replace(/\D/g, '')) || 0;
+    const montoPlan = parseInt((document.getElementById('planMonto').value || '').replace(/\D/g, '')) || 0;
+    const frecuencia = document.getElementById('planFrecuencia').value;
+    const fechaInicio = document.getElementById('planFechaInicio').value;
+    const preview = document.getElementById('planEstimacion');
+
+    if (!montoDeuda || !montoPlan || !frecuencia || !fechaInicio) {
+      preview.style.display = 'none';
+      return;
+    }
+
+    const cuotas = Math.ceil(montoDeuda / montoPlan);
+    const diasPorPeriodo = frecuencia === 'SEMANAL' ? 7 : 15;
+    const fechaFin = new Date(fechaInicio);
+    fechaFin.setDate(fechaFin.getDate() + (cuotas * diasPorPeriodo));
+
+    preview.innerHTML = `
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+        <div><span style="color:var(--text-muted);font-size:.8rem">Cuotas estimadas</span><br/><strong>${cuotas}</strong></div>
+        <div><span style="color:var(--text-muted);font-size:.8rem">Fecha est. cancelación</span><br/><strong>${fechaFin.toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' })}</strong></div>
+        <div><span style="color:var(--text-muted);font-size:.8rem">Última cuota</span><br/><strong>${fmtGs(montoDeuda % montoPlan === 0 ? montoPlan : montoDeuda % montoPlan)}</strong></div>
+      </div>`;
+    preview.style.display = 'block';
+  }
+
+  ['deudaMonto', 'planMonto', 'planFrecuencia', 'planFechaInicio'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateEstimacion);
+    document.getElementById(id).addEventListener('change', updateEstimacion);
+  });
+
+  // === Guardar deuda ===
+  document.getElementById('btnGuardarDeuda').addEventListener('click', async () => {
+    const funcionarioId = document.getElementById('deudaFuncId').value;
+    const motivoId = document.getElementById('deudaMotivo').value;
+    const descripcion = document.getElementById('deudaDesc').value.trim();
+    const fecha = document.getElementById('deudaFecha').value;
+    const montoOriginal = parseInt((document.getElementById('deudaMonto').value || '').replace(/\D/g, '')) || 0;
+
+    if (!funcionarioId) return showToast('Seleccione un funcionario', 'error');
+    if (!motivoId) return showToast('Seleccione un motivo', 'error');
+    if (!descripcion) return showToast('Ingrese una descripción', 'error');
+    if (!fecha) return showToast('Ingrese la fecha', 'error');
+    if (montoOriginal <= 0) return showToast('Ingrese un monto válido', 'error');
+
+    const body = { funcionarioId, motivoId, descripcion, fecha, montoOriginal };
+
+    // Plan opcional
+    const planMonto = parseInt((document.getElementById('planMonto').value || '').replace(/\D/g, '')) || 0;
+    const planFrec = document.getElementById('planFrecuencia').value;
+    const planFecha = document.getElementById('planFechaInicio').value;
+    if (planMonto > 0 && planFrec && planFecha) {
+      body.plan = { montoPorDescuento: planMonto, frecuencia: planFrec, fechaInicio: planFecha };
+    }
+
+    try {
+      const btn = document.getElementById('btnGuardarDeuda');
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader"></i>Guardando...';
+      if (window.lucide) lucide.createIcons();
+
+      await api.post('/deudas', body);
+      showToast('Deuda registrada correctamente');
+
+      // Ir a la ficha del funcionario
+      navigate(`deudas/funcionario/${funcionarioId}`);
+    } catch (err) {
+      showToast(err.message || 'Error al guardar', 'error');
+      const btn = document.getElementById('btnGuardarDeuda');
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="save"></i>Guardar Deuda';
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+}
+
+// ============================================
+// Tab: Deudores (Listado general)
+// ============================================
+async function renderDeudores() {
+  const area = document.getElementById('deudaContent');
+  area.innerHTML = `
+  <div class="fade-in" style="margin-top:1rem">
+    <div class="filters-bar">
+      <div class="search-bar">
+        <i data-lucide="search"></i>
+        <input type="text" class="form-control" id="deudoresSearch" placeholder="Buscar por CI o nombre..." />
+      </div>
+      <select class="form-control" id="deudoresEstado" style="width:auto;min-width:140px">
+        <option value="">Todos los estados</option>
+        <option value="ACTIVA" selected>Activas</option>
+        <option value="SALDADA">Saldadas</option>
+        <option value="ANULADA">Anuladas</option>
+      </select>
+      <select class="form-control" id="deudoresMotivo" style="width:auto;min-width:140px">
+        <option value="">Todos los motivos</option>
+        ${cachedMotivos.map(m => `<option value="${m.id}">${escapeHTML(m.nombre)}</option>`).join('')}
+      </select>
+      <button class="btn btn-secondary" id="btnExportDeudas"><i data-lucide="download"></i>Excel</button>
+    </div>
+    <div id="deudoresTotals" class="deuda-totals-bar"></div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Funcionario</th>
+            <th>CI</th>
+            <th>Motivo</th>
+            <th>Descripción</th>
+            <th>Fecha</th>
+            <th style="text-align:right">Monto</th>
+            <th style="text-align:right">Descontado</th>
+            <th style="text-align:right">Saldo</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="deudoresTableBody"></tbody>
+      </table>
+    </div>
+  </div>`;
+  if (window.lucide) lucide.createIcons();
+
+  let allDeudas = [];
+
+  async function loadDeudores() {
+    const search = document.getElementById('deudoresSearch').value.trim();
+    const estado = document.getElementById('deudoresEstado').value;
+    const motivoId = document.getElementById('deudoresMotivo').value;
+
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (estado) params.set('estado', estado);
+    if (motivoId) params.set('motivoId', motivoId);
+
+    try {
+      allDeudas = await api.get(`/deudas/deudores?${params.toString()}`);
+      renderDeudoresTable(allDeudas);
+    } catch (err) {
+      showToast('Error al cargar deudores', 'error');
+    }
+  }
+
+  function renderDeudoresTable(deudas) {
+    const tbody = document.getElementById('deudoresTableBody');
+    const totalsDiv = document.getElementById('deudoresTotals');
+
+    if (!deudas.length) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--text-muted);padding:2rem">No se encontraron deudas</td></tr>`;
+      totalsDiv.innerHTML = '';
+      return;
+    }
+
+    // Totals
+    const totalMonto = deudas.reduce((s, d) => s + d.montoOriginal, 0);
+    const totalDesc = deudas.reduce((s, d) => s + d.totalDescontado, 0);
+    const totalSaldo = deudas.filter(d => d.estado !== 'ANULADA').reduce((s, d) => s + d.saldo, 0);
+
+    totalsDiv.innerHTML = `
+      <div class="deuda-stat"><span>Total deudas</span><strong>${deudas.length}</strong></div>
+      <div class="deuda-stat"><span>Monto total</span><strong>${fmtGs(totalMonto)}</strong></div>
+      <div class="deuda-stat"><span>Descontado</span><strong style="color:var(--success)">${fmtGs(totalDesc)}</strong></div>
+      <div class="deuda-stat"><span>Saldo pendiente</span><strong style="color:var(--danger)">${fmtGs(totalSaldo)}</strong></div>`;
+
+    tbody.innerHTML = deudas.map(d => `
+      <tr>
+        <td><a href="javascript:void(0)" class="deuda-func-link" data-func="${d.funcionarioId}" style="color:var(--text);font-weight:600">${escapeHTML(d.funcionario?.name || '')}</a></td>
+        <td>${escapeHTML(d.funcionario?.cedula || '')}</td>
+        <td>${escapeHTML(d.motivo?.nombre || '')}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(d.descripcion)}">${escapeHTML(d.descripcion)}</td>
+        <td>${formatDate(d.fecha)}</td>
+        <td style="text-align:right;font-weight:500">${fmtGsPlain(d.montoOriginal)}</td>
+        <td style="text-align:right;color:var(--success)">${fmtGsPlain(d.totalDescontado)}</td>
+        <td style="text-align:right;font-weight:600;color:${d.saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGsPlain(d.saldo)}</td>
+        <td>${estadoBadge(d.estado)}</td>
+        <td>
+          <button class="btn btn-ghost btn-sm deuda-func-link" data-func="${d.funcionarioId}" title="Ver ficha"><i data-lucide="eye"></i></button>
+        </td>
+      </tr>`).join('');
+    if (window.lucide) lucide.createIcons();
+
+    tbody.querySelectorAll('.deuda-func-link').forEach(el => {
+      el.addEventListener('click', () => navigate(`deudas/funcionario/${el.dataset.func}`));
+    });
+  }
+
+  document.getElementById('deudoresSearch').addEventListener('input', debounce(loadDeudores, 400));
+  document.getElementById('deudoresEstado').addEventListener('change', loadDeudores);
+  document.getElementById('deudoresMotivo').addEventListener('change', loadDeudores);
+
+  document.getElementById('btnExportDeudas').addEventListener('click', () => {
+    if (!allDeudas.length) return showToast('No hay datos para exportar', 'info');
+    const headers = ['Funcionario', 'CI', 'Motivo', 'Descripción', 'Fecha', 'Monto', 'Descontado', 'Saldo', 'Estado'];
+    const rows = allDeudas.map(d => [
+      d.funcionario?.name, d.funcionario?.cedula, d.motivo?.nombre, d.descripcion,
+      formatDate(d.fecha), d.montoOriginal, d.totalDescontado, d.saldo, d.estado
+    ]);
+    exportExcel(headers, rows, 'Deudas_Funcionarios.xlsx', 'Deudas');
+  });
+
+  loadDeudores();
+}
+
+// ============================================
+// Tab: Planilla del período
+// ============================================
+async function renderPlanilla() {
+  const area = document.getElementById('deudaContent');
+  area.innerHTML = `
+  <div class="fade-in" style="margin-top:1rem">
+    <div class="filters-bar">
+      <select class="form-control" id="planillaFrec" style="width:auto;min-width:160px">
+        <option value="SEMANAL">Semanal</option>
+        <option value="QUINCENAL">Quincenal</option>
+      </select>
+      <button class="btn btn-primary" id="btnGenPlanilla"><i data-lucide="refresh-cw"></i>Generar Planilla</button>
+      <button class="btn btn-secondary" id="btnExportPlanilla"><i data-lucide="download"></i>Excel</button>
+    </div>
+    <div id="planillaContent">
+      <div class="empty-state" style="padding:3rem"><i data-lucide="calendar-check"></i><h3>Seleccione la frecuencia</h3><p>Haga clic en "Generar Planilla" para ver los descuentos a aplicar.</p></div>
+    </div>
+  </div>`;
+  if (window.lucide) lucide.createIcons();
+
+  let planillaData = [];
+
+  async function loadPlanilla() {
+    const frecuencia = document.getElementById('planillaFrec').value;
+    const content = document.getElementById('planillaContent');
+
+    try {
+      planillaData = await api.get(`/deudas/planilla?frecuencia=${frecuencia}`);
+
+      if (!planillaData.length) {
+        content.innerHTML = `<div class="empty-state" style="padding:3rem"><i data-lucide="check-circle"></i><h3>Sin descuentos pendientes</h3><p>No hay descuentos ${frecuencia === 'SEMANAL' ? 'semanales' : 'quincenales'} programados para este período.</p></div>`;
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
+
+      const totalGeneral = planillaData.reduce((s, f) => s + f.totalDescuento, 0);
+
+      content.innerHTML = `
+        <div class="deuda-totals-bar" style="margin-bottom:1rem">
+          <div class="deuda-stat"><span>Funcionarios</span><strong>${planillaData.length}</strong></div>
+          <div class="deuda-stat"><span>Total a descontar</span><strong style="color:var(--danger)">${fmtGs(totalGeneral)}</strong></div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Funcionario</th>
+                <th>CI</th>
+                <th>Deudas</th>
+                <th style="text-align:right">Monto a Descontar</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${planillaData.map(f => `
+              <tr>
+                <td>
+                  <a href="javascript:void(0)" class="deuda-func-link" data-func="${f.funcionario.id}" style="color:var(--text);font-weight:600">${escapeHTML(f.funcionario.name)}</a>
+                </td>
+                <td>${escapeHTML(f.funcionario.cedula)}</td>
+                <td>
+                  ${f.deudas.map(d => `
+                    <div style="font-size:.82rem;color:var(--text-secondary);margin:1px 0">
+                      ${escapeHTML(d.motivo)} - ${escapeHTML(d.descripcion)}: <strong>${fmtGs(d.montoDescuento)}</strong>
+                      <span style="color:var(--text-muted)">(saldo: ${fmtGs(d.saldo)})</span>
+                    </div>`).join('')}
+                </td>
+                <td style="text-align:right;font-weight:700;font-size:1rem">${fmtGs(f.totalDescuento)}</td>
+              </tr>`).join('')}
+            </tbody>
+            <tfoot>
+              <tr style="font-weight:700;font-size:1rem">
+                <td colspan="3" style="text-align:right;padding-right:1rem">TOTAL</td>
+                <td style="text-align:right">${fmtGs(totalGeneral)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>`;
+      if (window.lucide) lucide.createIcons();
+
+      content.querySelectorAll('.deuda-func-link').forEach(el => {
+        el.addEventListener('click', () => navigate(`deudas/funcionario/${el.dataset.func}`));
+      });
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state"><p>Error al generar planilla</p></div>`;
+    }
+  }
+
+  document.getElementById('btnGenPlanilla').addEventListener('click', loadPlanilla);
+  document.getElementById('btnExportPlanilla').addEventListener('click', () => {
+    if (!planillaData.length) return showToast('No hay datos', 'info');
+    const headers = ['Funcionario', 'CI', 'Deudas', 'Monto a Descontar'];
+    const rows = planillaData.map(f => [
+      f.funcionario.name, f.funcionario.cedula,
+      f.deudas.map(d => `${d.motivo}: ${d.descripcion}`).join('; '),
+      f.totalDescuento
+    ]);
+    exportExcel(headers, rows, 'Planilla_Descuentos.xlsx', 'Planilla');
+  });
+
+  loadPlanilla();
+}
+
+// ============================================
+// Ficha del funcionario (vista detallada)
+// ============================================
+async function renderFichaFuncionario(funcId) {
+  const container = document.getElementById('module-content');
+  container.innerHTML = `<div class="fade-in" style="padding:1rem"><div class="empty-state"><i data-lucide="loader" class="spin"></i><p>Cargando ficha...</p></div></div>`;
+  if (window.lucide) lucide.createIcons();
+
+  try {
+    const data = await api.get(`/deudas/funcionario/${funcId}`);
+    const { funcionario, deudas, totalDeuda, totalDescontado, saldoTotal } = data;
+
+    container.innerHTML = `
+    <div class="fade-in">
+      <div style="display:flex;align-items:center;gap:.75rem;margin-bottom:1.25rem;flex-wrap:wrap">
+        <button class="btn btn-ghost" id="btnVolverDeudas"><i data-lucide="arrow-left"></i>Volver</button>
+        <div style="flex:1">
+          <h3 style="margin:0">${escapeHTML(funcionario.name)}</h3>
+          <span style="color:var(--text-muted);font-size:.85rem">CI: ${escapeHTML(funcionario.cedula)}${funcionario.department ? ` — ${escapeHTML(funcionario.department)}` : ''}</span>
+        </div>
+        <button class="btn btn-secondary" id="btnTarjeta"><i data-lucide="printer"></i>Tarjeta PDF</button>
+        <button class="btn btn-primary" id="btnNuevaDeudaFunc"><i data-lucide="plus"></i>Nueva Deuda</button>
+      </div>
+
+      <div class="deuda-totals-bar" style="margin-bottom:1.25rem">
+        <div class="deuda-stat"><span>Total deudas</span><strong>${fmtGs(totalDeuda)}</strong></div>
+        <div class="deuda-stat"><span>Total descontado</span><strong style="color:var(--success)">${fmtGs(totalDescontado)}</strong></div>
+        <div class="deuda-stat"><span>Saldo actual</span><strong style="color:${saldoTotal > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGs(saldoTotal)}</strong></div>
+      </div>
+
+      <div id="fichaDeudas">
+        ${deudas.length === 0 ? '<div class="empty-state" style="padding:2rem"><i data-lucide="check-circle"></i><h3>Sin deudas</h3><p>Este funcionario no tiene deudas registradas.</p></div>' :
+        deudas.map(d => renderDeudaCard(d, funcionario)).join('')}
+      </div>
+    </div>`;
+    if (window.lucide) lucide.createIcons();
+
+    // Event handlers
+    document.getElementById('btnVolverDeudas').addEventListener('click', () => {
+      navigate('deudas');
+    });
+
+    document.getElementById('btnNuevaDeudaFunc').addEventListener('click', () => {
+      currentTab = 'cargar';
+      navigate('deudas');
+      // Pre-fill after render
+      setTimeout(() => {
+        const funcIdInput = document.getElementById('deudaFuncId');
+        if (funcIdInput) {
+          funcIdInput.value = funcId;
+          const searchInput = document.getElementById('deudaFuncSearch');
+          if (searchInput) searchInput.style.display = 'none';
+          const selected = document.getElementById('deudaFuncSelected');
+          if (selected) {
+            selected.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between"><div><strong>${escapeHTML(funcionario.name)}</strong><span style="color:var(--text-muted);font-size:.82rem;margin-left:.5rem">CI: ${escapeHTML(funcionario.cedula)}</span></div></div>`;
+            selected.style.display = 'block';
+          }
+        }
+      }, 100);
+    });
+
+    document.getElementById('btnTarjeta').addEventListener('click', () => {
+      openTarjetaPDF(funcId);
+    });
+
+    // Botones dentro de cada card de deuda
+    setupDeudaCardEvents(funcId);
+
+  } catch (err) {
+    container.innerHTML = `<div class="empty-state"><i data-lucide="alert-circle"></i><h3>Error</h3><p>${escapeHTML(err.message || 'Error al cargar ficha')}</p><button class="btn btn-primary" id="btnVolverErr">Volver</button></div>`;
+    if (window.lucide) lucide.createIcons();
+    document.getElementById('btnVolverErr')?.addEventListener('click', () => navigate('deudas'));
+  }
+}
+
+function renderDeudaCard(deuda, funcionario) {
+  const saldo = deuda.saldo;
+  const descontado = deuda.totalDescontado;
+  const porcentaje = deuda.montoOriginal > 0 ? Math.round((descontado / deuda.montoOriginal) * 100) : 0;
+  const descuentosValidos = deuda.descuentos.filter(d => !d.anulado);
+
+  return `
+  <div class="card deuda-card" data-deuda-id="${deuda.id}" style="margin-bottom:1rem;padding:0;overflow:hidden">
+    <div class="deuda-card-header">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+          <strong style="font-size:.95rem">${escapeHTML(deuda.motivo?.nombre || '')}</strong>
+          <span style="color:var(--text-muted)">—</span>
+          <span>${escapeHTML(deuda.descripcion)}</span>
+          ${estadoBadge(deuda.estado)}
+        </div>
+        <div style="color:var(--text-muted);font-size:.82rem;margin-top:.25rem">
+          Fecha: ${formatDate(deuda.fecha)} &bull; Monto: <strong>${fmtGs(deuda.montoOriginal)}</strong>
+          ${deuda.planDescuento ? ` &bull; Plan: ${fmtGs(deuda.planDescuento.montoPorDescuento)} ${deuda.planDescuento.frecuencia.toLowerCase()}` : ''}
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:0 1rem">
+      <div class="deuda-progress-bar">
+        <div class="deuda-progress-fill" style="width:${Math.min(porcentaje, 100)}%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-muted);margin-top:.25rem;margin-bottom:.5rem">
+        <span>Descontado: ${fmtGs(descontado)} (${porcentaje}%)</span>
+        <span>Saldo: <strong style="color:${saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGs(saldo)}</strong></span>
+      </div>
+    </div>
+
+    ${deuda.descuentos.length > 0 ? `
+    <div class="deuda-descuentos-list">
+      <div style="padding:.5rem 1rem;font-size:.82rem;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border)">
+        Descuentos (${descuentosValidos.length}/${deuda.descuentos.length})
+      </div>
+      ${deuda.descuentos.map(desc => `
+      <div class="deuda-descuento-row${desc.anulado ? ' anulado' : ''}" data-desc-id="${desc.id}">
+        <div style="flex:1;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+          <span>${formatDate(desc.fecha)}</span>
+          <strong>${fmtGs(desc.monto)}</strong>
+          ${desc.nota ? `<span style="color:var(--text-muted);font-size:.8rem">${escapeHTML(desc.nota)}</span>` : ''}
+          ${desc.anulado ? `<span class="badge badge-danger" style="font-size:.7rem">ANULADO${desc.motivoAnulacion ? ': ' + escapeHTML(desc.motivoAnulacion) : ''}</span>` : ''}
+        </div>
+        ${!desc.anulado && deuda.estado !== 'ANULADA' ? `<button class="btn btn-ghost btn-sm btn-anular-desc" data-desc-id="${desc.id}" title="Anular descuento"><i data-lucide="x-circle"></i></button>` : ''}
+      </div>`).join('')}
+    </div>` : ''}
+
+    ${deuda.estado === 'ACTIVA' ? `
+    <div class="deuda-card-actions">
+      <button class="btn btn-primary btn-sm btn-reg-desc" data-deuda-id="${deuda.id}" data-saldo="${saldo}" data-plan-monto="${deuda.planDescuento?.montoPorDescuento || ''}">
+        <i data-lucide="minus-circle"></i>Registrar Descuento
+      </button>
+      <button class="btn btn-ghost btn-sm btn-edit-plan" data-deuda-id="${deuda.id}" data-monto="${deuda.montoOriginal}" data-saldo="${saldo}">
+        <i data-lucide="calendar-range"></i>${deuda.planDescuento ? 'Editar Plan' : 'Asignar Plan'}
+      </button>
+      <button class="btn btn-ghost btn-sm btn-tarjeta-deuda" data-deuda-id="${deuda.id}">
+        <i data-lucide="printer"></i>Tarjeta
+      </button>
+      <button class="btn btn-danger btn-sm btn-anular-deuda" data-deuda-id="${deuda.id}" style="margin-left:auto">
+        <i data-lucide="ban"></i>Anular Deuda
+      </button>
+    </div>` : ''}
+  </div>`;
+}
+
+function setupDeudaCardEvents(funcId) {
+  // Registrar descuento
+  document.querySelectorAll('.btn-reg-desc').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showRegistrarDescuentoModal(btn.dataset.deudaId, parseInt(btn.dataset.saldo), parseInt(btn.dataset.planMonto) || null, funcId);
+    });
+  });
+
+  // Anular descuento
+  document.querySelectorAll('.btn-anular-desc').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showAnularDescuentoModal(btn.dataset.descId, funcId);
+    });
+  });
+
+  // Anular deuda
+  document.querySelectorAll('.btn-anular-deuda').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showAnularDeudaModal(btn.dataset.deudaId, funcId);
+    });
+  });
+
+  // Editar plan
+  document.querySelectorAll('.btn-edit-plan').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showPlanModal(btn.dataset.deudaId, parseInt(btn.dataset.monto), parseInt(btn.dataset.saldo), funcId);
+    });
+  });
+
+  // Tarjeta individual
+  document.querySelectorAll('.btn-tarjeta-deuda').forEach(btn => {
+    btn.addEventListener('click', () => {
+      openTarjetaPDF(funcId, btn.dataset.deudaId);
+    });
+  });
+}
+
+// ============================================
+// Modales
+// ============================================
+
+function showRegistrarDescuentoModal(deudaId, saldo, planMonto, funcId) {
+  const defaultMonto = planMonto ? Math.min(planMonto, saldo) : '';
+  const overlay = createModal(
+    'Registrar Descuento',
+    `<div class="form-group">
+       <label>Monto a descontar (Gs.) *</label>
+       <input type="text" class="form-control" id="descMonto" value="${defaultMonto ? Number(defaultMonto).toLocaleString('es-PY') : ''}" placeholder="Monto" />
+       <small style="color:var(--text-muted)">Saldo disponible: ${fmtGs(saldo)}</small>
+     </div>
+     <div class="form-group">
+       <label>Fecha *</label>
+       <input type="date" class="form-control" id="descFecha" value="${todayStr()}" />
+     </div>
+     <div class="form-group">
+       <label>Nota (opcional)</label>
+       <input type="text" class="form-control" id="descNota" placeholder="Observación..." maxlength="200" />
+     </div>`,
+    `<button class="btn btn-secondary modal-close">Cancelar</button>
+     <button class="btn btn-primary" id="btnSaveDesc"><i data-lucide="save"></i>Registrar</button>`
+  );
+
+  // Formateo
+  const montoInput = document.getElementById('descMonto');
+  montoInput.addEventListener('input', () => {
+    const raw = montoInput.value.replace(/\D/g, '');
+    montoInput.value = raw ? Number(raw).toLocaleString('es-PY') : '';
+  });
+
+  document.getElementById('btnSaveDesc').addEventListener('click', async () => {
+    const monto = parseInt((montoInput.value || '').replace(/\D/g, '')) || 0;
+    const fecha = document.getElementById('descFecha').value;
+    const nota = document.getElementById('descNota').value.trim();
+
+    if (monto <= 0) return showToast('Ingrese un monto válido', 'error');
+    if (monto > saldo) return showToast(`El monto supera el saldo (${fmtGs(saldo)})`, 'error');
+    if (!fecha) return showToast('Ingrese la fecha', 'error');
+
+    try {
+      await api.post(`/deudas/${deudaId}/descuentos`, { fecha, monto, nota: nota || null });
+      showToast('Descuento registrado');
+      closeModal(overlay);
+      renderFichaFuncionario(funcId);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  });
+}
+
+function showAnularDescuentoModal(descId, funcId) {
+  const overlay = createModal(
+    'Anular Descuento',
+    `<p style="color:var(--text-secondary);margin-bottom:1rem">Esta acción no se puede deshacer. El monto del descuento se sumará al saldo pendiente de la deuda.</p>
+     <div class="form-group">
+       <label>Motivo de anulación *</label>
+       <textarea class="form-control" id="anulDescMotivo" rows="2" placeholder="Ingrese el motivo..." maxlength="300"></textarea>
+     </div>`,
+    `<button class="btn btn-secondary modal-close">Cancelar</button>
+     <button class="btn btn-danger" id="btnConfAnulDesc"><i data-lucide="x-circle"></i>Anular Descuento</button>`
+  );
+
+  document.getElementById('btnConfAnulDesc').addEventListener('click', async () => {
+    const motivo = document.getElementById('anulDescMotivo').value.trim();
+    if (!motivo) return showToast('Ingrese el motivo de anulación', 'error');
+    try {
+      await api.put(`/deudas/descuentos/${descId}/anular`, { motivoAnulacion: motivo });
+      showToast('Descuento anulado');
+      closeModal(overlay);
+      renderFichaFuncionario(funcId);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  });
+}
+
+function showAnularDeudaModal(deudaId, funcId) {
+  const overlay = createModal(
+    'Anular Deuda',
+    `<p style="color:var(--danger);font-weight:600;margin-bottom:1rem">⚠️ ¿Está seguro de que desea anular esta deuda?</p>
+     <p style="color:var(--text-secondary);margin-bottom:1rem;font-size:.9rem">La deuda y sus descuentos quedarán como referencia pero no se contabilizarán.</p>
+     <div class="form-group">
+       <label>Motivo de anulación *</label>
+       <textarea class="form-control" id="anulDeudaMotivo" rows="2" placeholder="Ingrese el motivo..." maxlength="300"></textarea>
+     </div>`,
+    `<button class="btn btn-secondary modal-close">Cancelar</button>
+     <button class="btn btn-danger" id="btnConfAnulDeuda"><i data-lucide="ban"></i>Anular Deuda</button>`
+  );
+
+  document.getElementById('btnConfAnulDeuda').addEventListener('click', async () => {
+    const motivo = document.getElementById('anulDeudaMotivo').value.trim();
+    if (!motivo) return showToast('Ingrese el motivo de anulación', 'error');
+    try {
+      await api.put(`/deudas/${deudaId}/anular`, { motivoAnulacion: motivo });
+      showToast('Deuda anulada');
+      closeModal(overlay);
+      renderFichaFuncionario(funcId);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  });
+}
+
+function showPlanModal(deudaId, montoOriginal, saldo, funcId) {
+  const overlay = createModal(
+    'Plan de Descuento',
+    `<div class="form-group">
+       <label>Monto por descuento (Gs.) *</label>
+       <input type="text" class="form-control" id="planModalMonto" placeholder="150.000" />
+     </div>
+     <div class="form-group">
+       <label>Frecuencia *</label>
+       <select class="form-control" id="planModalFrec">
+         <option value="SEMANAL">Semanal</option>
+         <option value="QUINCENAL">Quincenal</option>
+       </select>
+     </div>
+     <div class="form-group">
+       <label>Fecha de inicio *</label>
+       <input type="date" class="form-control" id="planModalFecha" value="${todayStr()}" />
+     </div>
+     <div id="planModalPreview" class="deuda-plan-preview" style="display:none"></div>`,
+    `<button class="btn btn-secondary modal-close">Cancelar</button>
+     <button class="btn btn-primary" id="btnSavePlan"><i data-lucide="save"></i>Guardar Plan</button>`
+  );
+
+  const montoInput = document.getElementById('planModalMonto');
+  montoInput.addEventListener('input', () => {
+    const raw = montoInput.value.replace(/\D/g, '');
+    montoInput.value = raw ? Number(raw).toLocaleString('es-PY') : '';
+    updatePlanPreview();
+  });
+
+  function updatePlanPreview() {
+    const montoPlan = parseInt((montoInput.value || '').replace(/\D/g, '')) || 0;
+    const frecuencia = document.getElementById('planModalFrec').value;
+    const fechaInicio = document.getElementById('planModalFecha').value;
+    const preview = document.getElementById('planModalPreview');
+
+    if (!montoPlan || !frecuencia || !fechaInicio || saldo <= 0) {
+      preview.style.display = 'none';
+      return;
+    }
+
+    const cuotas = Math.ceil(saldo / montoPlan);
+    const diasPorPeriodo = frecuencia === 'SEMANAL' ? 7 : 15;
+    const fechaFin = new Date(fechaInicio);
+    fechaFin.setDate(fechaFin.getDate() + (cuotas * diasPorPeriodo));
+
+    preview.innerHTML = `
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap">
+        <div><span style="color:var(--text-muted);font-size:.8rem">Saldo actual</span><br/><strong>${fmtGs(saldo)}</strong></div>
+        <div><span style="color:var(--text-muted);font-size:.8rem">Cuotas estimadas</span><br/><strong>${cuotas}</strong></div>
+        <div><span style="color:var(--text-muted);font-size:.8rem">Fecha est. cancelación</span><br/><strong>${fechaFin.toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit', year: 'numeric' })}</strong></div>
+      </div>`;
+    preview.style.display = 'block';
+  }
+
+  document.getElementById('planModalFrec').addEventListener('change', updatePlanPreview);
+  document.getElementById('planModalFecha').addEventListener('change', updatePlanPreview);
+
+  document.getElementById('btnSavePlan').addEventListener('click', async () => {
+    const montoPorDescuento = parseInt((montoInput.value || '').replace(/\D/g, '')) || 0;
+    const frecuencia = document.getElementById('planModalFrec').value;
+    const fechaInicio = document.getElementById('planModalFecha').value;
+
+    if (montoPorDescuento <= 0) return showToast('Ingrese un monto válido', 'error');
+    if (!fechaInicio) return showToast('Ingrese fecha de inicio', 'error');
+
+    try {
+      await api.put(`/deudas/${deudaId}/plan`, { montoPorDescuento, frecuencia, fechaInicio });
+      showToast('Plan guardado');
+      closeModal(overlay);
+      renderFichaFuncionario(funcId);
+    } catch (err) {
+      showToast(err.message || 'Error', 'error');
+    }
+  });
+}
+
+// ============================================
+// Tarjeta PDF
+// ============================================
+function openTarjetaPDF(funcId, deudaId = null) {
+  let url = `/api/deudas/tarjeta/${funcId}`;
+  if (deudaId) url += `?deudaId=${deudaId}`;
+
+  // Agregar token como query param para la petición directa
+  const user = JSON.parse(localStorage.getItem('comepos_session') || 'null');
+  if (user?.token) url += `${deudaId ? '&' : '?'}token=${user.token}`;
+
+  window.open(url, '_blank');
+}

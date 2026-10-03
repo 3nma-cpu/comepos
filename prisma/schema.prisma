@@ -67,6 +67,7 @@ model Client {
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
   sales Sale[]
+  deudas Deuda[]
 }
 
 enum ProductCategory {
@@ -252,4 +253,83 @@ model PagoProveedor {
   @@index([fechaPago])
   @@index([fechaCobro])
   @@map("pagos_proveedores")
+}
+
+// ============================================
+// Módulo: Deudas de Funcionarios
+// ============================================
+
+enum DeudaEstado {
+  ACTIVA
+  SALDADA
+  ANULADA
+}
+
+enum FrecuenciaDescuento {
+  SEMANAL
+  QUINCENAL
+}
+
+model MotivoDeuda {
+  id        String   @id @default(cuid())
+  nombre    String   @unique
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  deudas    Deuda[]
+
+  @@map("motivos_deuda")
+}
+
+model Deuda {
+  id             String      @id @default(cuid())
+  funcionarioId  String
+  motivoId       String
+  descripcion    String
+  fecha          DateTime    @db.Date
+  montoOriginal  Int
+  estado         DeudaEstado @default(ACTIVA)
+  motivoAnulacion String?
+  createdBy      String
+  createdAt      DateTime    @default(now())
+
+  funcionario    Client       @relation(fields: [funcionarioId], references: [id])
+  motivo         MotivoDeuda  @relation(fields: [motivoId], references: [id])
+  planDescuento  PlanDescuento?
+  descuentos     Descuento[]
+
+  @@index([funcionarioId])
+  @@index([fecha])
+  @@index([estado])
+  @@map("deudas")
+}
+
+model PlanDescuento {
+  id                 String              @id @default(cuid())
+  deudaId            String              @unique
+  montoPorDescuento  Int
+  frecuencia         FrecuenciaDescuento
+  fechaInicio        DateTime            @db.Date
+  activo             Boolean             @default(true)
+
+  deuda              Deuda               @relation(fields: [deudaId], references: [id])
+
+  @@map("planes_descuento")
+}
+
+model Descuento {
+  id               String   @id @default(cuid())
+  deudaId          String
+  fecha            DateTime @db.Date
+  monto            Int
+  nota             String?
+  anulado          Boolean  @default(false)
+  motivoAnulacion  String?
+  createdBy        String
+  createdAt        DateTime @default(now())
+
+  deuda            Deuda    @relation(fields: [deudaId], references: [id])
+
+  @@index([deudaId])
+  @@index([fecha])
+  @@map("descuentos")
 }

@@ -9,7 +9,10 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:seed": "node src/seed.js",
-    "db:studio": "prisma studio"
+    "db:seed-motivos": "node src/seed-motivos-deuda.js",
+    "db:add-deudas-perm": "node src/migrate-add-deudas-permission.js",
+    "db:studio": "prisma studio",
+    "test:deudas": "node src/tests/deudas.test.js"
   },
   "dependencies": {
     "@prisma/client": "5.10.0",
