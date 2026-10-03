@@ -1083,6 +1083,8 @@ async function renderFichaFuncionario(funcId) {
   try {
     const data = await api.get(`/deudas/funcionario/${funcId}`);
     const { funcionario, deudas, totalBruto, totalUtilidad, totalDeuda, totalDescontado, saldoTotal } = data;
+    // Excluir deudas anuladas de la vista de la ficha
+    const deudasValidas = (deudas || []).filter(d => d.estado !== 'ANULADA');
 
     container.innerHTML = `
     <div class="fade-in">
@@ -1108,8 +1110,8 @@ async function renderFichaFuncionario(funcId) {
       </div>
 
       <div id="fichaDeudas">
-        ${deudas.length === 0 ? '<div class="empty-state" style="padding:2rem"><i data-lucide="check-circle"></i><h3>Sin préstamos / deudas</h3><p>Este funcionario no tiene deudas registradas.</p></div>' :
-        deudas.map(d => renderDeudaCard(d, funcionario)).join('')}
+        ${deudasValidas.length === 0 ? '<div class="empty-state" style="padding:2rem"><i data-lucide="check-circle"></i><h3>Sin préstamos / deudas</h3><p>Este funcionario no tiene deudas activas o pagadas.</p></div>' :
+        deudasValidas.map(d => renderDeudaCard(d, funcionario)).join('')}
       </div>
     </div>`;
     if (window.lucide) lucide.createIcons();
@@ -1208,21 +1210,22 @@ function renderDeudaCard(deuda, funcionario) {
       </div>`).join('')}
     </div>` : ''}
 
-    ${deuda.estado === 'ACTIVA' ? `
     <div class="deuda-card-actions">
+      ${deuda.estado === 'ACTIVA' ? `
       <button class="btn btn-primary btn-sm btn-reg-desc" data-deuda-id="${deuda.id}" data-saldo="${saldo}" data-plan-monto="${deuda.planDescuento?.montoPorDescuento || ''}">
         <i data-lucide="minus-circle"></i>Registrar Descuento
       </button>
       <button class="btn btn-ghost btn-sm btn-edit-plan" data-deuda-id="${deuda.id}" data-monto="${deuda.montoOriginal}" data-saldo="${saldo}">
         <i data-lucide="calendar-range"></i>${deuda.planDescuento ? 'Editar Plan' : 'Asignar Plan'}
-      </button>
+      </button>` : ''}
       <button class="btn btn-ghost btn-sm btn-tarjeta-deuda" data-deuda-id="${deuda.id}">
         <i data-lucide="printer"></i>Tarjeta
       </button>
+      ${deuda.estado === 'ACTIVA' ? `
       <button class="btn btn-danger btn-sm btn-anular-deuda" data-deuda-id="${deuda.id}" style="margin-left:auto">
         <i data-lucide="ban"></i>Anular Deuda
-      </button>
-    </div>` : ''}
+      </button>` : ''}
+    </div>
   </div>`;
 }
 
@@ -1345,7 +1348,7 @@ function showAnularDeudaModal(deudaId, funcId) {
   const overlay = createModal(
     'Anular Deuda',
     `<p style="color:var(--danger);font-weight:600;margin-bottom:1rem">⚠️ ¿Está seguro de que desea anular esta deuda?</p>
-     <p style="color:var(--text-secondary);margin-bottom:1rem;font-size:.9rem">La deuda y sus descuentos quedarán como referencia pero no se contabilizarán.</p>
+     <p style="color:var(--text-secondary);margin-bottom:1rem;font-size:.9rem">La deuda será anulada y ya no aparecerá en la ficha del cliente.</p>
      <div class="form-group">
        <label>Motivo de anulación *</label>
        <textarea class="form-control" id="anulDeudaMotivo" rows="2" placeholder="Ingrese el motivo..." maxlength="300"></textarea>

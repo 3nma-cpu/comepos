@@ -217,8 +217,12 @@ router.get('/funcionario/:id', async (req, res) => {
     const funcionario = await prisma.client.findUnique({ where: { id: req.params.id } });
     if (!funcionario) return res.status(404).json({ error: 'Funcionario no encontrado' });
 
+    // Excluir deudas anuladas para que no aparezcan al consultar un cliente
     const deudas = await prisma.deuda.findMany({
-      where: { funcionarioId: req.params.id },
+      where: {
+        funcionarioId: req.params.id,
+        estado: { not: 'ANULADA' }
+      },
       include: {
         motivo: true,
         planDescuento: true,
@@ -233,12 +237,13 @@ router.get('/funcionario/:id', async (req, res) => {
       const porcentajeInteres = d.porcentajeInteres ?? 0;
       const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
       const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      const saldo = d.estado === 'SALDADA' ? 0 : Math.max(0, calcSaldo(d));
       return {
         ...d,
         montoBruto,
         porcentajeInteres,
         montoInteres,
-        saldo: calcSaldo(d),
+        saldo,
         totalDescontado
       };
     });
@@ -250,7 +255,8 @@ router.get('/funcionario/:id', async (req, res) => {
       totalUtilidad: deudasConSaldo.reduce((s, d) => s + d.montoInteres, 0),
       totalDeuda: deudasConSaldo.reduce((s, d) => s + d.montoOriginal, 0),
       totalDescontado: deudasConSaldo.reduce((s, d) => s + d.totalDescontado, 0),
-      saldoTotal: deudasConSaldo.reduce((s, d) => s + (d.estado !== 'ANULADA' ? d.saldo : 0), 0)
+      // Solo las deudas activas suman a la deuda actual pendiente (las pagadas no suman)
+      saldoTotal: deudasConSaldo.filter(d => d.estado === 'ACTIVA').reduce((s, d) => s + d.saldo, 0)
     });
   } catch (err) {
     console.error('Error deudas funcionario:', err);
@@ -619,7 +625,13 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
     if (!funcionario) return res.status(404).json({ error: 'Funcionario no encontrado' });
 
     const where = { funcionarioId: req.params.funcionarioId };
-    if (deudaId) where.id = deudaId;
+    if (deudaId) {
+      where.id = deudaId;
+      where.estado = { not: 'ANULADA' };
+    } else {
+      // Tarjeta general de todas las deudas: solo se extrae lo activo (sin pagadas ni anuladas)
+      where.estado = 'ACTIVA';
+    }
 
     const deudas = await prisma.deuda.findMany({
       where,
@@ -635,12 +647,13 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
       const porcentajeInteres = d.porcentajeInteres ?? 0;
       const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
       const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      const saldo = d.estado === 'SALDADA' ? 0 : Math.max(0, calcSaldo(d));
       return {
         ...d,
         montoBruto,
         porcentajeInteres,
         montoInteres,
-        saldo: calcSaldo(d),
+        saldo,
         totalDescontado
       };
     });
@@ -649,14 +662,18 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
     const totalUtilidad = deudasConSaldo.reduce((s, d) => s + d.montoInteres, 0);
     const totalDeuda = deudasConSaldo.reduce((s, d) => s + d.montoOriginal, 0);
     const totalDescontado = deudasConSaldo.reduce((s, d) => s + d.totalDescontado, 0);
-    const saldoTotal = deudasConSaldo.filter(d => d.estado !== 'ANULADA').reduce((s, d) => s + d.saldo, 0);
+    const saldoTotal = deudasConSaldo.filter(d => d.estado === 'ACTIVA').reduce((s, d) => s + d.saldo, 0);
+
+    const isSingle = Boolean(deudaId);
+    const pageTitle = isSingle ? `Detalle de Deuda - ${funcionario.name}` : `Tarjeta de Deudas Activas - ${funcionario.name}`;
+    const mainTitle = isSingle ? 'DETALLE DE PRÉSTAMO / DEUDA' : 'TARJETA DE DEUDAS ACTIVAS';
 
     // Generar HTML para impresión / PDF
     const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Tarjeta de Deudas - ${funcionario.name}</title>
+  <title>${pageTitle}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1a1a1a; padding: 20mm; line-height: 1.5; }
@@ -685,7 +702,7 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
 </head>
 <body>
   <div class="header">
-    <h1>TARJETA DE DEUDAS / PRÉSTAMOS</h1>
+    <h1>${mainTitle}</h1>
     <p>Comedor TTA S.A.</p>
   </div>
   <div class="funcionario-info">
@@ -695,10 +712,14 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
     </div>
     <span class="cat-badge">${funcionario.category || 'GENERAL'}</span>
   </div>
-  ${deudasConSaldo.map((d, i) => `
+  ${deudasConSaldo.length === 0 ? `
+  <div style="padding:28px;text-align:center;background:#f9f9f9;border:1px dashed #ccc;border-radius:4px;margin-bottom:20px">
+    <p style="color:#666;font-size:11pt">No registra préstamos / deudas activas pendientes.</p>
+  </div>` :
+  deudasConSaldo.map((d, i) => `
   <div class="deuda-block">
     <div class="deuda-header">
-      <span>Deuda ${i + 1}: ${d.motivo.nombre} - ${d.descripcion} (${formatFecha(d.fecha)})</span>
+      <span>${isSingle ? 'Préstamo' : `Deuda ${i + 1}`}: ${d.motivo.nombre} - ${d.descripcion} (${formatFecha(d.fecha)})</span>
       <span class="estado estado-${d.estado}">${d.estado}</span>
     </div>
     <div class="deuda-sub">
