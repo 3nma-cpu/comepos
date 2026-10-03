@@ -130,7 +130,7 @@ router.post('/', async (req, res) => {
       descripcion: descripcion.trim(),
       fecha: new Date(fecha),
       montoOriginal,
-      createdBy: req.user.userId
+      createdBy: req.user?.id || req.user?.userId || 'sistema'
     };
 
     // Crear deuda con plan (si se proporcionó)
@@ -256,7 +256,7 @@ router.post('/:id/descuentos', async (req, res) => {
           fecha: new Date(fecha),
           monto,
           nota: nota?.trim() || null,
-          createdBy: req.user.userId
+          createdBy: req.user?.id || req.user?.userId || 'sistema'
         }
       });
 
