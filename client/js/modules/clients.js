@@ -71,7 +71,7 @@ function renderTable(clients, allClients) {
       </td>
       <td>
         <button class="btn btn-ghost btn-sm btn-icon" data-history="${c.id}" title="Historial"><i data-lucide="history"></i></button>
-        ${c.pinActive ? `<button class="btn btn-ghost btn-sm btn-icon" data-reset-pin="${c.id}" title="Resetear PIN de Portal" style="color:var(--warning, #f59e0b)"><i data-lucide="key-round"></i></button>` : ''}
+        ${c.pinActive ? `<button class="btn btn-ghost btn-sm btn-icon" data-reset-pin="${c.id}" title="Resetear PIN de Portal" style="color:var(--text-secondary)"><i data-lucide="key-round"></i></button>` : ''}
         <button class="btn btn-ghost btn-sm btn-icon" data-edit="${c.id}" title="Editar"><i data-lucide="pencil"></i></button>
         <button class="btn btn-ghost btn-sm btn-icon" data-delete="${c.id}" title="Eliminar"><i data-lucide="trash-2"></i></button>
       </td>
@@ -259,7 +259,7 @@ async function showClientHistory(clientId, allClients) {
               <tbody>${sales.map(s => {
                 const isCancelled = s.status === 'CANCELLED';
                 return `
-                <tr id="ch-row-${s.id}" style="${isCancelled ? 'opacity:0.75;background:rgba(239,68,68,0.04)' : ''}">
+                <tr id="ch-row-${s.id}" style="${isCancelled ? 'opacity:0.75;background:var(--bg-secondary)' : ''}">
                   <td style="font-size:.8rem">${formatDateTime(s.date)}</td>
                   <td style="font-size:.8rem">${s.items.map(i => escapeHTML(i.name)).join(', ')}</td>
                   <td>

@@ -63,9 +63,23 @@ function executeRoute(rawPath) {
         return;
     }
 
-    // Update active nav
+    // Update active nav and sync accordion
     document.querySelectorAll('.nav-item').forEach(el => {
-        el.classList.toggle('active', el.dataset.route === path);
+        const isActive = el.dataset.route === path;
+        el.classList.toggle('active', isActive);
+        if (isActive) {
+            const parentSection = el.closest('.nav-section');
+            if (parentSection) {
+                document.querySelectorAll('.nav-section').forEach(s => {
+                    if (s !== parentSection) {
+                        s.classList.remove('open');
+                        s.querySelector('.nav-section-header')?.setAttribute('aria-expanded', 'false');
+                    }
+                });
+                parentSection.classList.add('open');
+                parentSection.querySelector('.nav-section-header')?.setAttribute('aria-expanded', 'true');
+            }
+        }
     });
 }
 

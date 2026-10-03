@@ -1096,15 +1096,15 @@ async function reportCancelledSales(area) {
         if (kpisEl) {
             kpisEl.innerHTML = `
             <div class="kpi-card">
-              <div class="kpi-icon red" style="background:rgba(239,68,68,0.15);color:var(--danger)"><i data-lucide="ban"></i></div>
+              <div class="kpi-icon"><i data-lucide="ban"></i></div>
               <div class="kpi-content"><div class="kpi-label">Ventas Anuladas</div><div class="kpi-value">${filtered.length}</div></div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-icon yellow" style="background:rgba(245,158,11,0.15);color:var(--warning)"><i data-lucide="alert-triangle"></i></div>
+              <div class="kpi-icon"><i data-lucide="alert-triangle"></i></div>
               <div class="kpi-content"><div class="kpi-label">Monto Total Anulado</div><div class="kpi-value">${formatCurrency(totalAmount)}</div></div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-icon blue" style="background:rgba(59,130,246,0.15);color:#3b82f6"><i data-lucide="package"></i></div>
+              <div class="kpi-icon"><i data-lucide="package"></i></div>
               <div class="kpi-content"><div class="kpi-label">Unidades Reintegradas al Stock</div><div class="kpi-value">${totalUnitsReturned}</div></div>
             </div>`;
             if (window.lucide) lucide.createIcons();
@@ -1137,7 +1137,7 @@ async function reportCancelledSales(area) {
             ${filtered.map(s => {
                 const ticketId = (s.id || '').slice(-6).toUpperCase();
                 return `
-                <tr style="background:rgba(239,68,68,0.03)">
+                <tr style="background:var(--bg-secondary)">
                   <td style="font-size:.82rem">${formatDateTime(s.date)}</td>
                   <td style="font-size:.82rem;font-weight:600;color:var(--danger)">${formatDateTime(s.cancelledAt)}</td>
                   <td><code>${ticketId}</code></td>
@@ -1402,13 +1402,13 @@ async function reportLoansPeriod(area) {
                         {
                             label: 'Capital Bruto (Gs.)',
                             data: brutoData,
-                            backgroundColor: '#3b82f6',
+                            backgroundColor: 'rgba(255, 255, 255, 0.85)',
                             borderRadius: 4
                         },
                         {
                             label: 'Utilidad Ganada (Gs.)',
                             data: utilidadData,
-                            backgroundColor: '#10b981',
+                            backgroundColor: 'rgba(255, 255, 255, 0.35)',
                             borderRadius: 4
                         }
                     ]

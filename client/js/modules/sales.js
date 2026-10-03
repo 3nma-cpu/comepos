@@ -405,8 +405,8 @@ function processSale() {
 export function promptCancellationReason(saleTotal, onConfirm) {
   const body = `
     <div style="padding:0.25rem 0">
-      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.75rem 0.9rem;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-radius:var(--radius);margin-bottom:1rem">
-        <i data-lucide="alert-triangle" style="width:22px;height:22px;color:var(--danger);flex-shrink:0"></i>
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.75rem 0.9rem;background:var(--bg-card-hover);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:1rem">
+        <i data-lucide="alert-triangle" style="width:22px;height:22px;color:var(--text);flex-shrink:0"></i>
         <div style="font-size:0.85rem;color:var(--text);line-height:1.35">
           Se anulará la venta por <strong>${formatCurrency(saleTotal)}</strong>.<br/>
           <span style="font-size:0.78rem;color:var(--text-secondary)">Todos los productos volverán al stock automáticamente.</span>

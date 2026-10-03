@@ -21,12 +21,12 @@ import { escapeHTML } from './utils.js';
 // Navigation items
 const NAV_ITEMS = [
     {
-        section: 'Principal', items: [
+        section: 'Principal', icon: 'layout-grid', items: [
             { route: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard', perm: 'dashboard' }
         ]
     },
     {
-        section: 'Gestión', items: [
+        section: 'Gestión', icon: 'folder-cog', items: [
             { route: 'users', label: 'Usuarios', icon: 'users', perm: 'users' },
             { route: 'roles', label: 'Roles', icon: 'shield', perm: 'roles' },
             { route: 'clients', label: 'Clientes', icon: 'contact', perm: 'clients' },
@@ -34,19 +34,19 @@ const NAV_ITEMS = [
         ]
     },
     {
-        section: 'Operaciones', items: [
+        section: 'Operaciones', icon: 'activity', items: [
             { route: 'purchases', label: 'Compras', icon: 'package', perm: 'purchases' },
             { route: 'cashregister', label: 'Caja', icon: 'landmark', perm: 'cashregister' },
             { route: 'sales', label: 'Punto de Venta', icon: 'shopping-cart', perm: 'sales' }
         ]
     },
     {
-        section: 'Análisis', items: [
+        section: 'Análisis', icon: 'bar-chart-2', items: [
             { route: 'reports', label: 'Reportes', icon: 'bar-chart-3', perm: 'reports' }
         ]
     },
     {
-        section: 'Finanzas', items: [
+        section: 'Finanzas', icon: 'wallet-cards', items: [
             { route: 'pagos-proveedores', label: 'Pagos a Proveedores', icon: 'receipt', perm: 'supplier-payments' },
             { route: 'deudas', label: 'Deudas Funcionarios', icon: 'wallet', perm: 'deudas' }
         ]
@@ -124,8 +124,8 @@ function showInactivityWarning() {
     inactivityWarningEl.innerHTML = `
       <div style="
         position:fixed; bottom:1.5rem; right:1.5rem; z-index:9999;
-        background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(239,68,68,.1));
-        border:1px solid rgba(245,158,11,.4);
+        background:var(--bg-card);
+        border:1px solid var(--border);
         backdrop-filter:blur(16px);
         border-radius:12px; padding:1rem 1.25rem;
         display:flex; align-items:center; gap:.75rem;
@@ -133,16 +133,12 @@ function showInactivityWarning() {
         animation:slide-up .3s ease;
         max-width:340px;
       ">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         <div style="flex:1">
-          <div style="font-weight:600;font-size:.88rem;color:#f59e0b">Sesión por expirar</div>
-          <div style="font-size:.78rem;color:#94a3b8;margin-top:.1rem">Su sesión se cerrará en 1 minuto por inactividad.</div>
+          <div style="font-weight:600;font-size:.88rem;color:var(--text)">Sesión por expirar</div>
+          <div style="font-size:.78rem;color:var(--text-secondary);margin-top:.1rem">Su sesión se cerrará en 1 minuto por inactividad.</div>
         </div>
-        <button id="btnKeepAlive" style="
-          background:rgba(245,158,11,.2); border:1px solid rgba(245,158,11,.3);
-          color:#f59e0b; border-radius:8px; padding:.35rem .7rem;
-          font-size:.78rem; font-weight:600; cursor:pointer; white-space:nowrap;
-        ">Mantener</button>
+        <button id="btnKeepAlive" class="btn btn-secondary btn-sm" style="white-space:nowrap">Mantener</button>
       </div>`;
     document.body.appendChild(inactivityWarningEl);
     document.getElementById('btnKeepAlive')?.addEventListener('click', () => {
@@ -161,8 +157,8 @@ function showSessionExpiredScreen(reason) {
     app.innerHTML = `
       <div class="login-screen">
         <div class="login-card slide-up" style="text-align:center">
-          <div style="width:64px;height:64px;border-radius:50%;background:rgba(239,68,68,.15);display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <div style="width:64px;height:64px;border-radius:50%;background:var(--bg-card-hover);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto 1.25rem">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
           </div>
           <h2 style="font-size:1.4rem;font-weight:700;margin-bottom:.5rem">Sesión cerrada</h2>
           <p style="color:var(--text-secondary);font-size:.9rem;margin-bottom:1.5rem">Su sesión fue cerrada por ${reason}. Por favor inicie sesión nuevamente.</p>
@@ -210,7 +206,7 @@ function confirmLogout() {
       <div class="modal" style="max-width:400px">
         <div class="modal-header">
           <h3 style="display:flex;align-items:center;gap:.5rem">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Cerrar Sesión
           </h3>
         </div>
@@ -220,7 +216,7 @@ function confirmLogout() {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" id="btnCancelLogout">Cancelar</button>
-          <button class="btn btn-danger" id="btnConfirmLogout">
+          <button class="btn btn-primary" id="btnConfirmLogout">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             Cerrar Sesión
           </button>
@@ -341,17 +337,34 @@ function renderApp(user, defaultRoute = null) {
       <aside class="sidebar" id="mainSidebar">
         <div class="sidebar-header">
           <span class="logo-text">Comedor TTA S.A.</span>
+          <button class="btn-desktop-sidebar-close" id="btnSidebarClose" title="Cerrar barra lateral">
+            <svg class="icon-sidebar-toggle" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="18" height="18" rx="3.5" stroke="currentColor" stroke-width="2"/>
+              <rect x="5.5" y="5.5" width="5" height="13" rx="1.5" fill="currentColor"/>
+            </svg>
+          </button>
         </div>
-        <nav class="sidebar-nav">
-          ${visibleNav.map(section => `
-            <div class="nav-section">
-              <div class="nav-section-title">${section.section}</div>
-              ${section.items.map(item => `
-                <div class="nav-item" data-route="${item.route}">
-                  <i data-lucide="${item.icon}"></i>
-                  <span>${item.label}</span>
-                </div>`).join('')}
-            </div>`).join('')}
+        <nav class="sidebar-nav" id="sidebarNavAccordion">
+          ${visibleNav.map((section, idx) => {
+            const isInitialOpen = section.items.some(it => it.route === userDefaultRoute);
+            return `
+            <div class="nav-section ${isInitialOpen ? 'open' : ''}" data-section="${escapeHTML(section.section)}">
+              <button class="nav-section-header" type="button" aria-expanded="${isInitialOpen ? 'true' : 'false'}">
+                <div class="nav-section-header-left">
+                  <i data-lucide="${section.icon || 'folder'}" class="nav-section-icon"></i>
+                  <span class="nav-section-label">${escapeHTML(section.section)}</span>
+                </div>
+                <i data-lucide="chevron-right" class="nav-section-chevron"></i>
+              </button>
+              <div class="nav-section-items">
+                ${section.items.map(item => `
+                  <div class="nav-item ${item.route === userDefaultRoute ? 'active' : ''}" data-route="${item.route}">
+                    <i data-lucide="${item.icon}"></i>
+                    <span>${escapeHTML(item.label)}</span>
+                  </div>`).join('')}
+              </div>
+            </div>`;
+          }).join('')}
         </nav>
         <div class="sidebar-footer">
           <div class="sidebar-user">
@@ -370,9 +383,15 @@ function renderApp(user, defaultRoute = null) {
       </aside>
       <main class="main-content">
         <header class="content-header">
-          <div style="display:flex;align-items:center;gap:0.5rem">
+          <div style="display:flex;align-items:center;gap:0.35rem">
             <button class="btn-menu-toggle" id="btnMenuToggle">
               <i data-lucide="menu"></i>
+            </button>
+            <button class="btn-desktop-sidebar-toggle" id="btnDesktopSidebarToggle" title="Cerrar / abrir barra lateral">
+              <svg class="icon-sidebar-toggle" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="3" y="3" width="18" height="18" rx="3.5" stroke="currentColor" stroke-width="2"/>
+                <rect x="5.5" y="5.5" width="5" height="13" rx="1.5" fill="currentColor"/>
+              </svg>
             </button>
             <h2 id="pageTitle">Dashboard</h2>
           </div>
@@ -387,6 +406,24 @@ function renderApp(user, defaultRoute = null) {
       </main>
     </div>`;
 
+    if (window.lucide) lucide.createIcons();
+
+    // Desktop Sidebar Toggle
+    const layoutEl = document.querySelector('.app-layout');
+    const isSidebarCollapsedSaved = localStorage.getItem('comepos_sidebar_collapsed') === 'true';
+    if (isSidebarCollapsedSaved && window.innerWidth > 768 && layoutEl) {
+        layoutEl.classList.add('sidebar-collapsed');
+    }
+
+    function toggleDesktopSidebar() {
+        if (!layoutEl) return;
+        const isCollapsed = layoutEl.classList.toggle('sidebar-collapsed');
+        localStorage.setItem('comepos_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    }
+
+    document.getElementById('btnDesktopSidebarToggle')?.addEventListener('click', toggleDesktopSidebar);
+    document.getElementById('btnSidebarClose')?.addEventListener('click', toggleDesktopSidebar);
+
     // Sidebar Mobile Toggle
     const sidebar = document.getElementById('mainSidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -399,6 +436,25 @@ function renderApp(user, defaultRoute = null) {
 
     btnMenu.addEventListener('click', toggleMobileSidebar);
     overlay.addEventListener('click', toggleMobileSidebar);
+
+    // Accordion: strictly 1 section open at a time
+    const allSections = document.querySelectorAll('.nav-section');
+    allSections.forEach(section => {
+        const header = section.querySelector('.nav-section-header');
+        if (!header) return;
+        header.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isAlreadyOpen = section.classList.contains('open');
+            allSections.forEach(s => {
+                s.classList.remove('open');
+                s.querySelector('.nav-section-header')?.setAttribute('aria-expanded', 'false');
+            });
+            if (!isAlreadyOpen) {
+                section.classList.add('open');
+                header.setAttribute('aria-expanded', 'true');
+            }
+        });
+    });
 
     // Theme toggle
     document.getElementById('btnThemeToggle').addEventListener('click', toggleTheme);
@@ -451,9 +507,20 @@ function renderApp(user, defaultRoute = null) {
         confirmLogout();
     });
 
-    // Nav clicks
+    // Nav clicks: keep parent section open and close others
     document.querySelectorAll('.nav-item').forEach(item => {
         item.addEventListener('click', () => {
+            const parentSection = item.closest('.nav-section');
+            if (parentSection) {
+                allSections.forEach(s => {
+                    if (s !== parentSection) {
+                        s.classList.remove('open');
+                        s.querySelector('.nav-section-header')?.setAttribute('aria-expanded', 'false');
+                    }
+                });
+                parentSection.classList.add('open');
+                parentSection.querySelector('.nav-section-header')?.setAttribute('aria-expanded', 'true');
+            }
             navigate(item.dataset.route);
             if (window.innerWidth <= 768) {
                 toggleMobileSidebar();

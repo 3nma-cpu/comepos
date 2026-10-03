@@ -284,8 +284,8 @@ function confirmReopenRegister(registerId, parentOverlay = null) {
 function openOpenModal() {
     const body = `
     <div style="text-align:center;margin-bottom:1.5rem">
-        <div style="width:56px;height:56px;border-radius:50%;background:rgba(34,197,94,.12);display:flex;align-items:center;justify-content:center;margin:0 auto .75rem">
-            <i data-lucide="lock-open" style="width:28px;height:28px;color:var(--success)"></i>
+        <div style="width:56px;height:56px;border-radius:50%;background:var(--bg-card-hover);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;margin:0 auto .75rem">
+            <i data-lucide="lock-open" style="width:28px;height:28px;color:var(--text)"></i>
         </div>
         <p style="color:var(--text-secondary);font-size:.9rem">Se abrirá una nueva sesión de caja vinculada a su usuario.</p>
     </div>
@@ -668,7 +668,7 @@ async function printRegisterReport(registerId) {
     ${d.finalAmount !== null ? `
     <div class="info-row"><span>Efectivo Esperado:</span><span>${formatCurrency(expectedCash)}</span></div>
     <div class="info-row"><span>Efectivo Contado:</span><span class="bold">${formatCurrency(d.finalAmount)}</span></div>
-    <div class="info-row" style="font-size:11pt"><span class="bold">Diferencia:</span><span class="bold" style="color:${diff === 0 ? '#22c55e' : diff > 0 ? '#f59e0b' : '#ef4444'}">${diff >= 0 ? '+' : ''}${formatCurrency(diff)}</span></div>
+    <div class="info-row" style="font-size:11pt"><span class="bold">Diferencia:</span><span class="bold" style="color:var(--text)">${diff >= 0 ? '+' : ''}${formatCurrency(diff)}</span></div>
     <div class="divider"></div>` : ''}
 
     ${d.closingNotes ? `<div style="margin:4px 0;font-size:8pt"><strong>Notas:</strong> ${escapeHTML(d.closingNotes)}</div><div class="divider"></div>` : ''}
