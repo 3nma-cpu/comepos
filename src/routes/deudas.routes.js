@@ -668,83 +668,235 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
     const pageTitle = isSingle ? `Detalle de Deuda - ${funcionario.name}` : `Tarjeta de Deudas Activas - ${funcionario.name}`;
     const mainTitle = isSingle ? 'DETALLE DE PRÉSTAMO / DEUDA' : 'TARJETA DE DEUDAS ACTIVAS';
 
-    // Generar HTML para impresión / PDF
+    // Fecha con zona horaria de Paraguay (America/Asuncion)
+    const fechaGeneracion = new Date().toLocaleString('es-PY', {
+      timeZone: 'America/Asuncion',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+
+    // Generar HTML para impresión / PDF (formato vertical 8.5x13 pulgadas - Folio / Oficio)
     const html = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
   <title>${pageTitle}</title>
   <style>
+    @page {
+      size: 8.5in 13in portrait;
+      margin: 14mm 14mm 14mm 14mm;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #1a1a1a; padding: 20mm; line-height: 1.5; }
-    .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 12px; margin-bottom: 20px; }
-    .header h1 { font-size: 16pt; font-weight: 700; margin-bottom: 2px; }
-    .header p { font-size: 10pt; color: #555; }
-    .funcionario-info { background: #f5f5f5; padding: 10px 14px; border-radius: 4px; margin-bottom: 20px; font-size: 12pt; font-weight: 600; display:flex; justify-content:space-between; align-items:center; }
-    .cat-badge { display:inline-block; font-size:9.5pt; font-weight:700; padding:3px 10px; border-radius:12px; background:#e0e7ef; color:#1a365d; }
-    .deuda-block { margin-bottom: 18px; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
-    .deuda-header { background: #f0f0f0; padding: 8px 14px; font-weight: 600; font-size: 10.5pt; display: flex; justify-content: space-between; align-items: center; }
-    .deuda-header .estado { font-size: 9pt; padding: 2px 8px; border-radius: 3px; font-weight: 600; }
-    .estado-ACTIVA { background: #e3f2e8; color: #2d8a4e; }
-    .estado-SALDADA { background: #e0e7ef; color: #2c5f8a; }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+      font-size: 10.5pt;
+      color: #1a1a1a;
+      background: #f1f3f5;
+      padding: 20px 10px;
+      line-height: 1.45;
+    }
+    .page-sheet {
+      background: #ffffff;
+      width: 100%;
+      max-width: 8.5in;
+      min-height: 13in;
+      margin: 0 auto;
+      padding: 16mm 14mm;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .page-content {
+      flex: 1;
+    }
+    .header {
+      text-align: center;
+      border-bottom: 2px solid #222;
+      padding-bottom: 12px;
+      margin-bottom: 18px;
+    }
+    .header h1 {
+      font-size: 16pt;
+      font-weight: 800;
+      letter-spacing: .5px;
+      color: #111;
+    }
+    .funcionario-info {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      padding: 10px 14px;
+      border-radius: 4px;
+      margin-bottom: 18px;
+      font-size: 11pt;
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .cat-badge {
+      display: inline-block;
+      font-size: 9pt;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 12px;
+      background: #e0e7ef;
+      color: #1a365d;
+    }
+    .deuda-block {
+      margin-bottom: 16px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      overflow: hidden;
+      page-break-inside: avoid;
+    }
+    .deuda-header {
+      background: #f1f3f5;
+      padding: 8px 14px;
+      font-weight: 700;
+      font-size: 10.5pt;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #e9ecef;
+    }
+    .deuda-header .estado {
+      font-size: 8.5pt;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-weight: 700;
+    }
+    .estado-ACTIVA { background: #e3f2e8; color: #1e7e34; }
+    .estado-SALDADA { background: #e0e7ef; color: #1a365d; }
     .estado-ANULADA { background: #fde8e5; color: #c0392b; }
-    .deuda-sub { background:#fafafa; padding:6px 14px; font-size:9.5pt; border-bottom:1px solid #eee; display:flex; gap:16px; color:#555; }
-    .deuda-body { padding: 8px 14px; }
-    .descuento-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10pt; border-bottom: 1px dotted #eee; }
-    .descuento-row.anulado { text-decoration: line-through; color: #999; }
-    .saldo-line { font-weight: 700; font-size: 11pt; text-align: right; padding: 8px 14px; background: #fafafa; border-top: 1px solid #ddd; }
-    .totals { margin-top: 24px; border-top: 2px solid #333; padding-top: 14px; }
-    .total-row { display: flex; justify-content: space-between; font-size: 11pt; padding: 3px 0; }
-    .total-row.final { font-weight: 700; font-size: 13pt; border-top: 1px solid #ccc; padding-top: 8px; margin-top: 6px; }
-    .fecha-gen { text-align: right; font-size: 8.5pt; color: #999; margin-top: 30px; }
-    @media print { body { padding: 10mm; } }
+    .deuda-sub {
+      background: #fafafa;
+      padding: 6px 14px;
+      font-size: 9.5pt;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      color: #333;
+    }
+    .deuda-body {
+      padding: 8px 14px;
+      background: #fff;
+    }
+    .descuento-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      font-size: 10pt;
+      border-bottom: 1px dotted #e9ecef;
+    }
+    .descuento-row:last-child {
+      border-bottom: none;
+    }
+    .descuento-row.anulado {
+      text-decoration: line-through;
+      color: #999;
+    }
+    .saldo-line {
+      font-weight: 800;
+      font-size: 11pt;
+      text-align: right;
+      padding: 8px 14px;
+      background: #f8f9fa;
+      border-top: 1px solid #dee2e6;
+    }
+    .totals {
+      margin-top: 20px;
+      border-top: 2px solid #222;
+      padding-top: 12px;
+      page-break-inside: avoid;
+    }
+    .total-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11pt;
+      padding: 4px 0;
+    }
+    .total-row.final {
+      font-weight: 800;
+      font-size: 13pt;
+      border-top: 1px solid #ccc;
+      padding-top: 8px;
+      margin-top: 6px;
+    }
+    .fecha-gen {
+      text-align: right;
+      font-size: 8.5pt;
+      color: #777;
+      margin-top: 24px;
+      padding-top: 8px;
+      border-top: 1px dotted #ccc;
+    }
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .page-sheet {
+        box-shadow: none;
+        border-radius: 0;
+        padding: 0;
+        max-width: 100%;
+        min-height: auto;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="header">
-    <h1>${mainTitle}</h1>
-    <p>Comedor TTA S.A.</p>
+  <div class="page-sheet">
+    <div class="page-content">
+      <div class="header">
+        <h1>${mainTitle}</h1>
+      </div>
+      <div class="funcionario-info">
+        <div>
+          ${funcionario.name} &mdash; CI: ${funcionario.cedula}
+          ${funcionario.department ? ` &mdash; ${funcionario.department}` : ''}
+        </div>
+        <span class="cat-badge">${funcionario.category || 'GENERAL'}</span>
+      </div>
+      ${deudasConSaldo.length === 0 ? `
+      <div style="padding:28px;text-align:center;background:#f9f9f9;border:1px dashed #ccc;border-radius:4px;margin-bottom:20px">
+        <p style="color:#666;font-size:11pt">No registra préstamos / deudas activas pendientes.</p>
+      </div>` :
+      deudasConSaldo.map((d, i) => `
+      <div class="deuda-block">
+        <div class="deuda-header">
+          <span>${isSingle ? 'Préstamo' : `Deuda ${i + 1}`}: ${d.motivo?.nombre ? d.motivo.nombre + ' - ' : ''}${d.descripcion} (${formatFecha(d.fecha)})</span>
+          <span class="estado estado-${d.estado}">${d.estado}</span>
+        </div>
+        <div class="deuda-sub">
+          <span>Total Deuda: <strong>Gs. ${formatGs(d.montoOriginal)}</strong></span>
+          <span>Total Descontado: <strong style="color:#15803d">Gs. ${formatGs(d.totalDescontado)}</strong></span>
+        </div>
+        <div class="deuda-body">
+          ${d.descuentos.length === 0 ? '<p style="font-size:9.5pt;color:#888;font-style:italic">Sin descuentos registrados</p>' :
+          d.descuentos.map(desc => `
+            <div class="descuento-row${desc.anulado ? ' anulado' : ''}">
+              <span>${formatFecha(desc.fecha)}${desc.nota ? ' - ' + desc.nota : ''}${desc.anulado ? ' [ANULADO]' : ''}</span>
+              <span>Gs. ${formatGs(desc.monto)}</span>
+            </div>`).join('')}
+        </div>
+        <div class="saldo-line">Saldo: Gs. ${formatGs(d.saldo)}</div>
+      </div>`).join('')}
+      <div class="totals">
+        <div class="total-row"><span>TOTAL DEUDAS:</span><span>Gs. ${formatGs(totalDeuda)}</span></div>
+        <div class="total-row"><span>TOTAL DESCONTADO:</span><span style="color:#15803d">Gs. ${formatGs(totalDescontado)}</span></div>
+        <div class="total-row final"><span>SALDO PENDIENTE ACTUAL:</span><span>Gs. ${formatGs(saldoTotal)}</span></div>
+      </div>
+    </div>
+    <div class="fecha-gen">Generado: ${fechaGeneracion}</div>
   </div>
-  <div class="funcionario-info">
-    <div>
-      ${funcionario.name} &mdash; CI: ${funcionario.cedula}
-      ${funcionario.department ? ` &mdash; ${funcionario.department}` : ''}
-    </div>
-    <span class="cat-badge">${funcionario.category || 'GENERAL'}</span>
-  </div>
-  ${deudasConSaldo.length === 0 ? `
-  <div style="padding:28px;text-align:center;background:#f9f9f9;border:1px dashed #ccc;border-radius:4px;margin-bottom:20px">
-    <p style="color:#666;font-size:11pt">No registra préstamos / deudas activas pendientes.</p>
-  </div>` :
-  deudasConSaldo.map((d, i) => `
-  <div class="deuda-block">
-    <div class="deuda-header">
-      <span>${isSingle ? 'Préstamo' : `Deuda ${i + 1}`}: ${d.motivo.nombre} - ${d.descripcion} (${formatFecha(d.fecha)})</span>
-      <span class="estado estado-${d.estado}">${d.estado}</span>
-    </div>
-    <div class="deuda-sub">
-      <span>Préstamo Bruto: <strong>Gs. ${formatGs(d.montoBruto)}</strong></span>
-      <span>Interés / Utilidad (${d.porcentajeInteres}%): <strong>Gs. ${formatGs(d.montoInteres)}</strong></span>
-      <span>Total a Cobrar: <strong>Gs. ${formatGs(d.montoOriginal)}</strong></span>
-    </div>
-    <div class="deuda-body">
-      ${d.descuentos.length === 0 ? '<p style="font-size:9.5pt;color:#888;font-style:italic">Sin descuentos registrados</p>' :
-      d.descuentos.map(desc => `
-        <div class="descuento-row${desc.anulado ? ' anulado' : ''}">
-          <span>${formatFecha(desc.fecha)}${desc.nota ? ' - ' + desc.nota : ''}${desc.anulado ? ' [ANULADO]' : ''}</span>
-          <span>Gs. ${formatGs(desc.monto)}</span>
-        </div>`).join('')}
-    </div>
-    <div class="saldo-line">Saldo: Gs. ${formatGs(d.saldo)}</div>
-  </div>`).join('')}
-  <div class="totals">
-    <div class="total-row"><span>TOTAL CAPITAL BRUTO:</span><span>Gs. ${formatGs(totalBruto)}</span></div>
-    <div class="total-row"><span>TOTAL UTILIDAD / GANANCIA:</span><span>Gs. ${formatGs(totalUtilidad)}</span></div>
-    <div class="total-row"><span>TOTAL DEUDAS A COBRAR:</span><span>Gs. ${formatGs(totalDeuda)}</span></div>
-    <div class="total-row"><span>TOTAL DESCONTADO / COBRADO:</span><span>Gs. ${formatGs(totalDescontado)}</span></div>
-    <div class="total-row final"><span>SALDO PENDIENTE ACTUAL:</span><span>Gs. ${formatGs(saldoTotal)}</span></div>
-  </div>
-  <div class="fecha-gen">Generado: ${new Date().toLocaleString('es-PY')}</div>
 </body>
 </html>`;
 
