@@ -380,13 +380,13 @@ select:focus:not(:focus-visible) {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: .55rem .65rem;
+    padding: .58rem .7rem;
     border-radius: var(--radius);
     color: var(--text-secondary);
     background: transparent;
     border: none;
     cursor: pointer;
-    font-size: .84rem;
+    font-size: .98rem;
     font-weight: 600;
     text-align: left;
     transition: all var(--transition);
@@ -410,8 +410,8 @@ select:focus:not(:focus-visible) {
 }
 
 .nav-section-icon {
-    width: 17px;
-    height: 17px;
+    width: 18px;
+    height: 18px;
     color: var(--text-muted);
     transition: color var(--transition);
     stroke-width: 1.75;
@@ -426,8 +426,8 @@ select:focus:not(:focus-visible) {
 }
 
 .nav-section-chevron {
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
     color: var(--text-muted);
     transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), color var(--transition);
     stroke-width: 2;
@@ -453,29 +453,29 @@ select:focus:not(:focus-visible) {
 }
 
 .nav-section-items .nav-item {
-    padding: .45rem .6rem;
-    font-size: .82rem;
-    gap: .6rem;
+    padding: .48rem .65rem;
+    font-size: .96rem;
+    gap: .65rem;
     margin-bottom: 2px;
 }
 
 .nav-section-items .nav-item svg {
-    width: 15px;
-    height: 15px;
-    stroke-width: 1.5;
+    width: 17px;
+    height: 17px;
+    stroke-width: 1.6;
 }
 
 .nav-item {
     display: flex;
     align-items: center;
     gap: .7rem;
-    padding: .55rem .6rem;
+    padding: .55rem .65rem;
     border-radius: var(--radius);
     color: var(--text-secondary);
     cursor: pointer;
     transition: all var(--transition);
     font-weight: 500;
-    font-size: .88rem;
+    font-size: .98rem;
     margin-bottom: 1px;
     position: relative;
 }
@@ -1637,38 +1637,49 @@ tbody tr:last-child td {
 /* Toast */
 .toast-container {
     position: fixed;
-    top: 1rem;
-    right: 1rem;
+    top: 1.25rem;
+    right: 1.25rem;
     z-index: 2000;
     display: flex;
     flex-direction: column;
-    gap: .4rem
+    gap: .5rem;
 }
 
 .toast {
-    padding: .65rem 1rem;
+    padding: .75rem 1.15rem;
     border-radius: var(--radius);
-    font-size: .82rem;
+    font-size: .88rem;
     font-weight: 500;
     color: #fff;
-    box-shadow: var(--shadow);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     animation: slide-in-right .25s ease;
-    min-width: 260px;
+    min-width: 270px;
     display: flex;
     align-items: center;
-    gap: .4rem
+    gap: .6rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .toast.success {
-    background: var(--success)
+    background: linear-gradient(135deg, #15803d, #22c55e);
+    color: #fff;
 }
 
 .toast.error {
-    background: var(--danger)
+    background: linear-gradient(135deg, #b91c1c, #ef4444);
+    color: #fff;
 }
 
 .toast.info {
-    background: #333333
+    background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+    color: #fff;
+}
+
+.toast svg {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    color: #fff;
 }
 
 /* Ticket / Receipt */
