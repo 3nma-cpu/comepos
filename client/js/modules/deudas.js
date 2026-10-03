@@ -570,22 +570,57 @@ async function renderDeudores() {
 }
 
 // ============================================
-// Tab: Planilla del período
+// Tab: Planilla (Reporte General de Deudas)
 // ============================================
 async function renderPlanilla() {
   const area = document.getElementById('deudaContent');
   area.innerHTML = `
   <div class="fade-in" style="margin-top:1rem">
-    <div class="filters-bar">
-      <select class="form-control" id="planillaFrec" style="width:auto;min-width:160px">
-        <option value="SEMANAL">Semanal</option>
-        <option value="QUINCENAL">Quincenal</option>
+    <div class="filters-bar" style="flex-wrap:wrap;gap:.75rem">
+      <div class="search-bar" style="flex:1;min-width:220px">
+        <i data-lucide="search"></i>
+        <input type="text" class="form-control" id="planillaSearch" placeholder="Buscar funcionario por CI o nombre..." />
+      </div>
+      <select class="form-control" id="planillaEstado" style="width:auto;min-width:140px">
+        <option value="ACTIVA" selected>Solo Activas</option>
+        <option value="">Todos los estados</option>
+        <option value="SALDADA">Saldadas</option>
+        <option value="ANULADA">Anuladas</option>
       </select>
-      <button class="btn btn-primary" id="btnGenPlanilla"><i data-lucide="refresh-cw"></i>Generar Planilla</button>
-      <button class="btn btn-secondary" id="btnExportPlanilla"><i data-lucide="download"></i>Excel</button>
+      <select class="form-control" id="planillaMotivo" style="width:auto;min-width:140px">
+        <option value="">Todos los motivos</option>
+        ${cachedMotivos.map(m => `<option value="${m.id}">${escapeHTML(m.nombre)}</option>`).join('')}
+      </select>
+      <select class="form-control" id="planillaFrec" style="width:auto;min-width:140px">
+        <option value="">Todas las frecuencias</option>
+        <option value="QUINCENAL">Quincenal</option>
+        <option value="SEMANAL">Semanal</option>
+        <option value="SIN_PLAN">Sin plan</option>
+      </select>
+      <button class="btn btn-secondary" id="btnExportPlanilla" title="Exportar a Excel"><i data-lucide="download"></i>Excel</button>
+      <button class="btn btn-ghost" id="btnPrintPlanilla" title="Imprimir reporte"><i data-lucide="printer"></i>Imprimir</button>
     </div>
-    <div id="planillaContent">
-      <div class="empty-state" style="padding:3rem"><i data-lucide="calendar-check"></i><h3>Seleccione la frecuencia</h3><p>Haga clic en "Generar Planilla" para ver los descuentos a aplicar.</p></div>
+    <div id="planillaTotals" class="deuda-totals-bar" style="margin-bottom:1rem"></div>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Funcionario</th>
+            <th>CI</th>
+            <th>Fecha Entrega</th>
+            <th>Motivo</th>
+            <th>Descripción</th>
+            <th style="text-align:right">Deuda Total</th>
+            <th style="text-align:right">Ya Descontado</th>
+            <th style="text-align:right">Saldo Pendiente</th>
+            <th>Plan Descuento</th>
+            <th>Estado</th>
+            <th style="text-align:center">Acción</th>
+          </tr>
+        </thead>
+        <tbody id="planillaTableBody"></tbody>
+        <tfoot id="planillaTableFoot"></tfoot>
+      </table>
     </div>
   </div>`;
   if (window.lucide) lucide.createIcons();
@@ -593,83 +628,224 @@ async function renderPlanilla() {
   let planillaData = [];
 
   async function loadPlanilla() {
+    const search = document.getElementById('planillaSearch').value.trim();
+    const estado = document.getElementById('planillaEstado').value;
+    const motivoId = document.getElementById('planillaMotivo').value;
     const frecuencia = document.getElementById('planillaFrec').value;
-    const content = document.getElementById('planillaContent');
+
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (estado) params.set('estado', estado);
+    if (motivoId) params.set('motivoId', motivoId);
+    if (frecuencia) params.set('frecuencia', frecuencia);
+
+    const tbody = document.getElementById('planillaTableBody');
+    const tfoot = document.getElementById('planillaTableFoot');
+    const totalsDiv = document.getElementById('planillaTotals');
 
     try {
-      planillaData = await api.get(`/deudas/planilla?frecuencia=${frecuencia}`);
+      planillaData = await api.get(`/deudas/planilla?${params.toString()}`);
 
       if (!planillaData.length) {
-        content.innerHTML = `<div class="empty-state" style="padding:3rem"><i data-lucide="check-circle"></i><h3>Sin descuentos pendientes</h3><p>No hay descuentos ${frecuencia === 'SEMANAL' ? 'semanales' : 'quincenales'} programados para este período.</p></div>`;
+        tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:2.5rem"><i data-lucide="inbox" style="display:block;margin:0 auto .5rem;opacity:.5"></i>No se encontraron deudas para los filtros seleccionados</td></tr>`;
+        tfoot.innerHTML = '';
+        totalsDiv.innerHTML = '';
         if (window.lucide) lucide.createIcons();
         return;
       }
 
-      const totalGeneral = planillaData.reduce((s, f) => s + f.totalDescuento, 0);
+      // Totales
+      const funcionariosUnicos = new Set(planillaData.map(d => d.funcionarioId)).size;
+      const totalMonto = planillaData.reduce((s, d) => s + d.montoOriginal, 0);
+      const totalDesc = planillaData.reduce((s, d) => s + d.totalDescontado, 0);
+      const totalSaldo = planillaData.filter(d => d.estado !== 'ANULADA').reduce((s, d) => s + d.saldo, 0);
 
-      content.innerHTML = `
-        <div class="deuda-totals-bar" style="margin-bottom:1rem">
-          <div class="deuda-stat"><span>Funcionarios</span><strong>${planillaData.length}</strong></div>
-          <div class="deuda-stat"><span>Total a descontar</span><strong style="color:var(--danger)">${fmtGs(totalGeneral)}</strong></div>
-        </div>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Funcionario</th>
-                <th>CI</th>
-                <th>Deudas</th>
-                <th style="text-align:right">Monto a Descontar</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${planillaData.map(f => `
-              <tr>
-                <td>
-                  <a href="javascript:void(0)" class="deuda-func-link" data-func="${f.funcionario.id}" style="color:var(--text);font-weight:600">${escapeHTML(f.funcionario.name)}</a>
-                </td>
-                <td>${escapeHTML(f.funcionario.cedula)}</td>
-                <td>
-                  ${f.deudas.map(d => `
-                    <div style="font-size:.82rem;color:var(--text-secondary);margin:1px 0">
-                      ${escapeHTML(d.motivo)} - ${escapeHTML(d.descripcion)}: <strong>${fmtGs(d.montoDescuento)}</strong>
-                      <span style="color:var(--text-muted)">(saldo: ${fmtGs(d.saldo)})</span>
-                    </div>`).join('')}
-                </td>
-                <td style="text-align:right;font-weight:700;font-size:1rem">${fmtGs(f.totalDescuento)}</td>
-              </tr>`).join('')}
-            </tbody>
-            <tfoot>
-              <tr style="font-weight:700;font-size:1rem">
-                <td colspan="3" style="text-align:right;padding-right:1rem">TOTAL</td>
-                <td style="text-align:right">${fmtGs(totalGeneral)}</td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>`;
+      totalsDiv.innerHTML = `
+        <div class="deuda-stat"><span>Funcionarios</span><strong>${funcionariosUnicos}</strong></div>
+        <div class="deuda-stat"><span>Total Deudas</span><strong>${planillaData.length}</strong></div>
+        <div class="deuda-stat"><span>Deuda Total Otorgada</span><strong>${fmtGs(totalMonto)}</strong></div>
+        <div class="deuda-stat"><span>Total Descontado</span><strong style="color:var(--success)">${fmtGs(totalDesc)}</strong></div>
+        <div class="deuda-stat"><span>Saldo Pendiente Total</span><strong style="color:var(--danger)">${fmtGs(totalSaldo)}</strong></div>`;
+
+      tbody.innerHTML = planillaData.map(d => `
+        <tr>
+          <td>
+            <a href="javascript:void(0)" class="deuda-func-link" data-func="${d.funcionarioId}" style="color:var(--text);font-weight:600">${escapeHTML(d.funcionario?.name || '')}</a>
+            ${d.funcionario?.department ? `<div style="color:var(--text-muted);font-size:.78rem">${escapeHTML(d.funcionario.department)}</div>` : ''}
+          </td>
+          <td style="font-family:monospace;font-size:.9rem">${escapeHTML(d.funcionario?.cedula || '')}</td>
+          <td>${formatDate(d.fecha)}</td>
+          <td><span style="font-weight:500">${escapeHTML(d.motivo?.nombre || '')}</span></td>
+          <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(d.descripcion)}">${escapeHTML(d.descripcion)}</td>
+          <td style="text-align:right;font-weight:600">${fmtGsPlain(d.montoOriginal)}</td>
+          <td style="text-align:right;font-weight:600;color:var(--success)">${fmtGsPlain(d.totalDescontado)}</td>
+          <td style="text-align:right;font-weight:700;color:${d.saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGsPlain(d.saldo)}</td>
+          <td style="font-size:.85rem">
+            ${d.planDescuento ? `<strong>${fmtGsPlain(d.planDescuento.montoPorDescuento)}</strong> <span style="color:var(--text-muted)">(${d.planDescuento.frecuencia === 'SEMANAL' ? 'Sem' : 'Quinc'})</span>` : '<span style="color:var(--text-muted)">Sin plan</span>'}
+          </td>
+          <td>${estadoBadge(d.estado)}</td>
+          <td style="text-align:center">
+            <button class="btn btn-ghost btn-sm deuda-func-link" data-func="${d.funcionarioId}" title="Ver ficha individual"><i data-lucide="eye"></i></button>
+          </td>
+        </tr>`).join('');
+
+      tfoot.innerHTML = `
+        <tr style="font-weight:700;font-size:1rem;background:var(--bg-card-hover, rgba(255,255,255,0.03))">
+          <td colspan="5" style="text-align:right;padding-right:1rem">TOTALES:</td>
+          <td style="text-align:right">${fmtGsPlain(totalMonto)}</td>
+          <td style="text-align:right;color:var(--success)">${fmtGsPlain(totalDesc)}</td>
+          <td style="text-align:right;color:var(--danger)">${fmtGsPlain(totalSaldo)}</td>
+          <td colspan="3"></td>
+        </tr>`;
+
       if (window.lucide) lucide.createIcons();
 
-      content.querySelectorAll('.deuda-func-link').forEach(el => {
+      tbody.querySelectorAll('.deuda-func-link').forEach(el => {
         el.addEventListener('click', () => navigate(`deudas/funcionario/${el.dataset.func}`));
       });
     } catch (err) {
-      content.innerHTML = `<div class="empty-state"><p>Error al generar planilla</p></div>`;
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--danger);padding:2rem">Error al cargar la planilla de deudas</td></tr>`;
     }
   }
 
-  document.getElementById('btnGenPlanilla').addEventListener('click', loadPlanilla);
+  document.getElementById('planillaSearch').addEventListener('input', debounce(loadPlanilla, 400));
+  document.getElementById('planillaEstado').addEventListener('change', loadPlanilla);
+  document.getElementById('planillaMotivo').addEventListener('change', loadPlanilla);
+  document.getElementById('planillaFrec').addEventListener('change', loadPlanilla);
+
   document.getElementById('btnExportPlanilla').addEventListener('click', () => {
-    if (!planillaData.length) return showToast('No hay datos', 'info');
-    const headers = ['Funcionario', 'CI', 'Deudas', 'Monto a Descontar'];
-    const rows = planillaData.map(f => [
-      f.funcionario.name, f.funcionario.cedula,
-      f.deudas.map(d => `${d.motivo}: ${d.descripcion}`).join('; '),
-      f.totalDescuento
+    if (!planillaData.length) return showToast('No hay datos para exportar', 'info');
+    const headers = ['Funcionario', 'CI', 'Departamento', 'Fecha Entrega', 'Motivo', 'Descripción', 'Deuda Total', 'Ya Descontado', 'Saldo', 'Plan Cuota', 'Frecuencia', 'Estado'];
+    const rows = planillaData.map(d => [
+      d.funcionario?.name || '',
+      d.funcionario?.cedula || '',
+      d.funcionario?.department || '',
+      formatDate(d.fecha),
+      d.motivo?.nombre || '',
+      d.descripcion || '',
+      d.montoOriginal,
+      d.totalDescontado,
+      d.saldo,
+      d.planDescuento ? d.planDescuento.montoPorDescuento : 0,
+      d.planDescuento ? d.planDescuento.frecuencia : 'Sin plan',
+      d.estado
     ]);
-    exportExcel(headers, rows, 'Planilla_Descuentos.xlsx', 'Planilla');
+    exportExcel(headers, rows, 'Planilla_General_Deudas.xlsx', 'Planilla Deudas');
+  });
+
+  document.getElementById('btnPrintPlanilla').addEventListener('click', () => {
+    if (!planillaData.length) return showToast('No hay datos para imprimir', 'info');
+    printPlanillaReport(planillaData);
   });
 
   loadPlanilla();
+}
+
+// Helper para impresión de la planilla general
+function printPlanillaReport(data) {
+  const printWin = window.open('', '_blank', 'width=950,height=700');
+  if (!printWin) {
+    showToast('Permita las ventanas emergentes para imprimir', 'warning');
+    return;
+  }
+
+  const totalMonto = data.reduce((s, d) => s + d.montoOriginal, 0);
+  const totalDesc = data.reduce((s, d) => s + d.totalDescontado, 0);
+  const totalSaldo = data.filter(d => d.estado !== 'ANULADA').reduce((s, d) => s + d.saldo, 0);
+  const funcionariosUnicos = new Set(data.map(d => d.funcionarioId)).size;
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Planilla General de Deudas de Funcionarios</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; }
+    body { padding: 12mm; font-size: 9.5pt; color: #111; }
+    .header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 8px; margin-bottom: 12px; }
+    .header h1 { font-size: 15pt; font-weight: 700; margin-bottom: 3px; }
+    .header p { font-size: 9.5pt; color: #555; }
+    .summary-box { display: flex; justify-content: space-between; background: #f4f4f4; padding: 8px 12px; border-radius: 4px; margin-bottom: 12px; font-size: 9pt; }
+    .summary-box strong { font-size: 10pt; color: #000; }
+    table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+    th, td { border: 1px solid #ddd; padding: 5px 6px; text-align: left; }
+    th { background: #f0f0f0; font-weight: 700; font-size: 8pt; text-transform: uppercase; }
+    .num { text-align: right; }
+    .tfoot-total { font-weight: 700; background: #fafafa; font-size: 9pt; }
+    .footer { margin-top: 20px; display: flex; justify-content: space-between; font-size: 8pt; color: #777; }
+    @media print {
+      body { padding: 6mm; }
+      @page { size: landscape; margin: 8mm; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>PLANILLA GENERAL DE DEUDAS DE FUNCIONARIOS</h1>
+    <p>Comedor TTA S.A. — Reporte Consolidado</p>
+  </div>
+  <div class="summary-box">
+    <div>Funcionarios: <strong>${funcionariosUnicos}</strong></div>
+    <div>Total Deudas: <strong>${data.length}</strong></div>
+    <div>Total Otorgado: <strong>Gs. ${fmtGsPlain(totalMonto)}</strong></div>
+    <div>Total Descontado: <strong>Gs. ${fmtGsPlain(totalDesc)}</strong></div>
+    <div>Saldo Pendiente Total: <strong>Gs. ${fmtGsPlain(totalSaldo)}</strong></div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Funcionario</th>
+        <th>CI</th>
+        <th>Fecha Entrega</th>
+        <th>Motivo</th>
+        <th>Descripción</th>
+        <th class="num">Deuda Total</th>
+        <th class="num">Descontado</th>
+        <th class="num">Saldo</th>
+        <th>Plan</th>
+        <th>Estado</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.map((d, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td><strong>${escapeHTML(d.funcionario?.name || '')}</strong></td>
+        <td>${escapeHTML(d.funcionario?.cedula || '')}</td>
+        <td>${formatDate(d.fecha)}</td>
+        <td>${escapeHTML(d.motivo?.nombre || '')}</td>
+        <td>${escapeHTML(d.descripcion || '')}</td>
+        <td class="num">${fmtGsPlain(d.montoOriginal)}</td>
+        <td class="num">${fmtGsPlain(d.totalDescontado)}</td>
+        <td class="num"><strong>${fmtGsPlain(d.saldo)}</strong></td>
+        <td>${d.planDescuento ? `${fmtGsPlain(d.planDescuento.montoPorDescuento)} (${d.planDescuento.frecuencia === 'SEMANAL' ? 'Sem' : 'Quinc'})` : 'Sin plan'}</td>
+        <td>${d.estado}</td>
+      </tr>`).join('')}
+    </tbody>
+    <tfoot>
+      <tr class="tfoot-total">
+        <td colspan="6" style="text-align:right">TOTALES:</td>
+        <td class="num">Gs. ${fmtGsPlain(totalMonto)}</td>
+        <td class="num">Gs. ${fmtGsPlain(totalDesc)}</td>
+        <td class="num">Gs. ${fmtGsPlain(totalSaldo)}</td>
+        <td colspan="2"></td>
+      </tr>
+    </tfoot>
+  </table>
+  <div class="footer">
+    <span>Generado por sistema ComePOS</span>
+    <span>Fecha: ${new Date().toLocaleString('es-PY')}</span>
+  </div>
+</body>
+</html>`;
+
+  printWin.document.write(html);
+  printWin.document.close();
+  printWin.focus();
+  setTimeout(() => {
+    printWin.print();
+  }, 400);
 }
 
 // ============================================

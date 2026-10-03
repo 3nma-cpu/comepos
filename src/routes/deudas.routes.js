@@ -384,66 +384,124 @@ router.get('/deudores', async (req, res) => {
 });
 
 // ============================================
-// PLANILLA DEL PERÍODO
+// PLANILLA / REPORTE GENERAL DE DEUDAS
 // ============================================
 
 router.get('/planilla', async (req, res) => {
   try {
-    const { frecuencia } = req.query;
-    if (!frecuencia || !['SEMANAL', 'QUINCENAL'].includes(frecuencia)) {
-      return res.status(400).json({ error: 'Frecuencia inválida (SEMANAL o QUINCENAL)' });
+    const { frecuencia, estado, motivoId, search, tipo } = req.query;
+
+    // Modo específico de nómina periódica agrupada por funcionario
+    if (tipo === 'periodo') {
+      if (!frecuencia || !['SEMANAL', 'QUINCENAL'].includes(frecuencia)) {
+        return res.status(400).json({ error: 'Frecuencia inválida (SEMANAL o QUINCENAL)' });
+      }
+
+      const deudas = await prisma.deuda.findMany({
+        where: {
+          estado: 'ACTIVA',
+          planDescuento: {
+            activo: true,
+            frecuencia
+          }
+        },
+        include: {
+          funcionario: true,
+          motivo: true,
+          planDescuento: true,
+          descuentos: true
+        },
+        orderBy: { funcionario: { name: 'asc' } }
+      });
+
+      const planilla = deudas.map(d => {
+        const saldo = calcSaldo(d);
+        const montoDescuento = Math.min(d.planDescuento?.montoPorDescuento || 0, saldo);
+        return {
+          funcionario: d.funcionario,
+          deuda: {
+            id: d.id,
+            motivo: d.motivo.nombre,
+            descripcion: d.descripcion,
+            montoOriginal: d.montoOriginal,
+            saldo,
+            montoDescuento
+          },
+          plan: d.planDescuento
+        };
+      }).filter(item => item.deuda.montoDescuento > 0);
+
+      // Agrupar por funcionario
+      const agrupado = {};
+      for (const item of planilla) {
+        const fid = item.funcionario.id;
+        if (!agrupado[fid]) {
+          agrupado[fid] = {
+            funcionario: item.funcionario,
+            deudas: [],
+            totalDescuento: 0
+          };
+        }
+        agrupado[fid].deudas.push(item.deuda);
+        agrupado[fid].totalDescuento += item.deuda.montoDescuento;
+      }
+
+      return res.json(Object.values(agrupado));
     }
 
-    const deudas = await prisma.deuda.findMany({
-      where: {
-        estado: 'ACTIVA',
-        planDescuento: {
-          activo: true,
-          frecuencia
-        }
-      },
+    // Modo Reporte General de Deudas (por defecto en Planilla)
+    const where = {};
+    if (estado) where.estado = estado;
+    if (motivoId) where.motivoId = motivoId;
+    if (search) {
+      where.funcionario = {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { cedula: { contains: search } }
+        ]
+      };
+    }
+    if (frecuencia && ['SEMANAL', 'QUINCENAL'].includes(frecuencia)) {
+      where.planDescuento = { frecuencia };
+    }
+
+    let deudas = await prisma.deuda.findMany({
+      where,
       include: {
         funcionario: true,
         motivo: true,
-        planDescuento: true,
-        descuentos: true
+        descuentos: true,
+        planDescuento: true
       },
-      orderBy: { funcionario: { name: 'asc' } }
+      orderBy: [
+        { funcionario: { name: 'asc' } },
+        { fecha: 'desc' }
+      ]
     });
 
-    const planilla = deudas.map(d => {
-      const saldo = calcSaldo(d);
-      const montoDescuento = Math.min(d.planDescuento?.montoPorDescuento || 0, saldo);
-      return {
-        funcionario: d.funcionario,
-        deuda: {
-          id: d.id,
-          motivo: d.motivo.nombre,
-          descripcion: d.descripcion,
-          montoOriginal: d.montoOriginal,
-          saldo,
-          montoDescuento
-        },
-        plan: d.planDescuento
-      };
-    }).filter(item => item.deuda.montoDescuento > 0);
-
-    // Agrupar por funcionario
-    const agrupado = {};
-    for (const item of planilla) {
-      const fid = item.funcionario.id;
-      if (!agrupado[fid]) {
-        agrupado[fid] = {
-          funcionario: item.funcionario,
-          deudas: [],
-          totalDescuento: 0
-        };
-      }
-      agrupado[fid].deudas.push(item.deuda);
-      agrupado[fid].totalDescuento += item.deuda.montoDescuento;
+    if (frecuencia === 'SIN_PLAN') {
+      deudas = deudas.filter(d => !d.planDescuento);
     }
 
-    res.json(Object.values(agrupado));
+    const reporte = deudas.map(d => {
+      const saldo = calcSaldo(d);
+      const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      return {
+        id: d.id,
+        funcionarioId: d.funcionarioId,
+        funcionario: d.funcionario,
+        fecha: d.fecha,
+        motivo: d.motivo,
+        descripcion: d.descripcion,
+        montoOriginal: d.montoOriginal,
+        totalDescontado,
+        saldo,
+        estado: d.estado,
+        planDescuento: d.planDescuento
+      };
+    });
+
+    res.json(reporte);
   } catch (err) {
     console.error('Error planilla:', err);
     res.status(500).json({ error: 'Error al generar planilla' });
