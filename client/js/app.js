@@ -336,13 +336,10 @@ function renderApp(user, defaultRoute = null) {
       <div class="sidebar-overlay" id="sidebarOverlay"></div>
       <aside class="sidebar" id="mainSidebar">
         <div class="sidebar-header">
-          <span class="logo-text">Comedor TTA S.A.</span>
-          <button class="btn-desktop-sidebar-close" id="btnSidebarClose" title="Cerrar barra lateral">
-            <svg class="icon-sidebar-toggle" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="18" height="18" rx="3.5" stroke="currentColor" stroke-width="2"/>
-              <rect x="5.5" y="5.5" width="5" height="13" rx="1.5" fill="currentColor"/>
-            </svg>
-          </button>
+          <div class="sidebar-brand" title="Comedor TTA S.A.">
+            <img src="/img/icon-512.png" alt="Comedor TTA S.A." class="sidebar-brand-icon" />
+            <span class="logo-text">Comedor TTA S.A.</span>
+          </div>
         </div>
         <nav class="sidebar-nav" id="sidebarNavAccordion">
           ${visibleNav.map((section, idx) => {
@@ -358,7 +355,7 @@ function renderApp(user, defaultRoute = null) {
               </button>
               <div class="nav-section-items">
                 ${section.items.map(item => `
-                  <div class="nav-item ${item.route === userDefaultRoute ? 'active' : ''}" data-route="${item.route}">
+                  <div class="nav-item ${item.route === userDefaultRoute ? 'active' : ''}" data-route="${item.route}" title="${escapeHTML(item.label)}">
                     <i data-lucide="${item.icon}"></i>
                     <span>${escapeHTML(item.label)}</span>
                   </div>`).join('')}
@@ -387,7 +384,7 @@ function renderApp(user, defaultRoute = null) {
             <button class="btn-menu-toggle" id="btnMenuToggle">
               <i data-lucide="menu"></i>
             </button>
-            <button class="btn-desktop-sidebar-toggle" id="btnDesktopSidebarToggle" title="Cerrar / abrir barra lateral">
+            <button class="btn-desktop-sidebar-toggle" id="btnDesktopSidebarToggle" title="Minimizar / expandir barra lateral">
               <svg class="icon-sidebar-toggle" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="3" y="3" width="18" height="18" rx="3.5" stroke="currentColor" stroke-width="2"/>
                 <rect x="5.5" y="5.5" width="5" height="13" rx="1.5" fill="currentColor"/>
@@ -422,7 +419,6 @@ function renderApp(user, defaultRoute = null) {
     }
 
     document.getElementById('btnDesktopSidebarToggle')?.addEventListener('click', toggleDesktopSidebar);
-    document.getElementById('btnSidebarClose')?.addEventListener('click', toggleDesktopSidebar);
 
     // Sidebar Mobile Toggle
     const sidebar = document.getElementById('mainSidebar');

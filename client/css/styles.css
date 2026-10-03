@@ -313,21 +313,49 @@ select:focus:not(:focus-visible) {
     height: var(--header-height);
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 .85rem 0 1.25rem;
+    padding: 0 1rem;
     border-bottom: 1px solid var(--border);
     gap: .5rem;
+    overflow: hidden;
+    transition: padding var(--transition), justify-content var(--transition);
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    min-width: 0;
+    text-decoration: none;
+    user-select: none;
+    transition: all var(--transition);
+}
+
+.sidebar-brand-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    object-fit: cover;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+    border: 1px solid var(--border);
+    transition: transform var(--transition), width var(--transition), height var(--transition);
+}
+
+.sidebar-brand:hover .sidebar-brand-icon {
+    transform: scale(1.05);
 }
 
 .sidebar-header .logo-text {
-    font-size: 1.15rem;
+    font-size: 1.12rem;
     font-weight: 700;
     color: var(--text);
     letter-spacing: -.02em;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: opacity var(--transition);
 }
 
-.btn-desktop-sidebar-close,
 .btn-desktop-sidebar-toggle {
     display: none;
 }
@@ -1881,42 +1909,155 @@ tbody tr:last-child td {
         border-color: var(--border);
     }
 
-    .btn-desktop-sidebar-close {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 30px;
-        height: 30px;
-        border-radius: var(--radius-sm);
-        color: var(--text-muted);
-        background: transparent;
-        border: none;
-        cursor: pointer;
-        transition: all var(--transition);
-    }
-
-    .btn-desktop-sidebar-close:hover {
+    .app-layout.sidebar-collapsed .btn-desktop-sidebar-toggle {
         color: var(--text);
         background: var(--bg-card-hover);
     }
 
+    /* Sidebar Minimized / Rail Mode */
     .app-layout.sidebar-collapsed .sidebar {
-        transform: translateX(-100%);
-        visibility: hidden;
-        pointer-events: none;
+        width: var(--sidebar-collapsed, 68px) !important;
+        transform: translateX(0) !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        overflow-x: hidden;
     }
 
     .app-layout.sidebar-collapsed .main-content {
-        margin-left: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
+        margin-left: var(--sidebar-collapsed, 68px) !important;
+        width: calc(100vw - var(--sidebar-collapsed, 68px)) !important;
+        max-width: calc(100vw - var(--sidebar-collapsed, 68px)) !important;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-header {
+        padding: 0 !important;
+        justify-content: center !important;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-brand {
+        justify-content: center !important;
+        width: 100%;
+        gap: 0;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-header .logo-text {
+        display: none !important;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-brand-icon {
+        width: 34px;
+        height: 34px;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-nav {
+        padding: .75rem .35rem;
+        overflow-x: hidden;
+    }
+
+    .app-layout.sidebar-collapsed .nav-section {
+        margin-bottom: .4rem;
+        padding-bottom: .4rem;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .app-layout.sidebar-collapsed .nav-section:last-child {
+        border-bottom: none;
+    }
+
+    .app-layout.sidebar-collapsed .nav-section-header {
+        display: none !important;
+    }
+
+    .app-layout.sidebar-collapsed .nav-section-items {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        gap: .35rem;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+
+    .app-layout.sidebar-collapsed .nav-item {
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        margin: 0 auto;
+        justify-content: center;
+        align-items: center;
+        border-radius: var(--radius);
+        position: relative;
+    }
+
+    .app-layout.sidebar-collapsed .nav-item::before {
+        display: none !important;
+    }
+
+    .app-layout.sidebar-collapsed .nav-item span {
+        display: none !important;
+    }
+
+    .app-layout.sidebar-collapsed .nav-item svg,
+    .app-layout.sidebar-collapsed .nav-item i {
+        width: 20px;
+        height: 20px;
+        margin: 0;
+        flex-shrink: 0;
+    }
+
+    .app-layout.sidebar-collapsed .nav-item.active {
+        background: var(--text);
+        color: var(--bg-body);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, .25);
+    }
+
+    .app-layout.sidebar-collapsed .nav-item.active svg,
+    .app-layout.sidebar-collapsed .nav-item.active i {
+        stroke: var(--bg-body);
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-footer {
+        padding: .75rem .35rem;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-user {
+        flex-direction: column;
+        align-items: center;
+        gap: .65rem;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-user-clickable {
+        padding: 0;
+        margin: 0;
+        justify-content: center;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-user-info {
+        display: none !important;
+    }
+
+    .app-layout.sidebar-collapsed .sidebar-user-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .app-layout.sidebar-collapsed .btn-logout {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: var(--radius-sm);
+    }
+
+    .app-layout.sidebar-collapsed .btn-logout:hover {
+        background: var(--bg-card-hover);
     }
 }
 
 /* --- 768px: Tablet portrait / large phone landscape --- */
 @media(max-width:768px) {
-    .btn-desktop-sidebar-toggle,
-    .btn-desktop-sidebar-close {
+    .btn-desktop-sidebar-toggle {
         display: none !important;
     }
     .sidebar {
