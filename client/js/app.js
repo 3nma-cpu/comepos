@@ -307,7 +307,7 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('comepos_theme', next);
 
-    const icons = document.querySelectorAll('#themeIcon, #btnThemeSidebar i');
+    const icons = document.querySelectorAll('#themeIcon');
     icons.forEach(icon => {
         icon.setAttribute('data-lucide', next === 'dark' ? 'sun' : 'moon');
     });
@@ -337,18 +337,9 @@ function renderApp(user, defaultRoute = null) {
       <div class="sidebar-overlay" id="sidebarOverlay"></div>
       <aside class="sidebar" id="mainSidebar">
         <div class="sidebar-header">
-          <div class="sidebar-brand-wrapper">
-            <div class="sidebar-brand" title="ComePOS">
-              <span class="brand-logo-text">
-                <span class="brand-name">Come</span><span class="brand-badge">POS</span>
-              </span>
-            </div>
-            <button class="btn-theme-sidebar" id="btnThemeSidebar" title="Cambiar tema">
-              <i data-lucide="${currentTheme === 'dark' ? 'sun' : 'moon'}"></i>
-            </button>
-          </div>
-          <div class="sidebar-plan-row">
-            <span class="plan-pill-badge">Plan Boot</span>
+          <div class="sidebar-brand" title="Comedor TTA S.A.">
+            <img src="/img/icon-512.png" alt="Comedor TTA S.A." class="sidebar-brand-icon" />
+            <span class="logo-text">Comedor TTA S.A.</span>
           </div>
         </div>
         <nav class="sidebar-nav" id="sidebarNavAccordion">
@@ -373,19 +364,19 @@ function renderApp(user, defaultRoute = null) {
             </div>`;
           }).join('')}
         </nav>
-        <div class="sidebar-trial-banner">
-          <div class="trial-title">Prueba gratis de 10 días</div>
-          <a class="trial-link" id="btnSidebarTrial" href="javascript:void(0)">Active su plan hoy &rarr;</a>
-        </div>
         <div class="sidebar-footer">
-          <button class="sidebar-footer-link" id="btnSidebarProfile" title="Centro de ayuda / Mi Perfil">
-            <i data-lucide="help-circle"></i>
-            <span>Centro de ayuda</span>
-          </button>
-          <button class="sidebar-footer-link" id="btnLogout" title="Cerrar sesión">
-            <i data-lucide="log-out"></i>
-            <span>Cerrar Sesión</span>
-          </button>
+          <div class="sidebar-user">
+            <div class="sidebar-user-clickable" id="btnSidebarProfile" title="Ver mi perfil" role="button" tabindex="0">
+              <div class="sidebar-user-avatar" id="sidebarAvatar">
+                ${user.avatarUrl ? `<img src="${user.avatarUrl}" alt="Avatar" />` : escapeHTML((user.name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase())}
+              </div>
+              <div class="sidebar-user-info">
+                <div class="name" id="sidebarUserName">${escapeHTML(user.name || '')}</div>
+                <div class="role">${escapeHTML(user.roleName || '')}</div>
+              </div>
+            </div>
+            <button class="btn-logout" id="btnLogout" title="Cerrar sesión"><i data-lucide="log-out"></i></button>
+          </div>
         </div>
       </aside>
       <main class="main-content">
@@ -403,15 +394,7 @@ function renderApp(user, defaultRoute = null) {
             <h2 id="pageTitle">Dashboard</h2>
           </div>
           <div class="content-header-actions">
-            <button class="btn-plans-pill" id="btnHeaderPlans">
-              Ver Planes &rarr;
-            </button>
-            <div class="header-tenant-info" id="btnHeaderProfile" role="button" tabindex="0" title="Ver perfil">
-              <span>${escapeHTML(user.tenantName || 'Moca Creaciones')}</span>
-              <div class="tenant-avatar-badge">
-                <i data-lucide="store"></i>
-              </div>
-            </div>
+            <span style="color:var(--text-muted);font-size:.82rem" id="currentDateTime"></span>
             <button class="btn btn-ghost btn-icon" id="btnThemeToggle" title="Cambiar tema">
               <i data-lucide="${currentTheme === 'dark' ? 'sun' : 'moon'}" id="themeIcon"></i>
             </button>
@@ -470,20 +453,19 @@ function renderApp(user, defaultRoute = null) {
         });
     });
 
-    // Theme toggles
-    document.getElementById('btnThemeToggle')?.addEventListener('click', toggleTheme);
-    document.getElementById('btnThemeSidebar')?.addEventListener('click', toggleTheme);
+    // Theme toggle
+    document.getElementById('btnThemeToggle').addEventListener('click', toggleTheme);
 
-    // Plans pill
-    const handlePlansClick = () => {
-        alert('Plan Boot: Prueba gratuita de 10 días activa.\nTodos los módulos y reportes habilitados.');
-    };
-    document.getElementById('btnHeaderPlans')?.addEventListener('click', handlePlansClick);
-    document.getElementById('btnSidebarTrial')?.addEventListener('click', handlePlansClick);
+    // Update datetime
+    function updateClock() {
+        const el = document.getElementById('currentDateTime');
+        if (el) el.textContent = new Date().toLocaleString('es-PY', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    updateClock();
+    setInterval(updateClock, 30000);
 
     // Profile modal
     const btnProfile = document.getElementById('btnSidebarProfile');
-    const btnHeaderProfile = document.getElementById('btnHeaderProfile');
     if (btnProfile) {
         const handleOpenProfile = () => {
             if (sidebar.classList.contains('active')) {
@@ -511,11 +493,6 @@ function renderApp(user, defaultRoute = null) {
                 e.preventDefault();
                 handleOpenProfile();
             }
-        });
-    }
-    if (btnHeaderProfile) {
-        btnHeaderProfile.addEventListener('click', () => {
-            showProfileModal(() => {});
         });
     }
 
