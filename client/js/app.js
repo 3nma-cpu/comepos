@@ -307,11 +307,12 @@ function toggleTheme() {
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('comepos_theme', next);
 
-    const icon = document.getElementById('themeIcon');
-    if (icon) {
+    const icons = document.querySelectorAll('#themeIcon, #btnThemeSidebar i');
+    icons.forEach(icon => {
         icon.setAttribute('data-lucide', next === 'dark' ? 'sun' : 'moon');
-        if (window.lucide) lucide.createIcons();
-    }
+    });
+    if (window.lucide) lucide.createIcons();
+    window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: next } }));
 }
 
 function onLogin(user) {
@@ -336,9 +337,18 @@ function renderApp(user, defaultRoute = null) {
       <div class="sidebar-overlay" id="sidebarOverlay"></div>
       <aside class="sidebar" id="mainSidebar">
         <div class="sidebar-header">
-          <div class="sidebar-brand" title="Comedor TTA S.A.">
-            <img src="/img/icon-512.png" alt="Comedor TTA S.A." class="sidebar-brand-icon" />
-            <span class="logo-text">Comedor TTA S.A.</span>
+          <div class="sidebar-brand-wrapper">
+            <div class="sidebar-brand" title="ComePOS">
+              <span class="brand-logo-text">
+                <span class="brand-name">Come</span><span class="brand-badge">POS</span>
+              </span>
+            </div>
+            <button class="btn-theme-sidebar" id="btnThemeSidebar" title="Cambiar tema">
+              <i data-lucide="${currentTheme === 'dark' ? 'sun' : 'moon'}"></i>
+            </button>
+          </div>
+          <div class="sidebar-plan-row">
+            <span class="plan-pill-badge">Plan Boot</span>
           </div>
         </div>
         <nav class="sidebar-nav" id="sidebarNavAccordion">
@@ -363,40 +373,48 @@ function renderApp(user, defaultRoute = null) {
             </div>`;
           }).join('')}
         </nav>
+        <div class="sidebar-trial-banner">
+          <div class="trial-title">Prueba gratis de 10 días</div>
+          <a class="trial-link" id="btnSidebarTrial" href="javascript:void(0)">Active su plan hoy &rarr;</a>
+        </div>
         <div class="sidebar-footer">
-          <div class="sidebar-user">
-            <div class="sidebar-user-clickable" id="btnSidebarProfile" title="Ver mi perfil" role="button" tabindex="0">
-              <div class="sidebar-user-avatar" id="sidebarAvatar">
-                ${user.avatarUrl ? `<img src="${user.avatarUrl}" alt="Avatar" />` : escapeHTML((user.name || 'U').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase())}
-              </div>
-              <div class="sidebar-user-info">
-                <div class="name" id="sidebarUserName">${escapeHTML(user.name || '')}</div>
-                <div class="role">${escapeHTML(user.roleName || '')}</div>
-              </div>
-            </div>
-            <button class="btn-logout" id="btnLogout" title="Cerrar sesión"><i data-lucide="log-out"></i></button>
-          </div>
+          <button class="sidebar-footer-link" id="btnSidebarProfile" title="Centro de ayuda / Mi Perfil">
+            <i data-lucide="help-circle"></i>
+            <span>Centro de ayuda</span>
+          </button>
+          <button class="sidebar-footer-link" id="btnLogout" title="Cerrar sesión">
+            <i data-lucide="log-out"></i>
+            <span>Cerrar Sesión</span>
+          </button>
         </div>
       </aside>
       <main class="main-content">
         <header class="content-header">
-          <div style="display:flex;align-items:center;gap:0.35rem">
+          <div class="header-left">
+            <button class="btn-desktop-sidebar-toggle" id="btnDesktopSidebarToggle" title="Minimizar / expandir barra lateral">
+              <svg class="icon-sidebar-toggle" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3.5"></rect>
+                <path d="M9 3v18"></path>
+              </svg>
+            </button>
             <button class="btn-menu-toggle" id="btnMenuToggle">
               <i data-lucide="menu"></i>
-            </button>
-            <button class="btn-desktop-sidebar-toggle" id="btnDesktopSidebarToggle" title="Minimizar / expandir barra lateral">
-              <svg class="icon-sidebar-toggle" width="19" height="19" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect x="3" y="3" width="18" height="18" rx="3.5" stroke="currentColor" stroke-width="2"/>
-                <rect x="5.5" y="5.5" width="5" height="13" rx="1.5" fill="currentColor"/>
-              </svg>
             </button>
             <h2 id="pageTitle">Dashboard</h2>
           </div>
           <div class="content-header-actions">
+            <button class="btn-plans-pill" id="btnHeaderPlans">
+              Ver Planes &rarr;
+            </button>
+            <div class="header-tenant-info" id="btnHeaderProfile" role="button" tabindex="0" title="Ver perfil">
+              <span>${escapeHTML(user.tenantName || 'Moca Creaciones')}</span>
+              <div class="tenant-avatar-badge">
+                <i data-lucide="store"></i>
+              </div>
+            </div>
             <button class="btn btn-ghost btn-icon" id="btnThemeToggle" title="Cambiar tema">
               <i data-lucide="${currentTheme === 'dark' ? 'sun' : 'moon'}" id="themeIcon"></i>
             </button>
-            <span style="color:var(--text-muted);font-size:.82rem" id="currentDateTime"></span>
           </div>
         </header>
         <div class="content-body" id="module-content"></div>
@@ -452,19 +470,20 @@ function renderApp(user, defaultRoute = null) {
         });
     });
 
-    // Theme toggle
-    document.getElementById('btnThemeToggle').addEventListener('click', toggleTheme);
+    // Theme toggles
+    document.getElementById('btnThemeToggle')?.addEventListener('click', toggleTheme);
+    document.getElementById('btnThemeSidebar')?.addEventListener('click', toggleTheme);
 
-    // Update datetime
-    function updateClock() {
-        const el = document.getElementById('currentDateTime');
-        if (el) el.textContent = new Date().toLocaleString('es-PY', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    }
-    updateClock();
-    setInterval(updateClock, 30000);
+    // Plans pill
+    const handlePlansClick = () => {
+        alert('Plan Boot: Prueba gratuita de 10 días activa.\nTodos los módulos y reportes habilitados.');
+    };
+    document.getElementById('btnHeaderPlans')?.addEventListener('click', handlePlansClick);
+    document.getElementById('btnSidebarTrial')?.addEventListener('click', handlePlansClick);
 
     // Profile modal
     const btnProfile = document.getElementById('btnSidebarProfile');
+    const btnHeaderProfile = document.getElementById('btnHeaderProfile');
     if (btnProfile) {
         const handleOpenProfile = () => {
             if (sidebar.classList.contains('active')) {
@@ -492,6 +511,11 @@ function renderApp(user, defaultRoute = null) {
                 e.preventDefault();
                 handleOpenProfile();
             }
+        });
+    }
+    if (btnHeaderProfile) {
+        btnHeaderProfile.addEventListener('click', () => {
+            showProfileModal(() => {});
         });
     }
 
