@@ -17,7 +17,7 @@ function destroyCharts() {
 window.addEventListener('themeChanged', () => {
     if (lastChartData && document.getElementById('chartSales7d')) {
         destroyCharts();
-        renderCharts(lastChartData.daily, lastChartData.categories, lastChartData.selectedDate);
+        renderCharts(lastChartData.daily, lastChartData.selectedDate);
     }
 });
 
@@ -33,22 +33,21 @@ export async function renderDashboard(selectedDate) {
     container.innerHTML = '<div class="fade-in"><div class="empty-state"><p>Cargando dashboard...</p></div></div>';
 
     try {
-        // Calculate 7 days ago based on selectedDate
+        // Calculate 10 days ago based on selectedDate
         const parts = selectedDate.split('-');
         const year = parseInt(parts[0], 10);
         const month = parseInt(parts[1], 10) - 1;
         const day = parseInt(parts[2], 10);
 
-        const date7 = new Date(year, month, day);
-        date7.setDate(date7.getDate() - 6);
-        const from7d = `${date7.getFullYear()}-${String(date7.getMonth() + 1).padStart(2, '0')}-${String(date7.getDate()).padStart(2, '0')}`;
+        const date10 = new Date(year, month, day);
+        date10.setDate(date10.getDate() - 9);
+        const from10d = `${date10.getFullYear()}-${String(date10.getMonth() + 1).padStart(2, '0')}-${String(date10.getDate()).padStart(2, '0')}`;
 
         // Fetch data
-        const [todayReport, weekReport, catReport, topProducts, recentSales] = await Promise.all([
+        const [todayReport, weekReport, topProducts, recentSales] = await Promise.all([
             api.get(`/reports/sales-period?from=${selectedDate}&to=${selectedDate}`),
-            api.get(`/reports/sales-period?from=${from7d}&to=${selectedDate}`),
-            api.get(`/reports/sales-category?from=${from7d}&to=${selectedDate}`),
-            api.get(`/reports/top-products?from=${from7d}&to=${selectedDate}`),
+            api.get(`/reports/sales-period?from=${from10d}&to=${selectedDate}`),
+            api.get(`/reports/top-products?from=${selectedDate}&to=${selectedDate}`),
             api.get(`/sales?to=${selectedDate}&limit=8`)
         ]);
 
@@ -74,36 +73,20 @@ export async function renderDashboard(selectedDate) {
 
           <div class="kpi-grid">
             <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-title">Ventas del Día</span>
-                <i data-lucide="shopping-bag" class="kpi-top-icon"></i>
-              </div>
+              <span class="kpi-title">Ventas del Día</span>
               <div class="kpi-val">${todayReport.totalSales}</div>
-              <div class="kpi-pill-wrap"><span class="kpi-pill kpi-pill-default">${todayReport.totalSales} ventas</span></div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-title">Ingresos del Día</span>
-                <i data-lucide="trending-up" class="kpi-top-icon"></i>
-              </div>
+              <span class="kpi-title">Ingresos del Día</span>
               <div class="kpi-val">${formatCurrency(todayReport.totalRevenue)}</div>
-              <div class="kpi-pill-wrap"><span class="kpi-pill kpi-pill-black">Total cobrado</span></div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-title">Clientes Atendidos</span>
-                <i data-lucide="users" class="kpi-top-icon"></i>
-              </div>
+              <span class="kpi-title">Clientes Atendidos</span>
               <div class="kpi-val">${todayClients}</div>
-              <div class="kpi-pill-wrap"><span class="kpi-pill kpi-pill-default">Clientes únicos</span></div>
             </div>
             <div class="kpi-card">
-              <div class="kpi-top">
-                <span class="kpi-title">Ticket Promedio</span>
-                <i data-lucide="receipt" class="kpi-top-icon"></i>
-              </div>
+              <span class="kpi-title">Ticket Promedio</span>
               <div class="kpi-val">${formatCurrency(todayReport.avgTicket)}</div>
-              <div class="kpi-pill-wrap"><span class="kpi-pill kpi-pill-black">Por venta</span></div>
             </div>
           </div>
 
@@ -111,15 +94,9 @@ export async function renderDashboard(selectedDate) {
             <h3 class="stats-section-title">Estadísticas</h3>
           </div>
 
-          <div class="charts-grid-two">
-            <div class="card chart-card">
-              <div class="card-header"><h3 class="card-title">Ventas — Últimos 7 Días</h3></div>
-              <div class="chart-container" style="position:relative;height:240px"><canvas id="chartSales7d"></canvas></div>
-            </div>
-            <div class="card chart-card">
-              <div class="card-header"><h3 class="card-title">Por Categoría</h3></div>
-              <div class="chart-container" style="position:relative;height:240px"><canvas id="chartCategory"></canvas></div>
-            </div>
+          <div class="card chart-card" style="margin-bottom:1.5rem">
+            <div class="card-header"><h3 class="card-title">Ventas — Últimos 10 Días</h3></div>
+            <div class="chart-container" style="position:relative;height:240px"><canvas id="chartSales7d"></canvas></div>
           </div>
 
           <div class="dashboard-bottom-grid">
@@ -140,8 +117,8 @@ export async function renderDashboard(selectedDate) {
         </div>`;
 
         if (window.lucide) lucide.createIcons();
-        lastChartData = { daily: weekReport.daily, categories: catReport.categories, selectedDate };
-        renderCharts(weekReport.daily, catReport.categories, selectedDate);
+        lastChartData = { daily: weekReport.daily, selectedDate };
+        renderCharts(weekReport.daily, selectedDate);
         renderRecentSales(recentSales);
         renderTopProducts(topProducts.products);
 
@@ -158,7 +135,7 @@ export async function renderDashboard(selectedDate) {
     }
 }
 
-function renderCharts(daily, categories, selectedDate) {
+function renderCharts(daily, selectedDate) {
     const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
     const tickColor = isDark ? '#71717a' : '#94a3b8';
     const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
@@ -167,6 +144,7 @@ function renderCharts(daily, categories, selectedDate) {
 
     // Fill missing days for the last 7 days ending on selectedDate
     const labels = [];
+    const fullDates = [];
     const dataMap = {};
     daily.forEach(d => dataMap[d.date] = d.total);
 
@@ -179,12 +157,13 @@ function renderCharts(daily, categories, selectedDate) {
     const day = parseInt(parts[2], 10);
 
     const data = [];
-    for (let i = 6; i >= 0; i--) {
+    for (let i = 9; i >= 0; i--) {
         const d = new Date(year, month, day);
         d.setDate(d.getDate() - i);
         const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
         labels.push(dayNames[d.getDay()]);
+        fullDates.push(`${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`);
         data.push(dataMap[key] || 0);
     }
 
@@ -199,12 +178,23 @@ function renderCharts(daily, categories, selectedDate) {
                     data,
                     backgroundColor: barColor,
                     borderRadius: 6,
-                    maxBarThickness: 32
+                    barPercentage: 0.7,
+                    categoryPercentage: 0.8
                 }]
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: { 
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function(context) {
+                                const index = context[0].dataIndex;
+                                return `${labels[index]} (${fullDates[index]})`;
+                            }
+                        }
+                    }
+                },
                 scales: {
                     x: { grid: { display: false }, ticks: { color: tickColor, font } },
                     y: { grid: { color: gridColor }, ticks: { color: tickColor, font, callback: v => '₲' + (v / 1000).toFixed(0) + 'k' } }
@@ -212,29 +202,6 @@ function renderCharts(daily, categories, selectedDate) {
             }
         });
         charts.push(c1);
-    }
-
-    // Category pie
-    const catLabels = categories.map(c => c.category);
-    const catData = categories.map(c => c.amount);
-    const catColors = isDark
-        ? ['#ffffff', '#d4d4d8', '#a1a1aa', '#71717a', '#52525b', '#3f3f46', '#27272a', '#e4e4e7']
-        : ['#09090b', '#27272a', '#3f3f46', '#52525b', '#71717a', '#a1a1aa', '#d4d4d8', '#18181b'];
-
-    const ctx2 = document.getElementById('chartCategory');
-    if (ctx2) {
-        const c2 = new Chart(ctx2, {
-            type: 'doughnut',
-            data: {
-                labels: catLabels,
-                datasets: [{ data: catData, backgroundColor: catColors.slice(0, catLabels.length), borderWidth: 0 }]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom', labels: { color: tickColor, padding: 12, font } } }
-            }
-        });
-        charts.push(c2);
     }
 }
 
@@ -255,10 +222,15 @@ function renderTopProducts(products) {
     const container = document.getElementById('topProductsContainer');
     if (!container) return;
 
+    if (!products || products.length === 0) {
+        container.innerHTML = '<div style="padding:1.5rem;text-align:center;color:var(--text-secondary);font-size:.85rem">No hay productos vendidos en esta fecha</div>';
+        return;
+    }
+
     container.innerHTML = products.slice(0, 6).map((p, i) => `
       <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;${i < 5 ? 'border-bottom:1px solid var(--border)' : ''}">
         <div style="flex:1">
-          <div style="font-weight:600;font-size:.85rem">${p.name}</div>
+          <div style="font-weight:600;font-size:.85rem">${escapeHTML(p.name)}</div>
           <div style="font-size:.75rem;color:var(--text-secondary)">${p.qty} vendidos</div>
         </div>
         <div style="font-weight:700;color:var(--text);font-size:.85rem">${formatCurrency(p.revenue / (p.qty || 1))}</div>

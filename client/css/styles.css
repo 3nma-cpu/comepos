@@ -857,8 +857,9 @@ select:focus:not(:focus-visible) {
     padding: 1.25rem 1.4rem;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    min-height: 135px;
+    justify-content: center;
+    gap: .45rem;
+    min-height: 105px;
     box-shadow: var(--shadow);
     transition: transform var(--transition), border-color var(--transition), box-shadow var(--transition);
 }
@@ -899,7 +900,7 @@ select:focus:not(:focus-visible) {
     font-weight: 800;
     line-height: 1.1;
     letter-spacing: -.03em;
-    margin: .6rem 0 .75rem;
+    margin: 0;
     color: var(--text);
     font-variant-numeric: tabular-nums;
 }
