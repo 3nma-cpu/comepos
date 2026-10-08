@@ -515,62 +515,55 @@ export function showTicket(sale, onDeleted = null) {
   const ticketId = (sale.id || '').slice(-6).toUpperCase();
 
   const body = `
-    <div class="ticket-preview" id="ticketPrintArea" style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#000;font-weight:600">
+    <div class="ticket-preview" id="ticketPrintArea" style="font-family:'Courier New',Courier,'Lucida Console',monospace;color:#000;font-weight:700;max-width:300px;margin:0 auto">
       ${isCancelled ? `
       <!-- Banner Anulación -->
-      <div style="background:#fee2e2;border:2px dashed #dc2626;color:#991b1b;border-radius:6px;padding:8px 10px;margin-bottom:12px;text-align:center">
-        <div style="font-weight:900;font-size:1.05rem;letter-spacing:1px">⚠️ VENTA ANULADA</div>
-        <div style="font-size:0.75rem;margin-top:3px"><strong>Fecha Anulación:</strong> ${formatDateTime(sale.cancelledAt || saleDate)}</div>
+      <div style="background:#fee2e2;border:2px dashed #dc2626;color:#991b1b;border-radius:4px;padding:6px;margin-bottom:8px;text-align:center">
+        <div style="font-weight:900;font-size:0.95rem;letter-spacing:1px">*** VENTA ANULADA ***</div>
+        <div style="font-size:0.75rem;margin-top:2px"><strong>Fecha Anulación:</strong> ${formatDateTime(sale.cancelledAt || saleDate)}</div>
         ${sale.cancelledByName ? `<div style="font-size:0.75rem"><strong>Por:</strong> ${escapeHTML(sale.cancelledByName)}</div>` : ''}
-        <div style="font-size:0.75rem;margin-top:2px"><strong>Motivo:</strong> ${escapeHTML(sale.cancellationReason || 'No especificado')}</div>
+        <div style="font-size:0.75rem"><strong>Motivo:</strong> ${escapeHTML(sale.cancellationReason || 'No especificado')}</div>
       </div>` : ''}
 
       <!-- Encabezado -->
       <div style="text-align:center">
-        <div style="font-weight:800;font-size:1.05rem;letter-spacing:0.5px">COMEDOR TTA S.A.</div>
-        <div style="font-size:.78rem;font-weight:700;color:#000;margin-top:2px">${isCancelled ? 'Vale Anulado' : 'Vale de Comedor'}</div>
+        <div style="font-weight:900;font-size:1.05rem;letter-spacing:0.5px">COMEDOR TTA S.A.</div>
+        <div style="font-size:.8rem;font-weight:700;color:#000;margin-top:2px">${isCancelled ? 'VALE ANULADO' : 'VALE DE COMEDOR'}</div>
       </div>
-      <div class="ticket-divider" style="border-color:#000"></div>
+      <div style="text-align:center;letter-spacing:-1px;margin:4px 0;font-size:0.8rem">----------------------------------</div>
 
       <!-- Datos de venta -->
-      <div class="ticket-line"><span>Ticket #:</span><span style="font-weight:800">${ticketId}</span></div>
-      <div class="ticket-line"><span>Fecha:</span><span>${formatDateTime(saleDate)}</span></div>
-      <div class="ticket-line" style="margin-top:6px"><span>Cliente:</span><span style="font-weight:700">${escapeHTML(clientName)}</span></div>
-      <div class="ticket-line" style="margin-top:6px"><span>Pago:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
-      <div class="ticket-line" style="margin-top:6px"><span>Cajero:</span><span id="ticketVendorName">${escapeHTML(vendorName)}</span></div>
-      <div class="ticket-divider" style="border-color:#000;margin-top:6px"></div>
+      <div class="ticket-line"><span>FECHA:</span><span>${formatDateTime(saleDate)}</span></div>
+      <div class="ticket-line"><span>TICKET #:</span><span style="font-weight:900">${ticketId}</span></div>
+      <div class="ticket-line"><span>CLIENTE:</span><span style="font-weight:700">${escapeHTML(clientName)}</span></div>
+      <div class="ticket-line"><span>CAJERO:</span><span id="ticketVendorName">${escapeHTML(vendorName)}</span></div>
+      <div class="ticket-line"><span>PAGO:</span><span>${payLabels[sale.paymentMethod] || sale.paymentMethod}</span></div>
+      <div style="text-align:center;letter-spacing:-1px;margin:4px 0;font-size:0.8rem">----------------------------------</div>
 
       <!-- Items -->
       <div style="font-size:.8rem">
-        <div style="display:flex;justify-content:space-between;font-weight:800;border-bottom:1.5px dashed #000;padding-bottom:2px;margin-bottom:4px">
-          <span>Producto</span><span>SubTotal</span>
-        </div>
         ${sale.items.map(it => `
-        <div style="display:flex;justify-content:space-between;margin-bottom:2px">
-          <span>${escapeHTML(it.name)} x${it.quantity}${it.unit ? ' '+it.unit : ''}</span>
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span>${it.quantity}x ${escapeHTML(it.name)}</span>
           <span style="font-weight:700">${formatCurrency(it.price * it.quantity)}</span>
         </div>`).join('')}
       </div>
-      <div class="ticket-divider" style="border-color:#000"></div>
+      <div style="text-align:center;letter-spacing:-1px;margin:4px 0;font-size:0.8rem">----------------------------------</div>
 
       <!-- Total -->
-      <div class="ticket-line ticket-total" style="font-weight:800;font-size:1rem;color:#000">
-        <span>TOTAL</span>
+      <div class="ticket-line ticket-total" style="font-weight:900;font-size:1.05rem;color:#000;margin:4px 0">
+        <span>TOTAL:</span>
         <span style="${isCancelled ? 'text-decoration:line-through;color:#991b1b;' : ''}">${formatCurrency(sale.total)}</span>
       </div>
-      <div class="ticket-divider" style="border-color:#000"></div>
-
-      <!-- Mensaje -->
-      <div style="text-align:center;font-size:.75rem;font-weight:700;color:#000;margin:6px 0">
-        ${isCancelled ? 'COMPROBANTE DE VENTA ANULADA' : '¡Gracias por su consumo!'}
+      <div style="text-align:center;font-size:0.75rem;font-weight:700;margin-top:2px">
+        ${payLabels[sale.paymentMethod] ? `PAGADO (${payLabels[sale.paymentMethod].toUpperCase()})` : ''}
       </div>
-      <div class="ticket-divider" style="margin-bottom:10px;border-color:#000"></div>
+      <div style="text-align:center;letter-spacing:-1px;margin:4px 0;font-size:0.8rem">----------------------------------</div>
 
-      <!-- Firma exclusiva del cliente -->
-      <div style="text-align:center;margin:15px auto 10px auto;width:85%">
-        <div style="border-top:2px solid #000;padding-top:6px;margin-top:55px">
-          <div style="font-weight:800;font-size:.85rem">${escapeHTML(clientName)}</div>
-          <div style="font-size:.72rem;font-weight:800;letter-spacing:0.5px;color:#000;margin-top:2px">FIRMA DEL CLIENTE</div>
+      <!-- Firma cliente -->
+      <div style="text-align:center;margin:30px auto 10px auto;width:90%">
+        <div style="border-top:1.5px dashed #000;padding-top:4px">
+          <div style="font-size:.75rem;font-weight:800;letter-spacing:0.5px;color:#000">FIRMA DEL CLIENTE</div>
         </div>
       </div>
     </div>`;
@@ -665,16 +658,15 @@ export function printTicket(sale, ...rest) {
       padding: 0;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
-      color-adjust: exact !important;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      font-size: 8.5pt;
-      font-weight: 600;
-      line-height: 1.3;
+      font-family: "Courier New", Courier, "Lucida Console", monospace;
+      font-size: 9.5pt;
+      font-weight: 700;
+      line-height: 1.25;
       width: 100%;
-      max-width: 60mm;
-      padding: 2mm 3mm 8mm 3mm;
+      max-width: 66mm;
+      padding: 2mm 3mm 6mm 3mm;
       margin: 0 auto;
       background: #fff;
       color: #000000;
@@ -684,174 +676,118 @@ export function printTicket(sale, ...rest) {
       text-align: center; 
     }
     .bold { 
-      font-weight: 800; 
+      font-weight: 900; 
     }
     .header-title {
-      font-weight: 800;
+      font-weight: 900;
       font-size: 11pt;
       letter-spacing: 0.5px;
-      color: #000000;
+      text-align: center;
     }
     .header-subtitle {
-      font-size: 8pt;
+      font-size: 8.5pt;
       font-weight: 700;
-      color: #000000;
+      text-align: center;
       margin-top: 1px;
     }
-    .divider-dash {
-      border: none;
-      border-top: 1.5px dashed #000000;
-      margin: 4px 0;
+    .divider-dots {
+      text-align: center;
+      letter-spacing: -0.5px;
+      margin: 3px 0;
+      font-size: 9pt;
+      overflow: hidden;
+      white-space: nowrap;
     }
-    .ticket-line {
+    .ticket-row {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 6px;
-      margin: 3px 0;
-      font-size: 8.5pt;
-      font-weight: 600;
-      color: #000000;
+      margin: 2px 0;
+      font-size: 9pt;
     }
-    .ticket-line span:first-child {
+    .ticket-row span:first-child {
       flex-shrink: 0;
-      font-weight: 700;
     }
-    .ticket-line span:last-child {
+    .ticket-row span:last-child {
       text-align: right;
       word-break: break-word;
-      font-weight: 600;
-    }
-    .items-header {
-      display: flex;
-      justify-content: space-between;
-      font-weight: 800;
-      border-bottom: 1.5px dashed #000000;
-      padding-bottom: 2px;
-      margin-bottom: 3px;
-      font-size: 8.5pt;
-      color: #000000;
     }
     .item-row {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      gap: 6px;
-      margin-bottom: 2.5px;
-      font-size: 8.5pt;
-      font-weight: 600;
-      color: #000000;
+      gap: 4px;
+      margin-bottom: 2px;
+      font-size: 9pt;
     }
     .item-name {
       text-align: left;
       word-break: break-word;
-      padding-right: 4px;
     }
     .item-price {
       white-space: nowrap;
       text-align: right;
-      font-weight: 700;
+      font-weight: 800;
     }
     .ticket-total {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 10.5pt;
-      font-weight: 800;
+      font-size: 11pt;
+      font-weight: 900;
       margin: 3px 0;
-      color: #000000;
-    }
-    .ticket-message {
-      text-align: center;
-      font-size: 8pt;
-      font-weight: 700;
-      color: #000000;
-      margin: 5px 0;
     }
     .signature-container {
       text-align: center;
-      margin: 14mm auto 4mm auto;
+      margin: 10mm auto 2mm auto;
       width: 90%;
     }
     .signature-line-bar {
-      border-top: 2px solid #000000;
-      padding-top: 4px;
-    }
-    .signature-client {
-      font-weight: 800;
-      font-size: 8.5pt;
-      color: #000000;
+      border-top: 1.5px dashed #000000;
+      padding-top: 3px;
     }
     .signature-caption {
-      font-size: 7.5pt;
+      font-size: 8pt;
       font-weight: 800;
       letter-spacing: 0.5px;
-      color: #000000;
-      margin-top: 2px;
     }
   </style>
 </head>
 <body>
 
   <!-- Encabezado -->
-  <div class="center">
-    <div class="header-title">COMEDOR TTA S.A.</div>
-    <div class="header-subtitle">Vale de Comedor</div>
-  </div>
-  <hr class="divider-dash"/>
+  <div class="header-title">COMEDOR TTA S.A.</div>
+  <div class="header-subtitle">${isCancelled ? '*** VALE ANULADO ***' : 'VALE DE COMEDOR'}</div>
+  <div class="divider-dots">--------------------------------</div>
 
   <!-- Datos de venta -->
-  <div class="ticket-line">
-    <span>Ticket #:</span>
-    <span class="bold">${ticketId}</span>
-  </div>
-  <div class="ticket-line">
-    <span>Fecha:</span>
-    <span>${formatDateTime(saleDate)}</span>
-  </div>
-  <div class="ticket-line" style="margin-top:5px">
-    <span>Cliente:</span>
-    <span>${escapeHTML(clientName)}</span>
-  </div>
-  <div class="ticket-line" style="margin-top:5px">
-    <span>Pago:</span>
-    <span>${payLabel}</span>
-  </div>
-  <div class="ticket-line" style="margin-top:5px">
-    <span>Cajero:</span>
-    <span>${escapeHTML(vendorName)}</span>
-  </div>
-  <hr class="divider-dash" style="margin-top:5px"/>
+  <div class="ticket-row"><span>FECHA:</span><span>${formatDateTime(saleDate)}</span></div>
+  <div class="ticket-row"><span>TICKET #:</span><span class="bold">${ticketId}</span></div>
+  <div class="ticket-row"><span>CLIENTE:</span><span>${escapeHTML(clientName)}</span></div>
+  <div class="ticket-row"><span>CAJERO:</span><span>${escapeHTML(vendorName)}</span></div>
+  <div class="divider-dots">--------------------------------</div>
 
   <!-- Items -->
   <div>
-    <div class="items-header">
-      <span>Producto</span>
-      <span>SubTotal</span>
-    </div>
     ${items.map(it => `
     <div class="item-row">
-      <span class="item-name">${escapeHTML(it.name)} x${it.quantity}${it.unit ? ' ' + it.unit : ''}</span>
+      <span class="item-name">${it.quantity}x ${escapeHTML(it.name)}</span>
       <span class="item-price">${formatCurrency(it.price * it.quantity)}</span>
     </div>`).join('')}
   </div>
-  <hr class="divider-dash"/>
+  <div class="divider-dots">--------------------------------</div>
 
   <!-- Total -->
   <div class="ticket-total">
-    <span>TOTAL</span>
-    <span>${formatCurrency(total)}</span>
+    <span>TOTAL:</span>
+    <span class="bold">${formatCurrency(total)}</span>
   </div>
-  <hr class="divider-dash"/>
+  <div class="center" style="font-size:8pt;margin-top:1px">PAGADO (${escapeHTML(payLabel.toUpperCase())})</div>
+  <div class="divider-dots">--------------------------------</div>
 
-  <!-- Mensaje -->
-  <div class="ticket-message">¡Gracias por su consumo!</div>
-  <hr class="divider-dash"/>
-
-  <!-- Firma exclusiva del cliente -->
+  <!-- Firma -->
   <div class="signature-container">
     <div class="signature-line-bar">
-      <div class="signature-client">${escapeHTML(clientName)}</div>
       <div class="signature-caption">FIRMA DEL CLIENTE</div>
     </div>
   </div>
