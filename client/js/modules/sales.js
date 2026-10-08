@@ -636,13 +636,9 @@ export function printTicket(sale, ...rest) {
   const items = actualSale?.items || [];
   const total = actualSale?.total || 0;
 
-  const printWin = window.open('', '_blank', 'width=400,height=600');
-  if (!printWin) {
-    showToast('Ventana de impresión bloqueada. Permita las ventanas emergentes en su navegador.', 'warning');
-    return;
-  }
+  const isCancelled = actualSale?.status === 'CANCELLED';
 
-  printWin.document.write(`<!DOCTYPE html>
+  const ticketHtml = `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
@@ -793,17 +789,36 @@ export function printTicket(sale, ...rest) {
   </div>
 
 </body>
-</html>
-`);
+</html>`;
 
-  printWin.document.close();
-  printWin.focus();
+  // Imprimir usando un iframe oculto: evita ventanas emergentes about:blank y bloqueos de navegador
+  const oldFrame = document.getElementById('printTicketIframe');
+  if (oldFrame) oldFrame.remove();
+
+  const iframe = document.createElement('iframe');
+  iframe.id = 'printTicketIframe';
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentWindow.document;
+  doc.open();
+  doc.write(ticketHtml);
+  doc.close();
+
+  iframe.contentWindow.focus();
   setTimeout(() => {
     try {
-      printWin.print();
-      printWin.close();
+      iframe.contentWindow.print();
     } catch (e) {
-      console.warn('Error al imprimir ticket:', e);
+      console.warn('Error al llamar a print():', e);
     }
-  }, 350);
+    setTimeout(() => {
+      iframe.remove();
+    }, 1000);
+  }, 300);
 }
