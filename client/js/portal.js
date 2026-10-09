@@ -212,9 +212,7 @@ function renderWelcomeScreen(initialMsg = '') {
     <div class="portal-login-screen">
       <div class="portal-login-card">
         <div class="portal-login-header">
-          <div class="portal-login-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-          </div>
+          <img src="/img/icon-512.png" alt="ComePOS" class="portal-login-icon" style="object-fit:cover;border-radius:12px;" />
           <h1>Mi Consumo</h1>
           <p>Comedor TTA S.A. — Portal de Funcionarios</p>
           <div class="portal-badge-system">Acceso Seguro</div>
@@ -613,9 +611,7 @@ async function renderPortalApp() {
     <header class="portal-header">
       <div class="portal-header-inner">
         <div class="portal-brand-wrap">
-          <div class="portal-brand-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
-          </div>
+          <img src="/img/icon-512.png" alt="ComePOS" class="portal-brand-icon" />
           <div class="portal-welcome">
             <h1>${session.name || 'Funcionario'}</h1>
             <p>C.I. ${session.cedula || ''} ${session.department ? '• ' + session.department : ''}</p>
