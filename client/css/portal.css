@@ -45,24 +45,24 @@
     --p-bg: #f8fafc;
     --p-bg-header: #ffffff;
     --p-bg-card: #ffffff;
-    --p-bg-card-hover: #f4f4f5;
-    --p-secondary: #f4f4f5;
-    --p-bg-input: #f8fafc;
-    --p-bg-modal-overlay: rgba(0, 0, 0, .45);
+    --p-bg-card-hover: #f1f5f9;
+    --p-bg-secondary: #f1f5f9;
+    --p-bg-input: #ffffff;
+    --p-bg-modal-overlay: rgba(15, 23, 42, .45);
 
-    --p-border: #e4e4e7;
-    --p-border-focus: #000000;
+    --p-border: #e2e8f0;
+    --p-border-focus: #0f172a;
 
-    --p-text: #09090b;
-    --p-text-sec: #64748b;
-    --p-text-muted: #94a3b8;
+    --p-text: #0f172a;
+    --p-text-sec: #475569;
+    --p-text-muted: #64748b;
 
-    --p-btn-pri-bg: #000000;
+    --p-btn-pri-bg: #0f172a;
     --p-btn-pri-text: #ffffff;
-    --p-btn-pri-hover: #27272a;
+    --p-btn-pri-hover: #1e293b;
 
-    --p-shadow: 0 1px 3px rgba(0, 0, 0, .05);
-    --p-shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, .08);
+    --p-shadow: 0 1px 3px rgba(0, 0, 0, .05), 0 1px 2px rgba(0, 0, 0, .03);
+    --p-shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, .08), 0 8px 10px -6px rgba(0, 0, 0, .04);
 }
 
 /* Reset */
@@ -386,7 +386,7 @@ body {
 }
 
 .p-btn-outline {
-    background: transparent;
+    background: var(--p-bg-card);
     border: 1px solid var(--p-border);
     color: var(--p-text-sec);
     font-size: 0.8rem;
@@ -395,6 +395,7 @@ body {
     cursor: pointer;
     transition: all var(--p-transition);
     width: auto;
+    font-weight: 500;
 }
 
 .p-btn-outline:hover {
@@ -408,6 +409,7 @@ body {
     color: var(--p-btn-pri-text);
     border-color: var(--p-btn-pri-bg);
     font-weight: 600;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .12);
 }
 
 /* Alerts & Notices */
@@ -479,6 +481,12 @@ body {
     border-radius: var(--p-radius);
     padding: 1rem;
     box-shadow: var(--p-shadow);
+    transition: all var(--p-transition);
+}
+
+.portal-kpi:hover {
+    box-shadow: var(--p-shadow-lg);
+    border-color: rgba(15, 23, 42, 0.18);
 }
 
 .portal-kpi-label {
@@ -494,6 +502,7 @@ body {
     font-size: 1.25rem;
     font-weight: 700;
     color: var(--p-text);
+    letter-spacing: -0.01em;
 }
 
 /* Filters Bar */
@@ -540,25 +549,27 @@ body {
     background: var(--p-bg-secondary);
     border: 1px solid var(--p-border);
     border-radius: var(--p-radius);
-    padding: 0.85rem 1.15rem;
+    padding: 0.95rem 1.25rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 1.25rem;
+    box-shadow: var(--p-shadow);
 }
 
 .portal-period-total .label {
-    font-size: 0.82rem;
-    font-weight: 600;
+    font-size: 0.8rem;
+    font-weight: 700;
     color: var(--p-text-sec);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .portal-period-total .value {
-    font-size: 1.2rem;
+    font-size: 1.35rem;
     font-weight: 800;
     color: var(--p-text);
+    letter-spacing: -0.02em;
 }
 
 /* Ticket List */
@@ -574,11 +585,12 @@ body {
     border-radius: var(--p-radius);
     overflow: hidden;
     box-shadow: var(--p-shadow);
-    transition: border-color var(--p-transition);
+    transition: all var(--p-transition);
 }
 
 .portal-ticket:hover {
     border-color: var(--p-border-focus);
+    box-shadow: var(--p-shadow-lg);
 }
 
 .portal-ticket-header {
@@ -600,6 +612,7 @@ body {
 
 .portal-ticket-date strong {
     color: var(--p-text);
+    font-weight: 600;
 }
 
 .portal-ticket-total {
@@ -616,9 +629,9 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0.4rem 0;
+    padding: 0.45rem 0;
     border-bottom: 1px dashed var(--p-border);
-    font-size: 0.82rem;
+    font-size: 0.83rem;
 }
 
 .portal-ticket-item:last-child {
@@ -641,7 +654,7 @@ body {
 }
 
 .portal-ticket-footer {
-    padding: 0.5rem 1rem;
+    padding: 0.55rem 1rem;
     background: var(--p-bg-card);
     border-top: 1px solid var(--p-border);
     display: flex;
@@ -651,21 +664,15 @@ body {
     color: var(--p-text-sec);
 }
 
-/* Badge Forma de Pago (Monocromo y limpio) */
+/* Badge Forma de Pago */
 .portal-badge-pay {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    padding: 2px 8px;
-    border-radius: 4px;
+    padding: 3px 8px;
+    border-radius: var(--p-radius-sm);
     font-size: 0.72rem;
     font-weight: 600;
-    background: var(--p-bg-secondary);
-    border: 1px solid var(--p-border);
-    color: var(--p-text);
-}
-
-.portal-badge-pay.vale_comedor {
     background: var(--p-bg-secondary);
     border: 1px solid var(--p-border);
     color: var(--p-text);
