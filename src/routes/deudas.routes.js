@@ -35,6 +35,54 @@ function formatFecha(dateStr) {
   return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`;
 }
 
+// Helper para parsear la descripción e ítems/cargos de una deuda
+function parseDeudaInfo(deuda) {
+  let texto = (deuda.descripcion || '').trim();
+  let cargos = [];
+
+  if (texto.startsWith('{') && texto.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(texto);
+      if (parsed && typeof parsed === 'object') {
+        texto = (parsed.texto || '').trim();
+        if (Array.isArray(parsed.cargos || parsed.items)) {
+          cargos = parsed.cargos || parsed.items;
+        }
+      }
+    } catch {
+      // Fallback a texto plano
+    }
+  }
+
+  // Si no hay cargos explícitos, derivar el cargo inicial
+  if (!cargos.length) {
+    const bruto = deuda.montoBruto ?? deuda.montoOriginal;
+    const interes = deuda.montoInteres ?? Math.max(0, deuda.montoOriginal - bruto);
+    const pct = deuda.porcentajeInteres ?? 0;
+    cargos = [
+      {
+        id: 'init_' + deuda.id,
+        fecha: deuda.fecha,
+        descripcion: texto || 'Cargo inicial',
+        montoBruto: bruto,
+        porcentajeInteres: pct,
+        montoInteres: interes,
+        montoTotal: deuda.montoOriginal,
+        isInitial: true
+      }
+    ];
+  }
+
+  return { texto, cargos };
+}
+
+function encodeDeudaInfo(texto, cargos) {
+  return JSON.stringify({
+    texto: (texto || '').trim(),
+    cargos: cargos || []
+  });
+}
+
 // ============================================
 // MOTIVOS DE DEUDA (Catálogo)
 // ============================================
@@ -167,10 +215,23 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Los montos deben ser mayores a 0' });
     }
 
+    const initialCargo = {
+      id: 'c_' + Date.now(),
+      fecha: new Date(fecha),
+      descripcion: descripcion.trim(),
+      montoBruto: finalBruto,
+      porcentajeInteres: finalPct,
+      montoInteres: finalInteres,
+      montoTotal: finalTotal,
+      isInitial: true,
+      createdAt: new Date(),
+      createdBy: req.user?.id || req.user?.userId || 'sistema'
+    };
+
     const deudaData = {
       funcionarioId,
       motivoId,
-      descripcion: descripcion.trim(),
+      descripcion: encodeDeudaInfo(descripcion.trim(), [initialCargo]),
       fecha: new Date(fecha),
       montoBruto: finalBruto,
       porcentajeInteres: finalPct,
@@ -197,17 +258,193 @@ router.post('/', async (req, res) => {
         },
         include: { motivo: true, funcionario: true, planDescuento: true, descuentos: true }
       });
-      return res.status(201).json(deuda);
+      const { texto, cargos } = parseDeudaInfo(deuda);
+      return res.status(201).json({ ...deuda, descripcion: texto, cargos });
     }
 
     const deuda = await prisma.deuda.create({
       data: deudaData,
       include: { motivo: true, funcionario: true, planDescuento: true, descuentos: true }
     });
-    res.status(201).json(deuda);
+    const { texto, cargos } = parseDeudaInfo(deuda);
+    res.status(201).json({ ...deuda, descripcion: texto, cargos });
   } catch (err) {
     console.error('Error crear deuda:', err);
     res.status(500).json({ error: 'Error al crear deuda' });
+  }
+});
+
+// POST /api/deudas/:id/agregar-cargo — Agregar nuevo cargo/deuda a una deuda existente
+router.post('/:id/agregar-cargo', async (req, res) => {
+  try {
+    const { descripcion, fecha, montoBruto, porcentajeInteres, montoInteres, montoOriginal } = req.body;
+
+    if (!descripcion?.trim()) return res.status(400).json({ error: 'Descripción / Concepto es obligatorio' });
+    if (!fecha) return res.status(400).json({ error: 'Fecha es obligatoria' });
+
+    const deuda = await prisma.deuda.findUnique({
+      where: { id: req.params.id },
+      include: { motivo: true, funcionario: true, descuentos: true }
+    });
+    if (!deuda) return res.status(404).json({ error: 'Deuda no encontrada' });
+    if (deuda.estado === 'ANULADA') return res.status(400).json({ error: 'No se pueden agregar cargos a una deuda anulada' });
+
+    // Cálculo y normalización de montos para el nuevo cargo
+    let finalBruto;
+    let finalPct;
+    let finalInteres;
+    let finalTotal;
+
+    if (montoBruto !== undefined && montoBruto !== null && !isNaN(parseInt(montoBruto))) {
+      finalBruto = parseInt(montoBruto);
+      finalPct = (porcentajeInteres !== undefined && porcentajeInteres !== null && !isNaN(Number(porcentajeInteres)))
+        ? Math.max(0, Number(porcentajeInteres))
+        : (deuda.porcentajeInteres || deuda.motivo?.porcentajeInteres || 0);
+
+      const interesCalculado = Math.round(finalBruto * (finalPct / 100));
+      finalInteres = (montoInteres !== undefined && montoInteres !== null && !isNaN(parseInt(montoInteres)))
+        ? parseInt(montoInteres)
+        : interesCalculado;
+
+      finalTotal = (montoOriginal !== undefined && montoOriginal !== null && !isNaN(parseInt(montoOriginal)))
+        ? parseInt(montoOriginal)
+        : (finalBruto + finalInteres);
+    } else if (montoOriginal !== undefined && montoOriginal !== null && !isNaN(parseInt(montoOriginal))) {
+      finalTotal = parseInt(montoOriginal);
+      finalBruto = finalTotal;
+      finalPct = 0;
+      finalInteres = 0;
+    } else {
+      return res.status(400).json({ error: 'Monto debe ser mayor a 0' });
+    }
+
+    if (finalBruto <= 0 || finalTotal <= 0) {
+      return res.status(400).json({ error: 'Los montos deben ser mayores a 0' });
+    }
+
+    // Parsear cargos existentes
+    const { texto: textoActual, cargos } = parseDeudaInfo(deuda);
+
+    const nuevoCargo = {
+      id: 'c_' + Date.now(),
+      fecha: new Date(fecha),
+      descripcion: descripcion.trim(),
+      montoBruto: finalBruto,
+      porcentajeInteres: finalPct,
+      montoInteres: finalInteres,
+      montoTotal: finalTotal,
+      isInitial: false,
+      createdAt: new Date(),
+      createdBy: req.user?.id || req.user?.userId || 'sistema'
+    };
+
+    cargos.push(nuevoCargo);
+
+    // Calcular nuevos totales acumulados
+    const prevBruto = deuda.montoBruto ?? deuda.montoOriginal;
+    const prevInteres = deuda.montoInteres ?? Math.max(0, deuda.montoOriginal - prevBruto);
+    const nuevoBrutoTotal = prevBruto + finalBruto;
+    const nuevoInteresTotal = prevInteres + finalInteres;
+    const nuevoMontoOriginal = deuda.montoOriginal + finalTotal;
+    const nuevoTexto = textoActual ? `${textoActual} + ${descripcion.trim()}` : descripcion.trim();
+
+    // Actualizar en base de datos. Si estaba SALDADA, vuelve a ACTIVA.
+    const updated = await prisma.deuda.update({
+      where: { id: deuda.id },
+      data: {
+        montoBruto: nuevoBrutoTotal,
+        montoInteres: nuevoInteresTotal,
+        montoOriginal: nuevoMontoOriginal,
+        descripcion: encodeDeudaInfo(nuevoTexto, cargos),
+        estado: 'ACTIVA'
+      },
+      include: {
+        motivo: true,
+        funcionario: true,
+        planDescuento: true,
+        descuentos: { orderBy: { fecha: 'asc' } }
+      }
+    });
+
+    const { texto, cargos: updatedCargos } = parseDeudaInfo(updated);
+    res.status(201).json({
+      ...updated,
+      descripcion: texto,
+      cargos: updatedCargos,
+      saldo: calcSaldo(updated)
+    });
+  } catch (err) {
+    console.error('Error agregar cargo:', err);
+    res.status(500).json({ error: 'Error al agregar cargo a la deuda' });
+  }
+});
+
+// DELETE /api/deudas/:id/cargos/:cargoId — Eliminar un cargo adicional de la deuda
+router.delete('/:id/cargos/:cargoId', async (req, res) => {
+  try {
+    const deuda = await prisma.deuda.findUnique({
+      where: { id: req.params.id },
+      include: { motivo: true, funcionario: true, descuentos: true }
+    });
+    if (!deuda) return res.status(404).json({ error: 'Deuda no encontrada' });
+
+    const { texto: textoActual, cargos } = parseDeudaInfo(deuda);
+    const cargoIndex = cargos.findIndex(c => c.id === req.params.cargoId);
+    if (cargoIndex === -1) return res.status(404).json({ error: 'Cargo no encontrado' });
+
+    const cargo = cargos[cargoIndex];
+    if (cargo.isInitial || cargos.length <= 1) {
+      return res.status(400).json({ error: 'No se puede eliminar el cargo principal de la deuda. Si desea eliminar toda la deuda, use Anular Deuda.' });
+    }
+
+    // Verificar que al descontar este cargo el saldo no sea negativo
+    const nuevoMontoOriginal = deuda.montoOriginal - cargo.montoTotal;
+    const totalDescontado = deuda.descuentos.filter(d => !d.anulado).reduce((s, d) => s + d.monto, 0);
+    if (nuevoMontoOriginal < totalDescontado) {
+      return res.status(400).json({ error: `No se puede eliminar el cargo porque los descuentos ya realizados (${formatGs(totalDescontado)}) superarían el nuevo total (${formatGs(nuevoMontoOriginal)})` });
+    }
+
+    // Eliminar el cargo del array
+    cargos.splice(cargoIndex, 1);
+
+    const prevBruto = deuda.montoBruto ?? deuda.montoOriginal;
+    const prevInteres = deuda.montoInteres ?? Math.max(0, deuda.montoOriginal - prevBruto);
+    const nuevoBrutoTotal = Math.max(0, prevBruto - (cargo.montoBruto || cargo.montoTotal));
+    const nuevoInteresTotal = Math.max(0, prevInteres - (cargo.montoInteres || 0));
+
+    // Reconstruir texto descriptivo
+    const nuevoTexto = cargos.map(c => c.descripcion).join(' + ');
+
+    const nuevoSaldo = nuevoMontoOriginal - totalDescontado;
+    const nuevoEstado = nuevoSaldo === 0 ? 'SALDADA' : 'ACTIVA';
+
+    const updated = await prisma.deuda.update({
+      where: { id: deuda.id },
+      data: {
+        montoBruto: nuevoBrutoTotal,
+        montoInteres: nuevoInteresTotal,
+        montoOriginal: nuevoMontoOriginal,
+        descripcion: encodeDeudaInfo(nuevoTexto, cargos),
+        estado: nuevoEstado
+      },
+      include: {
+        motivo: true,
+        funcionario: true,
+        planDescuento: true,
+        descuentos: { orderBy: { fecha: 'asc' } }
+      }
+    });
+
+    const { texto, cargos: updatedCargos } = parseDeudaInfo(updated);
+    res.json({
+      ...updated,
+      descripcion: texto,
+      cargos: updatedCargos,
+      saldo: calcSaldo(updated)
+    });
+  } catch (err) {
+    console.error('Error eliminar cargo:', err);
+    res.status(500).json({ error: 'Error al eliminar cargo de la deuda' });
   }
 });
 
@@ -233,6 +470,7 @@ router.get('/funcionario/:id', async (req, res) => {
 
     // Calcular saldos y valores brutos / intereses
     const deudasConSaldo = deudas.map(d => {
+      const { texto, cargos } = parseDeudaInfo(d);
       const montoBruto = d.montoBruto ?? d.montoOriginal;
       const porcentajeInteres = d.porcentajeInteres ?? 0;
       const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
@@ -240,6 +478,8 @@ router.get('/funcionario/:id', async (req, res) => {
       const saldo = d.estado === 'SALDADA' ? 0 : Math.max(0, calcSaldo(d));
       return {
         ...d,
+        descripcion: texto,
+        cargos,
         montoBruto,
         porcentajeInteres,
         montoInteres,
@@ -438,18 +678,37 @@ router.get('/deudores', async (req, res) => {
     });
 
     const deudasConSaldo = deudas.map(d => {
+      const { texto, cargos } = parseDeudaInfo(d);
       const montoBruto = d.montoBruto ?? d.montoOriginal;
       const porcentajeInteres = d.porcentajeInteres ?? 0;
       const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
-      const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
+      const descuentosValidos = (d.descuentos || []).filter(desc => !desc.anulado);
+      const totalDescontado = descuentosValidos.reduce((s, desc) => s + desc.monto, 0);
+
+      // Obtener fecha del último descuento válido
+      const ultimoDesc = descuentosValidos.length > 0
+        ? [...descuentosValidos].sort((a, b) => new Date(b.fecha) - new Date(a.fecha))[0]
+        : null;
+      const ultimoDescuentoFecha = ultimoDesc ? ultimoDesc.fecha : null;
+
       return {
         ...d,
+        descripcion: texto,
+        cargos,
         montoBruto,
         porcentajeInteres,
         montoInteres,
         saldo: calcSaldo(d),
-        totalDescontado
+        totalDescontado,
+        ultimoDescuentoFecha
       };
+    });
+
+    // Ordenar siempre alfabéticamente por nombre de funcionario
+    deudasConSaldo.sort((a, b) => {
+      const nameA = (a.funcionario?.name || '').toLowerCase();
+      const nameB = (b.funcionario?.name || '').toLowerCase();
+      return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
     });
 
     res.json(deudasConSaldo);
@@ -496,6 +755,7 @@ router.get('/planilla', async (req, res) => {
       });
 
       const planilla = deudas.map(d => {
+        const { texto, cargos } = parseDeudaInfo(d);
         const saldo = calcSaldo(d);
         const montoDescuento = Math.min(d.planDescuento?.montoPorDescuento || 0, saldo);
         const montoBruto = d.montoBruto ?? d.montoOriginal;
@@ -506,7 +766,8 @@ router.get('/planilla', async (req, res) => {
           deuda: {
             id: d.id,
             motivo: d.motivo.nombre,
-            descripcion: d.descripcion,
+            descripcion: texto,
+            cargos,
             montoBruto,
             porcentajeInteres,
             montoInteres,
@@ -584,6 +845,7 @@ router.get('/planilla', async (req, res) => {
     }
 
     const reporte = deudas.map(d => {
+      const { texto, cargos } = parseDeudaInfo(d);
       const saldo = calcSaldo(d);
       const totalDescontado = d.descuentos.filter(desc => !desc.anulado).reduce((s, desc) => s + desc.monto, 0);
       const montoBruto = d.montoBruto ?? d.montoOriginal;
@@ -595,7 +857,8 @@ router.get('/planilla', async (req, res) => {
         funcionario: d.funcionario,
         fecha: d.fecha,
         motivo: d.motivo,
-        descripcion: d.descripcion,
+        descripcion: texto,
+        cargos,
         montoBruto,
         porcentajeInteres,
         montoInteres,
@@ -643,6 +906,7 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
     });
 
     const deudasConSaldo = deudas.map(d => {
+      const { texto, cargos } = parseDeudaInfo(d);
       const montoBruto = d.montoBruto ?? d.montoOriginal;
       const porcentajeInteres = d.porcentajeInteres ?? 0;
       const montoInteres = d.montoInteres ?? Math.max(0, d.montoOriginal - montoBruto);
@@ -650,6 +914,8 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
       const saldo = d.estado === 'SALDADA' ? 0 : Math.max(0, calcSaldo(d));
       return {
         ...d,
+        descripcion: texto,
+        cargos,
         montoBruto,
         porcentajeInteres,
         montoInteres,
@@ -880,11 +1146,21 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
           <span>Total Descontado: <strong style="color:#15803d">Gs. ${formatGs(d.totalDescontado)}</strong></span>
         </div>
         <div class="deuda-body">
+          ${(d.cargos && d.cargos.length > 1) ? `
+            <div style="font-size:8.5pt;font-weight:700;color:#495057;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #e9ecef;padding-bottom:3px">Cargos / Conceptos Acumulados:</div>
+            ${d.cargos.map(c => `
+              <div class="descuento-row" style="color:#111">
+                <span>${formatFecha(c.fecha)} &mdash; <strong>${c.descripcion}</strong></span>
+                <span style="font-weight:600">+Gs. ${formatGs(c.montoTotal)}</span>
+              </div>
+            `).join('')}
+            <div style="font-size:8.5pt;font-weight:700;color:#495057;text-transform:uppercase;margin-top:10px;margin-bottom:6px;border-bottom:1px solid #e9ecef;padding-bottom:3px">Descuentos Registrados:</div>
+          ` : ''}
           ${d.descuentos.length === 0 ? '<p style="font-size:9.5pt;color:#888;font-style:italic">Sin descuentos registrados</p>' :
           d.descuentos.map(desc => `
             <div class="descuento-row${desc.anulado ? ' anulado' : ''}">
-              <span>${formatFecha(desc.fecha)}${desc.nota ? ' - ' + desc.nota : ''}${desc.anulado ? ' [ANULADO]' : ''}</span>
-              <span>Gs. ${formatGs(desc.monto)}</span>
+              <span>${formatFecha(desc.fecha)}${desc.nota ? ' &mdash; ' + desc.nota : ''}${desc.anulado ? ' [ANULADO]' : ''}</span>
+              <span style="color:#15803d;font-weight:600">-Gs. ${formatGs(desc.monto)}</span>
             </div>`).join('')}
         </div>
         <div class="saldo-line">Saldo: Gs. ${formatGs(d.saldo)}</div>

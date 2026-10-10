@@ -6,22 +6,29 @@ import { api } from '../api.js';
 import { generateId, showToast, createModal, closeModal, escapeHTML, formatCurrency, formatDateTime, EMPLOYEE_CATEGORIES, CATEGORY_BADGE_COLORS } from '../utils.js';
 import { showTicket, promptCancellationReason } from './sales.js';
 
-export async function renderClients() {
+let clientFilterState = { search: '', category: '' };
+let cachedClientsList = null;
+
+export async function renderClients(forceRefresh = false) {
     const container = document.getElementById('module-content');
     try {
-        const clients = await api.get('/clients');
+        if (forceRefresh || cachedClientsList === null) {
+            cachedClientsList = await api.get('/clients');
+        }
+        const clients = cachedClientsList;
 
         container.innerHTML = `
         <div class="fade-in">
           <div class="filters-bar">
             <div class="search-bar">
               <i data-lucide="search"></i>
-              <input type="text" class="form-control" id="searchClients" placeholder="Buscar por nombre o cédula..." />
+              <input type="text" class="form-control" id="searchClients" placeholder="Buscar por nombre o cédula..." value="${escapeHTML(clientFilterState.search)}" />
             </div>
             <select class="form-control" id="filterCategory" style="width:auto;min-width:160px">
-              <option value="">Todas las categorías</option>
-              ${EMPLOYEE_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('')}
+              <option value="" ${!clientFilterState.category ? 'selected' : ''}>Todas las categorías</option>
+              ${EMPLOYEE_CATEGORIES.map(c => `<option value="${c}" ${clientFilterState.category === c ? 'selected' : ''}>${c}</option>`).join('')}
             </select>
+            <button class="btn btn-ghost" id="btnRefreshClients" title="Recargar lista"><i data-lucide="refresh-cw"></i></button>
             <button class="btn btn-primary" id="btnAddClient"><i data-lucide="plus"></i>Nuevo Cliente</button>
           </div>
           <div class="table-container">
@@ -35,8 +42,9 @@ export async function renderClients() {
         if (window.lucide) lucide.createIcons();
 
         function applyFilters() {
-            const q = document.getElementById('searchClients').value.toLowerCase();
-            const cat = document.getElementById('filterCategory').value;
+            const q = (document.getElementById('searchClients')?.value || '').toLowerCase();
+            const cat = document.getElementById('filterCategory')?.value || '';
+            clientFilterState = { search: document.getElementById('searchClients')?.value || '', category: cat };
             const filtered = clients.filter(c => {
                 const matchQ = !q || c.name.toLowerCase().includes(q) || c.cedula.includes(q);
                 const matchCat = !cat || c.category === cat;
@@ -45,9 +53,13 @@ export async function renderClients() {
             renderTable(filtered, clients);
         }
 
-        renderTable(clients, clients);
+        applyFilters();
         document.getElementById('searchClients').addEventListener('input', applyFilters);
         document.getElementById('filterCategory').addEventListener('change', applyFilters);
+        document.getElementById('btnRefreshClients').addEventListener('click', () => {
+            renderClients(true);
+            showToast('Clientes actualizados');
+        });
         document.getElementById('btnAddClient').addEventListener('click', () => openClientModal(null, clients));
     } catch (err) {
         container.innerHTML = `<div class="empty-state"><p>Error al cargar clientes: ${err.message}</p></div>`;
@@ -86,7 +98,7 @@ function renderTable(clients, allClients) {
                 try {
                     await api.post(`/clients/${client.id}/reset-pin`);
                     showToast('PIN de acceso al portal reseteado');
-                    renderClients();
+                    renderClients(true);
                 } catch (e) {
                     showToast(e.message, 'error');
                 }
@@ -107,7 +119,7 @@ function renderTable(clients, allClients) {
                 try {
                     await api.delete(`/clients/${btn.dataset.delete}`);
                     showToast('Cliente eliminado');
-                    renderClients();
+                    renderClients(true);
                 } catch (e) {
                     showToast(e.message, 'error');
                 }
@@ -229,7 +241,7 @@ function openClientModal(client, allClients) {
                 showToast('Cliente registrado');
             }
             closeModal(overlay);
-            renderClients();
+            renderClients(true);
         } catch (err) {
             showToast(err.message, 'error');
             btnSave.disabled = false;

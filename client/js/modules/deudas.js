@@ -10,6 +10,24 @@ import { navigate } from '../router.js';
 let currentTab = 'deudores';
 let cachedMotivos = [];
 
+// Estado persistente de filtros y cache de datos (para no perder búsquedas/filtros al volver de una ficha)
+let deudoresFilterState = {
+  search: '',
+  categoria: '',
+  estado: 'ACTIVA',
+  motivoId: ''
+};
+let cachedDeudoresList = null;
+
+let planillaFilterState = {
+  search: '',
+  categoria: '',
+  estado: 'ACTIVA',
+  motivoId: '',
+  frecuencia: ''
+};
+let cachedPlanillaList = null;
+
 // ============================================
 // Formateo
 // ============================================
@@ -55,10 +73,12 @@ export async function renderDeudas(subRoute) {
     </div>`;
   if (window.lucide) lucide.createIcons();
 
-  // Preload motivos
-  try {
-    cachedMotivos = await api.get('/deudas/motivos');
-  } catch { cachedMotivos = []; }
+  // Preload motivos si no están en caché
+  if (!cachedMotivos || cachedMotivos.length === 0) {
+    try {
+      cachedMotivos = await api.get('/deudas/motivos');
+    } catch { cachedMotivos = []; }
+  }
 
   document.getElementById('deudaTabs').addEventListener('click', e => {
     const tab = e.target.closest('.sp-tab');
@@ -231,11 +251,12 @@ async function renderCargarDeuda() {
         </div>
         <div id="deudaFuncSelected" style="display:none" class="deuda-selected-func"></div>
         <input type="hidden" id="deudaFuncId" />
+        <div id="deudaTipoCargaContainer" style="display:none"></div>
       </div>
 
       <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
-        <div class="form-group">
-          <label>Motivo del Préstamo / Deuda *</label>
+        <div class="form-group" id="groupMotivo">
+          <label id="lblMotivo">Motivo del Préstamo / Deuda *</label>
           <div style="display:flex;gap:.5rem">
             <select class="form-control" id="deudaMotivo" style="flex:1">
               <option value="">Seleccionar...</option>
@@ -251,18 +272,18 @@ async function renderCargarDeuda() {
       </div>
 
       <div class="form-group">
-        <label>Descripción *</label>
+        <label id="lblDesc">Descripción / Concepto *</label>
         <input type="text" class="form-control" id="deudaDesc" placeholder="Ej: Préstamo personal / Heladera Philco 320L / Uniforme institucional" maxlength="200" />
       </div>
 
       <div class="card" style="background:var(--bg-secondary);border:1px solid var(--border);padding:1.15rem;margin-bottom:1.25rem;border-radius:var(--radius)">
         <div style="font-weight:600;font-size:.9rem;margin-bottom:.85rem;display:flex;align-items:center;gap:.5rem">
-          <i data-lucide="calculator"></i>Cálculo de Préstamo Bruto y Ganancia / Interés
+          <i data-lucide="calculator"></i>Cálculo de Monto Bruto y Ganancia / Interés
         </div>
 
         <div class="form-row" style="display:grid;grid-template-columns:1.5fr 1fr 1.5fr;gap:1rem;align-items:flex-start">
           <div class="form-group">
-            <label>Préstamo Bruto / Capital (Gs.) *</label>
+            <label>Capital Bruto (Gs.) *</label>
             <input type="text" class="form-control" id="deudaMontoBruto" placeholder="1.000.000" />
             <small style="color:var(--text-muted);font-size:.78rem">Capital o valor neto entregado</small>
           </div>
@@ -293,13 +314,13 @@ async function renderCargarDeuda() {
           </div>
           <div style="font-size:1.25rem;color:var(--text-muted);font-weight:600">=</div>
           <div class="calc-stat total">
-            <span>Total Deuda a Cobrar</span>
+            <span id="lblResumenTotal">Total Deuda a Cobrar</span>
             <strong id="resumenTotal" style="color:var(--primary)">Gs. 0</strong>
           </div>
         </div>
       </div>
 
-      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-top:.5rem">
+      <div id="sectionPlan" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:.5rem">
         <h4 style="margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem;font-size:.92rem"><i data-lucide="calendar-range"></i>Plan de Descuento (opcional)</h4>
         <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
           <div class="form-group">
@@ -328,6 +349,88 @@ async function renderCargarDeuda() {
     </div>
   </div>`;
   if (window.lucide) lucide.createIcons();
+
+  let funcionarioDeudasActivas = [];
+
+  async function checkFuncionarioDeudasActivas(funcId) {
+    const container = document.getElementById('deudaTipoCargaContainer');
+    if (!container) return;
+    try {
+      const data = await api.get(`/deudas/funcionario/${funcId}`);
+      funcionarioDeudasActivas = (data.deudas || []).filter(d => d.estado === 'ACTIVA');
+      if (funcionarioDeudasActivas.length > 0) {
+        container.innerHTML = `
+          <div style="background:var(--bg-secondary);border:1px solid var(--border);padding:1rem;border-radius:var(--radius);margin-top:1rem;margin-bottom:.5rem">
+            <label style="font-weight:700;display:block;margin-bottom:.5rem;font-size:.88rem">
+              <i data-lucide="layers" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px"></i>Modalidad de Registro:
+            </label>
+            <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.9rem">
+              <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                <input type="radio" name="tipoCarga" value="nueva" checked />
+                <span><strong>Crear nueva deuda</strong> (independiente)</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer">
+                <input type="radio" name="tipoCarga" value="anexar" />
+                <span><strong>Anexar cargo a deuda existente</strong> (${funcionarioDeudasActivas.length} activa${funcionarioDeudasActivas.length > 1 ? 's' : ''})</span>
+              </label>
+            </div>
+            <div id="deudaExistenteSelectBox" style="display:none;margin-top:.85rem;padding-top:.85rem;border-top:1px dashed var(--border)">
+              <label style="font-size:.85rem;font-weight:600">Seleccionar deuda a la que se anexará este cargo *</label>
+              <select class="form-control" id="deudaExistenteId">
+                ${funcionarioDeudasActivas.map((d, idx) => `
+                  <option value="${d.id}" data-pct="${d.porcentajeInteres ?? 0}" data-motivo="${d.motivoId}">
+                    Deuda #${idx + 1}: ${escapeHTML(d.motivo?.nombre || '')} — ${escapeHTML(d.descripcion)} (Saldo: ${fmtGs(d.saldo)})
+                  </option>
+                `).join('')}
+              </select>
+            </div>
+          </div>`;
+        if (window.lucide) lucide.createIcons();
+        container.style.display = 'block';
+
+        container.querySelectorAll('input[name="tipoCarga"]').forEach(radio => {
+          radio.addEventListener('change', () => {
+            const isAnexar = radio.value === 'anexar';
+            const selectBox = document.getElementById('deudaExistenteSelectBox');
+            if (selectBox) selectBox.style.display = isAnexar ? 'block' : 'none';
+            const btnGuardar = document.getElementById('btnGuardarDeuda');
+            if (btnGuardar) {
+              btnGuardar.innerHTML = isAnexar ? '<i data-lucide="plus-circle"></i>Anexar Cargo a Deuda' : '<i data-lucide="save"></i>Guardar Préstamo';
+              if (window.lucide) lucide.createIcons();
+            }
+            const sectionPlan = document.getElementById('sectionPlan');
+            if (sectionPlan) sectionPlan.style.display = isAnexar ? 'none' : 'block';
+            const groupMotivo = document.getElementById('groupMotivo');
+            if (groupMotivo) groupMotivo.style.display = isAnexar ? 'none' : 'block';
+
+            if (isAnexar) {
+              const sel = document.getElementById('deudaExistenteId');
+              if (sel) {
+                const opt = sel.options[sel.selectedIndex];
+                if (opt && opt.dataset.pct) {
+                  document.getElementById('deudaPorcentaje').value = opt.dataset.pct;
+                  recalcFromBrutoAndPct();
+                }
+              }
+            }
+          });
+        });
+
+        document.getElementById('deudaExistenteId')?.addEventListener('change', e => {
+          const opt = e.target.options[e.target.selectedIndex];
+          if (opt && opt.dataset.pct) {
+            document.getElementById('deudaPorcentaje').value = opt.dataset.pct;
+            recalcFromBrutoAndPct();
+          }
+        });
+      } else {
+        container.style.display = 'none';
+        container.innerHTML = '';
+      }
+    } catch {
+      container.style.display = 'none';
+    }
+  }
 
   // === Búsqueda de funcionario ===
   const searchInput = document.getElementById('deudaFuncSearch');
@@ -378,11 +481,28 @@ async function renderCargarDeuda() {
       </div>`;
     selectedDiv.style.display = 'block';
     if (window.lucide) lucide.createIcons();
+
+    checkFuncionarioDeudasActivas(item.dataset.id);
+
     document.getElementById('btnClearFunc').addEventListener('click', () => {
       document.getElementById('deudaFuncId').value = '';
       searchInput.style.display = '';
       searchInput.value = '';
       selectedDiv.style.display = 'none';
+      const container = document.getElementById('deudaTipoCargaContainer');
+      if (container) {
+        container.style.display = 'none';
+        container.innerHTML = '';
+      }
+      const sectionPlan = document.getElementById('sectionPlan');
+      if (sectionPlan) sectionPlan.style.display = 'block';
+      const groupMotivo = document.getElementById('groupMotivo');
+      if (groupMotivo) groupMotivo.style.display = 'block';
+      const btnGuardar = document.getElementById('btnGuardarDeuda');
+      if (btnGuardar) {
+        btnGuardar.innerHTML = '<i data-lucide="save"></i>Guardar Préstamo';
+        if (window.lucide) lucide.createIcons();
+      }
       searchInput.focus();
     });
   });
@@ -526,7 +646,6 @@ async function renderCargarDeuda() {
   // === Guardar préstamo / deuda ===
   document.getElementById('btnGuardarDeuda').addEventListener('click', async () => {
     const funcionarioId = document.getElementById('deudaFuncId').value;
-    const motivoId = document.getElementById('deudaMotivo').value;
     const descripcion = document.getElementById('deudaDesc').value.trim();
     const fecha = document.getElementById('deudaFecha').value;
     const montoBruto = parseDigits(document.getElementById('deudaMontoBruto').value);
@@ -535,10 +654,49 @@ async function renderCargarDeuda() {
     const montoOriginal = montoBruto + montoInteres;
 
     if (!funcionarioId) return showToast('Seleccione un funcionario', 'error');
-    if (!motivoId) return showToast('Seleccione un motivo', 'error');
-    if (!descripcion) return showToast('Ingrese una descripción', 'error');
+    if (!descripcion) return showToast('Ingrese una descripción / concepto', 'error');
     if (!fecha) return showToast('Ingrese la fecha', 'error');
     if (montoBruto <= 0) return showToast('Ingrese un monto bruto válido', 'error');
+
+    const tipoCarga = document.querySelector('input[name="tipoCarga"]:checked')?.value || 'nueva';
+
+    if (tipoCarga === 'anexar') {
+      const deudaExistenteId = document.getElementById('deudaExistenteId')?.value;
+      if (!deudaExistenteId) return showToast('Seleccione la deuda a la que anexará el cargo', 'error');
+
+      const cargoBody = {
+        descripcion,
+        fecha,
+        montoBruto,
+        porcentajeInteres,
+        montoInteres,
+        montoOriginal
+      };
+
+      try {
+        const btn = document.getElementById('btnGuardarDeuda');
+        btn.disabled = true;
+        btn.innerHTML = '<i data-lucide="loader"></i>Guardando...';
+        if (window.lucide) lucide.createIcons();
+
+        await api.post(`/deudas/${deudaExistenteId}/agregar-cargo`, cargoBody);
+        cachedDeudoresList = null;
+        cachedPlanillaList = null;
+        showToast('Cargo anexado a la deuda correctamente');
+        navigate(`deudas/funcionario/${funcionarioId}`);
+      } catch (err) {
+        showToast(err.message || 'Error al anexar cargo', 'error');
+        const btn = document.getElementById('btnGuardarDeuda');
+        btn.disabled = false;
+        btn.innerHTML = '<i data-lucide="plus-circle"></i>Anexar Cargo a Deuda';
+        if (window.lucide) lucide.createIcons();
+      }
+      return;
+    }
+
+    // Modalidad nueva deuda
+    const motivoId = document.getElementById('deudaMotivo').value;
+    if (!motivoId) return showToast('Seleccione un motivo', 'error');
 
     const body = {
       funcionarioId,
@@ -566,6 +724,8 @@ async function renderCargarDeuda() {
       if (window.lucide) lucide.createIcons();
 
       await api.post('/deudas', body);
+      cachedDeudoresList = null;
+      cachedPlanillaList = null;
       showToast('Préstamo registrado correctamente');
 
       // Ir a la ficha del funcionario
@@ -581,6 +741,7 @@ async function renderCargarDeuda() {
 }
 
 // ============================================
+// ============================================
 // Tab: Deudores (Listado general)
 // ============================================
 async function renderDeudores() {
@@ -590,23 +751,24 @@ async function renderDeudores() {
     <div class="filters-bar" style="flex-wrap:wrap;gap:.75rem">
       <div class="search-bar" style="flex:1;min-width:200px">
         <i data-lucide="search"></i>
-        <input type="text" class="form-control" id="deudoresSearch" placeholder="Buscar por CI o nombre..." />
+        <input type="text" class="form-control" id="deudoresSearch" placeholder="Buscar por CI o nombre..." value="${escapeHTML(deudoresFilterState.search)}" />
       </div>
       <select class="form-control" id="deudoresCategoria" style="width:auto;min-width:130px">
-        <option value="">Todas las categorías</option>
-        <option value="CHOFER">CHOFER</option>
-        <option value="ADM">ADM</option>
+        <option value="" ${!deudoresFilterState.categoria ? 'selected' : ''}>Todas las categorías</option>
+        <option value="CHOFER" ${deudoresFilterState.categoria === 'CHOFER' ? 'selected' : ''}>CHOFER</option>
+        <option value="ADM" ${deudoresFilterState.categoria === 'ADM' ? 'selected' : ''}>ADM</option>
       </select>
       <select class="form-control" id="deudoresEstado" style="width:auto;min-width:140px">
-        <option value="">Todos los estados</option>
-        <option value="ACTIVA" selected>Activas</option>
-        <option value="SALDADA">Saldadas</option>
-        <option value="ANULADA">Anuladas</option>
+        <option value="" ${!deudoresFilterState.estado ? 'selected' : ''}>Todos los estados</option>
+        <option value="ACTIVA" ${deudoresFilterState.estado === 'ACTIVA' ? 'selected' : ''}>Activas</option>
+        <option value="SALDADA" ${deudoresFilterState.estado === 'SALDADA' ? 'selected' : ''}>Saldadas</option>
+        <option value="ANULADA" ${deudoresFilterState.estado === 'ANULADA' ? 'selected' : ''}>Anuladas</option>
       </select>
       <select class="form-control" id="deudoresMotivo" style="width:auto;min-width:140px">
         <option value="">Todos los motivos</option>
-        ${cachedMotivos.map(m => `<option value="${m.id}">${escapeHTML(m.nombre)}</option>`).join('')}
+        ${cachedMotivos.map(m => `<option value="${m.id}" ${deudoresFilterState.motivoId === m.id ? 'selected' : ''}>${escapeHTML(m.nombre)}</option>`).join('')}
       </select>
+      <button class="btn btn-ghost" id="btnRefreshDeudores" title="Recargar listado"><i data-lucide="refresh-cw"></i></button>
       <button class="btn btn-secondary" id="btnExportDeudas"><i data-lucide="download"></i>Excel</button>
     </div>
     <div id="deudoresTotals" class="deuda-totals-bar"></div>
@@ -617,11 +779,9 @@ async function renderDeudores() {
             <th>Funcionario</th>
             <th>Cat</th>
             <th>CI</th>
-            <th>Motivo</th>
             <th>Descripción</th>
-            <th>Fecha</th>
+            <th>Último Descuento</th>
             <th style="text-align:right">Préstamo Bruto</th>
-            <th style="text-align:right">Ganancia / Utilidad</th>
             <th style="text-align:right">Total Deuda</th>
             <th style="text-align:right">Descontado</th>
             <th style="text-align:right">Saldo</th>
@@ -637,11 +797,19 @@ async function renderDeudores() {
 
   let allDeudas = [];
 
-  async function loadDeudores() {
-    const search = document.getElementById('deudoresSearch').value.trim();
-    const categoria = document.getElementById('deudoresCategoria').value;
-    const estado = document.getElementById('deudoresEstado').value;
-    const motivoId = document.getElementById('deudoresMotivo').value;
+  async function loadDeudores(forceRefresh = false) {
+    const search = document.getElementById('deudoresSearch')?.value.trim() ?? deudoresFilterState.search;
+    const categoria = document.getElementById('deudoresCategoria')?.value ?? deudoresFilterState.categoria;
+    const estado = document.getElementById('deudoresEstado')?.value ?? deudoresFilterState.estado;
+    const motivoId = document.getElementById('deudoresMotivo')?.value ?? deudoresFilterState.motivoId;
+
+    deudoresFilterState = { search, categoria, estado, motivoId };
+
+    if (!forceRefresh && cachedDeudoresList !== null) {
+      allDeudas = cachedDeudoresList;
+      renderDeudoresTable(allDeudas);
+      return;
+    }
 
     const params = new URLSearchParams();
     if (search) params.set('search', search);
@@ -651,6 +819,7 @@ async function renderDeudores() {
 
     try {
       allDeudas = await api.get(`/deudas/deudores?${params.toString()}`);
+      cachedDeudoresList = allDeudas;
       renderDeudoresTable(allDeudas);
     } catch (err) {
       showToast('Error al cargar deudores', 'error');
@@ -660,12 +829,20 @@ async function renderDeudores() {
   function renderDeudoresTable(deudas) {
     const tbody = document.getElementById('deudoresTableBody');
     const totalsDiv = document.getElementById('deudoresTotals');
+    if (!tbody || !totalsDiv) return;
 
     if (!deudas.length) {
-      tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;color:var(--text-muted);padding:2rem">No se encontraron deudas</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:2rem">No se encontraron deudas</td></tr>`;
       totalsDiv.innerHTML = '';
       return;
     }
+
+    // Siempre ordenar alfabéticamente por nombre de funcionario
+    deudas.sort((a, b) => {
+      const nameA = (a.funcionario?.name || '').toLowerCase();
+      const nameB = (b.funcionario?.name || '').toLowerCase();
+      return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+    });
 
     // Totales
     const totalBruto = deudas.reduce((s, d) => s + (d.montoBruto ?? d.montoOriginal), 0);
@@ -684,22 +861,26 @@ async function renderDeudores() {
 
     tbody.innerHTML = deudas.map(d => {
       const bruto = d.montoBruto ?? d.montoOriginal;
-      const interes = d.montoInteres ?? Math.max(0, d.montoOriginal - bruto);
-      const pct = d.porcentajeInteres ?? 0;
       const cat = d.funcionario?.category || 'ADM';
+
+      // Obtener fecha del último descuento válido
+      let ultimoDescFecha = d.ultimoDescuentoFecha;
+      if (!ultimoDescFecha && d.descuentos && d.descuentos.length > 0) {
+        const valids = d.descuentos.filter(x => !x.anulado);
+        if (valids.length > 0) {
+          const sorted = [...valids].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+          ultimoDescFecha = sorted[0].fecha;
+        }
+      }
+
       return `
       <tr>
         <td><a href="javascript:void(0)" class="deuda-func-link" data-func="${d.funcionarioId}" style="color:var(--text);font-weight:600">${escapeHTML(d.funcionario?.name || '')}</a></td>
         <td><span class="badge ${cat === 'CHOFER' ? 'badge-warning' : 'badge-primary'}">${cat}</span></td>
         <td>${escapeHTML(d.funcionario?.cedula || '')}</td>
-        <td>${escapeHTML(d.motivo?.nombre || '')}</td>
-        <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(d.descripcion)}">${escapeHTML(d.descripcion)}</td>
-        <td>${formatDate(d.fecha)}</td>
+        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(d.descripcion)}">${escapeHTML(d.descripcion)}</td>
+        <td style="white-space:nowrap">${ultimoDescFecha ? formatDate(ultimoDescFecha) : '<span style="color:var(--text-muted)">—</span>'}</td>
         <td style="text-align:right;font-weight:500">${fmtGsPlain(bruto)}</td>
-        <td style="text-align:right">
-          <span style="color:var(--success);font-weight:600">+${fmtGsPlain(interes)}</span>
-          <small style="color:var(--text-muted);display:block;font-size:.72rem">(${pct}%)</small>
-        </td>
         <td style="text-align:right;font-weight:600">${fmtGsPlain(d.montoOriginal)}</td>
         <td style="text-align:right;color:var(--success)">${fmtGsPlain(d.totalDescontado)}</td>
         <td style="text-align:right;font-weight:600;color:${d.saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGsPlain(d.saldo)}</td>
@@ -712,30 +893,44 @@ async function renderDeudores() {
     if (window.lucide) lucide.createIcons();
 
     tbody.querySelectorAll('.deuda-func-link').forEach(el => {
-      el.addEventListener('click', () => navigate(`deudas/funcionario/${el.dataset.func}`));
+      el.addEventListener('click', () => {
+        currentTab = 'deudores';
+        navigate(`deudas/funcionario/${el.dataset.func}`);
+      });
     });
   }
 
-  document.getElementById('deudoresSearch').addEventListener('input', debounce(loadDeudores, 400));
-  document.getElementById('deudoresCategoria').addEventListener('change', loadDeudores);
-  document.getElementById('deudoresEstado').addEventListener('change', loadDeudores);
-  document.getElementById('deudoresMotivo').addEventListener('change', loadDeudores);
+  document.getElementById('deudoresSearch').addEventListener('input', debounce(() => loadDeudores(true), 400));
+  document.getElementById('deudoresCategoria').addEventListener('change', () => loadDeudores(true));
+  document.getElementById('deudoresEstado').addEventListener('change', () => loadDeudores(true));
+  document.getElementById('deudoresMotivo').addEventListener('change', () => loadDeudores(true));
+  document.getElementById('btnRefreshDeudores').addEventListener('click', () => {
+    loadDeudores(true);
+    showToast('Datos actualizados');
+  });
 
   document.getElementById('btnExportDeudas').addEventListener('click', () => {
     if (!allDeudas.length) return showToast('No hay datos para exportar', 'info');
-    const headers = ['Funcionario', 'Categoría', 'CI', 'Motivo', 'Descripción', 'Fecha', 'Préstamo Bruto', '% Ganancia', 'Utilidad Ganada', 'Total a Cobrar', 'Descontado', 'Saldo', 'Estado'];
+    const headers = ['Funcionario', 'Categoría', 'CI', 'Descripción', 'Último Descuento', 'Préstamo Bruto', 'Total a Cobrar', 'Descontado', 'Saldo', 'Estado'];
     const rows = allDeudas.map(d => {
       const bruto = d.montoBruto ?? d.montoOriginal;
-      const interes = d.montoInteres ?? Math.max(0, d.montoOriginal - bruto);
+      let ultimoDescFecha = d.ultimoDescuentoFecha;
+      if (!ultimoDescFecha && d.descuentos && d.descuentos.length > 0) {
+        const valids = d.descuentos.filter(x => !x.anulado);
+        if (valids.length > 0) {
+          const sorted = [...valids].sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+          ultimoDescFecha = sorted[0].fecha;
+        }
+      }
       return [
-        d.funcionario?.name, d.funcionario?.category || 'ADM', d.funcionario?.cedula, d.motivo?.nombre, d.descripcion,
-        formatDate(d.fecha), bruto, `${d.porcentajeInteres ?? 0}%`, interes, d.montoOriginal, d.totalDescontado, d.saldo, d.estado
+        d.funcionario?.name, d.funcionario?.category || 'ADM', d.funcionario?.cedula, d.descripcion,
+        ultimoDescFecha ? formatDate(ultimoDescFecha) : '—', bruto, d.montoOriginal, d.totalDescontado, d.saldo, d.estado
       ];
     });
     exportExcel(headers, rows, 'Deudas_Funcionarios.xlsx', 'Deudas');
   });
 
-  loadDeudores();
+  loadDeudores(false);
 }
 
 // ============================================
@@ -748,29 +943,30 @@ async function renderPlanilla() {
     <div class="filters-bar" style="flex-wrap:wrap;gap:.75rem">
       <div class="search-bar" style="flex:1;min-width:200px">
         <i data-lucide="search"></i>
-        <input type="text" class="form-control" id="planillaSearch" placeholder="Buscar funcionario por CI o nombre..." />
+        <input type="text" class="form-control" id="planillaSearch" placeholder="Buscar funcionario por CI o nombre..." value="${escapeHTML(planillaFilterState.search)}" />
       </div>
       <select class="form-control" id="planillaCategoria" style="width:auto;min-width:130px">
-        <option value="">Todas las categorías</option>
-        <option value="CHOFER">CHOFER</option>
-        <option value="ADM">ADM</option>
+        <option value="" ${!planillaFilterState.categoria ? 'selected' : ''}>Todas las categorías</option>
+        <option value="CHOFER" ${planillaFilterState.categoria === 'CHOFER' ? 'selected' : ''}>CHOFER</option>
+        <option value="ADM" ${planillaFilterState.categoria === 'ADM' ? 'selected' : ''}>ADM</option>
       </select>
       <select class="form-control" id="planillaEstado" style="width:auto;min-width:130px">
-        <option value="ACTIVA" selected>Solo Activas</option>
-        <option value="">Todos los estados</option>
-        <option value="SALDADA">Saldadas</option>
-        <option value="ANULADA">Anuladas</option>
+        <option value="ACTIVA" ${planillaFilterState.estado === 'ACTIVA' ? 'selected' : ''}>Solo Activas</option>
+        <option value="" ${!planillaFilterState.estado ? 'selected' : ''}>Todos los estados</option>
+        <option value="SALDADA" ${planillaFilterState.estado === 'SALDADA' ? 'selected' : ''}>Saldadas</option>
+        <option value="ANULADA" ${planillaFilterState.estado === 'ANULADA' ? 'selected' : ''}>Anuladas</option>
       </select>
       <select class="form-control" id="planillaMotivo" style="width:auto;min-width:130px">
         <option value="">Todos los motivos</option>
-        ${cachedMotivos.map(m => `<option value="${m.id}">${escapeHTML(m.nombre)}</option>`).join('')}
+        ${cachedMotivos.map(m => `<option value="${m.id}" ${planillaFilterState.motivoId === m.id ? 'selected' : ''}>${escapeHTML(m.nombre)}</option>`).join('')}
       </select>
       <select class="form-control" id="planillaFrec" style="width:auto;min-width:130px">
-        <option value="">Todas las frecuencias</option>
-        <option value="QUINCENAL">Quincenal</option>
-        <option value="SEMANAL">Semanal</option>
-        <option value="SIN_PLAN">Sin plan</option>
+        <option value="" ${!planillaFilterState.frecuencia ? 'selected' : ''}>Todas las frecuencias</option>
+        <option value="QUINCENAL" ${planillaFilterState.frecuencia === 'QUINCENAL' ? 'selected' : ''}>Quincenal</option>
+        <option value="SEMANAL" ${planillaFilterState.frecuencia === 'SEMANAL' ? 'selected' : ''}>Semanal</option>
+        <option value="SIN_PLAN" ${planillaFilterState.frecuencia === 'SIN_PLAN' ? 'selected' : ''}>Sin plan</option>
       </select>
+      <button class="btn btn-ghost" id="btnRefreshPlanilla" title="Recargar planilla"><i data-lucide="refresh-cw"></i></button>
       <button class="btn btn-secondary" id="btnExportPlanilla" title="Exportar a Excel"><i data-lucide="download"></i>Excel</button>
       <button class="btn btn-ghost" id="btnPrintPlanilla" title="Imprimir reporte"><i data-lucide="printer"></i>Imprimir</button>
     </div>
@@ -804,12 +1000,106 @@ async function renderPlanilla() {
 
   let planillaData = [];
 
-  async function loadPlanilla() {
-    const search = document.getElementById('planillaSearch').value.trim();
-    const categoria = document.getElementById('planillaCategoria').value;
-    const estado = document.getElementById('planillaEstado').value;
-    const motivoId = document.getElementById('planillaMotivo').value;
-    const frecuencia = document.getElementById('planillaFrec').value;
+  function renderPlanillaTableContent(data) {
+    const tbody = document.getElementById('planillaTableBody');
+    const tfoot = document.getElementById('planillaTableFoot');
+    const totalsDiv = document.getElementById('planillaTotals');
+    if (!tbody || !tfoot || !totalsDiv) return;
+
+    if (!data.length) {
+      tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:2.5rem"><i data-lucide="inbox" style="display:block;margin:0 auto .5rem;opacity:.5"></i>No se encontraron deudas para los filtros seleccionados</td></tr>`;
+      tfoot.innerHTML = '';
+      totalsDiv.innerHTML = '';
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    // Totales
+    const funcionariosUnicos = new Set(data.map(d => d.funcionarioId)).size;
+    const totalBruto = data.reduce((s, d) => s + (d.montoBruto ?? d.montoOriginal), 0);
+    const totalUtilidad = data.reduce((s, d) => s + (d.montoInteres ?? 0), 0);
+    const totalMonto = data.reduce((s, d) => s + d.montoOriginal, 0);
+    const totalDesc = data.reduce((s, d) => s + d.totalDescontado, 0);
+    const totalSaldo = data.filter(d => d.estado !== 'ANULADA').reduce((s, d) => s + d.saldo, 0);
+
+    totalsDiv.innerHTML = `
+      <div class="deuda-stat"><span>Funcionarios</span><strong>${funcionariosUnicos}</strong></div>
+      <div class="deuda-stat"><span>Total Deudas</span><strong>${data.length}</strong></div>
+      <div class="deuda-stat"><span>Capital Bruto Total</span><strong>${fmtGs(totalBruto)}</strong></div>
+      <div class="deuda-stat"><span>Utilidad Total Ganada</span><strong style="color:var(--success)">+${fmtGs(totalUtilidad)}</strong></div>
+      <div class="deuda-stat"><span>Deuda Total a Cobrar</span><strong>${fmtGs(totalMonto)}</strong></div>
+      <div class="deuda-stat"><span>Total Descontado</span><strong style="color:var(--success)">${fmtGs(totalDesc)}</strong></div>
+      <div class="deuda-stat"><span>Saldo Pendiente</span><strong style="color:var(--danger)">${fmtGs(totalSaldo)}</strong></div>`;
+
+    tbody.innerHTML = data.map(d => {
+      const bruto = d.montoBruto ?? d.montoOriginal;
+      const interes = d.montoInteres ?? Math.max(0, d.montoOriginal - bruto);
+      const pct = d.porcentajeInteres ?? 0;
+      const cat = d.funcionario?.category || 'ADM';
+      return `
+      <tr>
+        <td>
+          <a href="javascript:void(0)" class="deuda-func-link" data-func="${d.funcionarioId}" style="color:var(--text);font-weight:600">${escapeHTML(d.funcionario?.name || '')}</a>
+          ${d.funcionario?.department ? `<div style="color:var(--text-muted);font-size:.78rem">${escapeHTML(d.funcionario.department)}</div>` : ''}
+        </td>
+        <td><span class="badge ${cat === 'CHOFER' ? 'badge-warning' : 'badge-primary'}">${cat}</span></td>
+        <td style="font-family:monospace;font-size:.9rem">${escapeHTML(d.funcionario?.cedula || '')}</td>
+        <td>${formatDate(d.fecha)}</td>
+        <td><span style="font-weight:500">${escapeHTML(d.motivo?.nombre || '')}</span></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(d.descripcion)}">${escapeHTML(d.descripcion)}</td>
+        <td style="text-align:right;font-weight:500">${fmtGsPlain(bruto)}</td>
+        <td style="text-align:right">
+          <span style="color:var(--success);font-weight:600">+${fmtGsPlain(interes)}</span>
+          <small style="color:var(--text-muted);display:block;font-size:.72rem">(${pct}%)</small>
+        </td>
+        <td style="text-align:right;font-weight:600">${fmtGsPlain(d.montoOriginal)}</td>
+        <td style="text-align:right;font-weight:600;color:var(--success)">${fmtGsPlain(d.totalDescontado)}</td>
+        <td style="text-align:right;font-weight:700;color:${d.saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGsPlain(d.saldo)}</td>
+        <td style="font-size:.85rem">
+          ${d.planDescuento ? `<strong>${fmtGsPlain(d.planDescuento.montoPorDescuento)}</strong> <span style="color:var(--text-muted)">(${d.planDescuento.frecuencia === 'SEMANAL' ? 'Sem' : 'Quinc'})</span>` : '<span style="color:var(--text-muted)">Sin plan</span>'}
+        </td>
+        <td>${estadoBadge(d.estado)}</td>
+        <td style="text-align:center">
+          <button class="btn btn-ghost btn-sm deuda-func-link" data-func="${d.funcionarioId}" title="Ver ficha individual"><i data-lucide="eye"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    tfoot.innerHTML = `
+      <tr style="font-weight:700;font-size:.95rem;background:var(--bg-card-hover, rgba(255,255,255,0.03))">
+        <td colspan="6" style="text-align:right;padding-right:1rem">TOTALES:</td>
+        <td style="text-align:right">${fmtGsPlain(totalBruto)}</td>
+        <td style="text-align:right;color:var(--success)">+${fmtGsPlain(totalUtilidad)}</td>
+        <td style="text-align:right">${fmtGsPlain(totalMonto)}</td>
+        <td style="text-align:right;color:var(--success)">${fmtGsPlain(totalDesc)}</td>
+        <td style="text-align:right;color:var(--danger)">${fmtGsPlain(totalSaldo)}</td>
+        <td colspan="3"></td>
+      </tr>`;
+
+    if (window.lucide) lucide.createIcons();
+
+    tbody.querySelectorAll('.deuda-func-link').forEach(el => {
+      el.addEventListener('click', () => {
+        currentTab = 'planilla';
+        navigate(`deudas/funcionario/${el.dataset.func}`);
+      });
+    });
+  }
+
+  async function loadPlanilla(forceRefresh = false) {
+    const search = document.getElementById('planillaSearch')?.value.trim() ?? planillaFilterState.search;
+    const categoria = document.getElementById('planillaCategoria')?.value ?? planillaFilterState.categoria;
+    const estado = document.getElementById('planillaEstado')?.value ?? planillaFilterState.estado;
+    const motivoId = document.getElementById('planillaMotivo')?.value ?? planillaFilterState.motivoId;
+    const frecuencia = document.getElementById('planillaFrec')?.value ?? planillaFilterState.frecuencia;
+
+    planillaFilterState = { search, categoria, estado, motivoId, frecuencia };
+
+    if (!forceRefresh && cachedPlanillaList !== null) {
+      planillaData = cachedPlanillaList;
+      renderPlanillaTableContent(planillaData);
+      return;
+    }
 
     const params = new URLSearchParams();
     if (search) params.set('search', search);
@@ -819,97 +1109,25 @@ async function renderPlanilla() {
     if (frecuencia) params.set('frecuencia', frecuencia);
 
     const tbody = document.getElementById('planillaTableBody');
-    const tfoot = document.getElementById('planillaTableFoot');
-    const totalsDiv = document.getElementById('planillaTotals');
 
     try {
       planillaData = await api.get(`/deudas/planilla?${params.toString()}`);
-
-      if (!planillaData.length) {
-        tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:2.5rem"><i data-lucide="inbox" style="display:block;margin:0 auto .5rem;opacity:.5"></i>No se encontraron deudas para los filtros seleccionados</td></tr>`;
-        tfoot.innerHTML = '';
-        totalsDiv.innerHTML = '';
-        if (window.lucide) lucide.createIcons();
-        return;
-      }
-
-      // Totales
-      const funcionariosUnicos = new Set(planillaData.map(d => d.funcionarioId)).size;
-      const totalBruto = planillaData.reduce((s, d) => s + (d.montoBruto ?? d.montoOriginal), 0);
-      const totalUtilidad = planillaData.reduce((s, d) => s + (d.montoInteres ?? 0), 0);
-      const totalMonto = planillaData.reduce((s, d) => s + d.montoOriginal, 0);
-      const totalDesc = planillaData.reduce((s, d) => s + d.totalDescontado, 0);
-      const totalSaldo = planillaData.filter(d => d.estado !== 'ANULADA').reduce((s, d) => s + d.saldo, 0);
-
-      totalsDiv.innerHTML = `
-        <div class="deuda-stat"><span>Funcionarios</span><strong>${funcionariosUnicos}</strong></div>
-        <div class="deuda-stat"><span>Total Deudas</span><strong>${planillaData.length}</strong></div>
-        <div class="deuda-stat"><span>Capital Bruto Total</span><strong>${fmtGs(totalBruto)}</strong></div>
-        <div class="deuda-stat"><span>Utilidad Total Ganada</span><strong style="color:var(--success)">+${fmtGs(totalUtilidad)}</strong></div>
-        <div class="deuda-stat"><span>Deuda Total a Cobrar</span><strong>${fmtGs(totalMonto)}</strong></div>
-        <div class="deuda-stat"><span>Total Descontado</span><strong style="color:var(--success)">${fmtGs(totalDesc)}</strong></div>
-        <div class="deuda-stat"><span>Saldo Pendiente</span><strong style="color:var(--danger)">${fmtGs(totalSaldo)}</strong></div>`;
-
-      tbody.innerHTML = planillaData.map(d => {
-        const bruto = d.montoBruto ?? d.montoOriginal;
-        const interes = d.montoInteres ?? Math.max(0, d.montoOriginal - bruto);
-        const pct = d.porcentajeInteres ?? 0;
-        const cat = d.funcionario?.category || 'ADM';
-        return `
-        <tr>
-          <td>
-            <a href="javascript:void(0)" class="deuda-func-link" data-func="${d.funcionarioId}" style="color:var(--text);font-weight:600">${escapeHTML(d.funcionario?.name || '')}</a>
-            ${d.funcionario?.department ? `<div style="color:var(--text-muted);font-size:.78rem">${escapeHTML(d.funcionario.department)}</div>` : ''}
-          </td>
-          <td><span class="badge ${cat === 'CHOFER' ? 'badge-warning' : 'badge-primary'}">${cat}</span></td>
-          <td style="font-family:monospace;font-size:.9rem">${escapeHTML(d.funcionario?.cedula || '')}</td>
-          <td>${formatDate(d.fecha)}</td>
-          <td><span style="font-weight:500">${escapeHTML(d.motivo?.nombre || '')}</span></td>
-          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(d.descripcion)}">${escapeHTML(d.descripcion)}</td>
-          <td style="text-align:right;font-weight:500">${fmtGsPlain(bruto)}</td>
-          <td style="text-align:right">
-            <span style="color:var(--success);font-weight:600">+${fmtGsPlain(interes)}</span>
-            <small style="color:var(--text-muted);display:block;font-size:.72rem">(${pct}%)</small>
-          </td>
-          <td style="text-align:right;font-weight:600">${fmtGsPlain(d.montoOriginal)}</td>
-          <td style="text-align:right;font-weight:600;color:var(--success)">${fmtGsPlain(d.totalDescontado)}</td>
-          <td style="text-align:right;font-weight:700;color:${d.saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGsPlain(d.saldo)}</td>
-          <td style="font-size:.85rem">
-            ${d.planDescuento ? `<strong>${fmtGsPlain(d.planDescuento.montoPorDescuento)}</strong> <span style="color:var(--text-muted)">(${d.planDescuento.frecuencia === 'SEMANAL' ? 'Sem' : 'Quinc'})</span>` : '<span style="color:var(--text-muted)">Sin plan</span>'}
-          </td>
-          <td>${estadoBadge(d.estado)}</td>
-          <td style="text-align:center">
-            <button class="btn btn-ghost btn-sm deuda-func-link" data-func="${d.funcionarioId}" title="Ver ficha individual"><i data-lucide="eye"></i></button>
-          </td>
-        </tr>`;
-      }).join('');
-
-      tfoot.innerHTML = `
-        <tr style="font-weight:700;font-size:.95rem;background:var(--bg-card-hover, rgba(255,255,255,0.03))">
-          <td colspan="6" style="text-align:right;padding-right:1rem">TOTALES:</td>
-          <td style="text-align:right">${fmtGsPlain(totalBruto)}</td>
-          <td style="text-align:right;color:var(--success)">+${fmtGsPlain(totalUtilidad)}</td>
-          <td style="text-align:right">${fmtGsPlain(totalMonto)}</td>
-          <td style="text-align:right;color:var(--success)">${fmtGsPlain(totalDesc)}</td>
-          <td style="text-align:right;color:var(--danger)">${fmtGsPlain(totalSaldo)}</td>
-          <td colspan="3"></td>
-        </tr>`;
-
-      if (window.lucide) lucide.createIcons();
-
-      tbody.querySelectorAll('.deuda-func-link').forEach(el => {
-        el.addEventListener('click', () => navigate(`deudas/funcionario/${el.dataset.func}`));
-      });
+      cachedPlanillaList = planillaData;
+      renderPlanillaTableContent(planillaData);
     } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--danger);padding:2rem">Error al cargar la planilla de deudas</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--danger);padding:2rem">Error al cargar la planilla de deudas</td></tr>`;
     }
   }
 
-  document.getElementById('planillaSearch').addEventListener('input', debounce(loadPlanilla, 400));
-  document.getElementById('planillaCategoria').addEventListener('change', loadPlanilla);
-  document.getElementById('planillaEstado').addEventListener('change', loadPlanilla);
-  document.getElementById('planillaMotivo').addEventListener('change', loadPlanilla);
-  document.getElementById('planillaFrec').addEventListener('change', loadPlanilla);
+  document.getElementById('planillaSearch').addEventListener('input', debounce(() => loadPlanilla(true), 400));
+  document.getElementById('planillaCategoria').addEventListener('change', () => loadPlanilla(true));
+  document.getElementById('planillaEstado').addEventListener('change', () => loadPlanilla(true));
+  document.getElementById('planillaMotivo').addEventListener('change', () => loadPlanilla(true));
+  document.getElementById('planillaFrec').addEventListener('change', () => loadPlanilla(true));
+  document.getElementById('btnRefreshPlanilla').addEventListener('click', () => {
+    loadPlanilla(true);
+    showToast('Planilla actualizada');
+  });
 
   document.getElementById('btnExportPlanilla').addEventListener('click', () => {
     if (!planillaData.length) return showToast('No hay datos para exportar', 'info');
@@ -944,7 +1162,7 @@ async function renderPlanilla() {
     printPlanillaReport(planillaData);
   });
 
-  loadPlanilla();
+  loadPlanilla(false);
 }
 
 // Helper para impresión de la planilla general
@@ -1193,6 +1411,33 @@ function renderDeudaCard(deuda, funcionario) {
       </div>
     </div>
 
+    ${(deuda.cargos && deuda.cargos.length > 1) ? `
+    <div class="deuda-cargos-list" style="border-top:1px solid var(--border);background:var(--bg-secondary);padding:.75rem 1rem">
+      <div style="font-size:.82rem;font-weight:700;color:var(--text-secondary);margin-bottom:.5rem;display:flex;align-items:center;justify-content:space-between">
+        <span><i data-lucide="layers" style="width:14px;height:14px;display:inline-block;vertical-align:middle;margin-right:4px"></i>Cargos / Conceptos Acumulados (${deuda.cargos.length})</span>
+        <span style="font-size:.78rem;color:var(--text-muted)">Total: ${fmtGs(deuda.montoOriginal)}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.4rem">
+        ${deuda.cargos.map((c, idx) => `
+          <div style="display:flex;justify-content:space-between;align-items:center;font-size:.84rem;background:var(--bg-card);padding:.4rem .7rem;border-radius:4px;border:1px solid var(--border)">
+            <div>
+              <span style="color:var(--text-muted);font-size:.78rem;margin-right:.5rem">${formatDate(c.fecha)}</span>
+              <strong>${escapeHTML(c.descripcion)}</strong>
+              ${c.isInitial ? '<span class="badge badge-primary" style="font-size:.68rem;margin-left:.35rem">Inicial</span>' : ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <strong style="color:var(--primary)">+${fmtGs(c.montoTotal)}</strong>
+              ${(!c.isInitial && deuda.estado === 'ACTIVA') ? `
+                <button class="btn btn-ghost btn-sm btn-del-cargo" data-deuda-id="${deuda.id}" data-cargo-id="${c.id}" data-cargo-desc="${escapeHTML(c.descripcion)}" data-cargo-monto="${c.montoTotal}" title="Eliminar este cargo adicional" style="padding:2px 6px;color:var(--danger)">
+                  <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : ''}
+
     ${deuda.descuentos.length > 0 ? `
     <div class="deuda-descuentos-list">
       <div style="padding:.5rem 1rem;font-size:.82rem;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border)">
@@ -1212,6 +1457,9 @@ function renderDeudaCard(deuda, funcionario) {
 
     <div class="deuda-card-actions">
       ${deuda.estado === 'ACTIVA' ? `
+      <button class="btn btn-secondary btn-sm btn-agregar-cargo" data-deuda-id="${deuda.id}" data-motivo-pct="${pct}" data-desc="${escapeHTML(deuda.descripcion)}">
+        <i data-lucide="plus-circle"></i>+ Agregar Deuda / Cargo
+      </button>
       <button class="btn btn-primary btn-sm btn-reg-desc" data-deuda-id="${deuda.id}" data-saldo="${saldo}" data-plan-monto="${deuda.planDescuento?.montoPorDescuento || ''}">
         <i data-lucide="minus-circle"></i>Registrar Descuento
       </button>
@@ -1230,6 +1478,20 @@ function renderDeudaCard(deuda, funcionario) {
 }
 
 function setupDeudaCardEvents(funcId) {
+  // Agregar cargo adicional a deuda existente
+  document.querySelectorAll('.btn-agregar-cargo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showAgregarCargoModal(btn.dataset.deudaId, funcId, parseFloat(btn.dataset.motivoPct) || 0, btn.dataset.desc || '');
+    });
+  });
+
+  // Eliminar cargo adicional
+  document.querySelectorAll('.btn-del-cargo').forEach(btn => {
+    btn.addEventListener('click', () => {
+      showEliminarCargoModal(btn.dataset.deudaId, btn.dataset.cargoId, btn.dataset.cargoDesc, parseInt(btn.dataset.cargoMonto) || 0, funcId);
+    });
+  });
+
   // Registrar descuento
   document.querySelectorAll('.btn-reg-desc').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1270,6 +1532,180 @@ function setupDeudaCardEvents(funcId) {
 // Modales
 // ============================================
 
+function showAgregarCargoModal(deudaId, funcId, defaultPct = 0, deudaDesc = '') {
+  const overlay = createModal(
+    'Agregar Deuda / Cargo Adicional',
+    `<div style="background:var(--bg-secondary);border:1px solid var(--border);padding:.75rem 1rem;border-radius:var(--radius);margin-bottom:1rem;font-size:.85rem">
+       <span style="color:var(--text-muted)">Se sumará este cargo a la deuda activa:</span><br/>
+       <strong style="color:var(--text);font-size:.9rem">${escapeHTML(deudaDesc || 'Deuda activa')}</strong>
+     </div>
+     <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+       <div class="form-group">
+         <label>Fecha del nuevo cargo *</label>
+         <input type="date" class="form-control" id="cargoModalFecha" value="${todayStr()}" />
+       </div>
+       <div class="form-group">
+         <label>Descripción / Concepto *</label>
+         <input type="text" class="form-control" id="cargoModalDesc" placeholder="Ej: HELADERA PHILCO 320L / ROCE 113 Y 115" maxlength="200" />
+       </div>
+     </div>
+
+     <div class="card" style="background:var(--bg-secondary);border:1px solid var(--border);padding:1rem;margin-top:.75rem;margin-bottom:1rem;border-radius:var(--radius)">
+       <div style="font-weight:600;font-size:.85rem;margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem">
+         <i data-lucide="calculator"></i>Monto y Ganancia / Interés del nuevo cargo
+       </div>
+       <div class="form-row" style="display:grid;grid-template-columns:1.5fr 1fr 1.5fr;gap:.75rem;align-items:flex-start">
+         <div class="form-group">
+           <label>Capital Bruto (Gs.) *</label>
+           <input type="text" class="form-control" id="cargoModalBruto" placeholder="5.000.000" />
+         </div>
+         <div class="form-group">
+           <label>% Ganancia</label>
+           <div style="position:relative">
+             <input type="number" class="form-control" id="cargoModalPct" value="${defaultPct || 0}" min="0" max="500" step="0.5" />
+             <span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-weight:600;font-size:.8rem">%</span>
+           </div>
+         </div>
+         <div class="form-group">
+           <label>Utilidad Ganada (Gs.)</label>
+           <input type="text" class="form-control" id="cargoModalInteres" placeholder="0" />
+         </div>
+       </div>
+
+       <div class="deuda-calc-box" style="margin-top:.5rem">
+         <div class="calc-stat">
+           <span>Capital Bruto</span>
+           <strong id="cargoModalResBruto">Gs. 0</strong>
+         </div>
+         <div style="font-size:1.1rem;color:var(--text-muted);font-weight:600">+</div>
+         <div class="calc-stat">
+           <span>Utilidad (<span id="cargoModalResPct">${defaultPct || 0}</span>%)</span>
+           <strong id="cargoModalResInteres" style="color:var(--success)">Gs. 0</strong>
+         </div>
+         <div style="font-size:1.1rem;color:var(--text-muted);font-weight:600">=</div>
+         <div class="calc-stat total">
+           <span>Total a Sumar</span>
+           <strong id="cargoModalResTotal" style="color:var(--primary)">Gs. 0</strong>
+         </div>
+       </div>
+     </div>`,
+    `<button class="btn btn-secondary modal-close">Cancelar</button>
+     <button class="btn btn-primary" id="btnModalSaveCargo"><i data-lucide="plus-circle"></i>Anexar a Deuda</button>`
+  );
+
+  function parseDigits(val) {
+    return parseInt((val || '').replace(/\D/g, '')) || 0;
+  }
+  function formatMonto(val) {
+    return val ? Number(val).toLocaleString('es-PY') : '';
+  }
+
+  function updateModalCalc() {
+    const bruto = parseDigits(document.getElementById('cargoModalBruto').value);
+    const pct = parseFloat(document.getElementById('cargoModalPct').value) || 0;
+    const interes = Math.round(bruto * (pct / 100));
+    const total = bruto + interes;
+    document.getElementById('cargoModalInteres').value = interes ? formatMonto(interes) : (bruto > 0 && pct === 0 ? '0' : '');
+    document.getElementById('cargoModalResBruto').textContent = fmtGs(bruto);
+    document.getElementById('cargoModalResPct').textContent = pct;
+    document.getElementById('cargoModalResInteres').textContent = fmtGs(interes);
+    document.getElementById('cargoModalResTotal').textContent = fmtGs(total);
+  }
+
+  function updateModalFromInteres() {
+    const bruto = parseDigits(document.getElementById('cargoModalBruto').value);
+    const interes = parseDigits(document.getElementById('cargoModalInteres').value);
+    const pct = bruto > 0 ? Number(((interes / bruto) * 100).toFixed(1)) : 0;
+    document.getElementById('cargoModalPct').value = pct;
+    const total = bruto + interes;
+    document.getElementById('cargoModalResBruto').textContent = fmtGs(bruto);
+    document.getElementById('cargoModalResPct').textContent = pct;
+    document.getElementById('cargoModalResInteres').textContent = fmtGs(interes);
+    document.getElementById('cargoModalResTotal').textContent = fmtGs(total);
+  }
+
+  const inputBruto = document.getElementById('cargoModalBruto');
+  inputBruto.addEventListener('input', () => {
+    const raw = parseDigits(inputBruto.value);
+    inputBruto.value = formatMonto(raw);
+    updateModalCalc();
+  });
+  document.getElementById('cargoModalPct').addEventListener('input', updateModalCalc);
+  const inputInteres = document.getElementById('cargoModalInteres');
+  inputInteres.addEventListener('input', () => {
+    const raw = parseDigits(inputInteres.value);
+    inputInteres.value = formatMonto(raw);
+    updateModalFromInteres();
+  });
+
+  document.getElementById('btnModalSaveCargo').addEventListener('click', async () => {
+    const fecha = document.getElementById('cargoModalFecha').value;
+    const descripcion = document.getElementById('cargoModalDesc').value.trim();
+    const montoBruto = parseDigits(document.getElementById('cargoModalBruto').value);
+    const porcentajeInteres = parseFloat(document.getElementById('cargoModalPct').value) || 0;
+    const montoInteres = parseDigits(document.getElementById('cargoModalInteres').value);
+    const montoOriginal = montoBruto + montoInteres;
+
+    if (!fecha) return showToast('Ingrese la fecha del cargo', 'error');
+    if (!descripcion) return showToast('Ingrese la descripción del cargo', 'error');
+    if (montoBruto <= 0) return showToast('Ingrese un monto bruto válido', 'error');
+
+    try {
+      const btn = document.getElementById('btnModalSaveCargo');
+      btn.disabled = true;
+      btn.innerHTML = '<i data-lucide="loader"></i>Anexando...';
+      if (window.lucide) lucide.createIcons();
+
+      await api.post(`/deudas/${deudaId}/agregar-cargo`, {
+        descripcion,
+        fecha,
+        montoBruto,
+        porcentajeInteres,
+        montoInteres,
+        montoOriginal
+      });
+      cachedDeudoresList = null;
+      cachedPlanillaList = null;
+      showToast('Cargo agregado a la deuda correctamente');
+      closeModal(overlay);
+      renderFichaFuncionario(funcId);
+    } catch (err) {
+      showToast(err.message || 'Error al agregar cargo', 'error');
+      const btn = document.getElementById('btnModalSaveCargo');
+      btn.disabled = false;
+      btn.innerHTML = '<i data-lucide="plus-circle"></i>Anexar a Deuda';
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+}
+
+function showEliminarCargoModal(deudaId, cargoId, cargoDesc, cargoMonto, funcId) {
+  const overlay = createModal(
+    'Eliminar Cargo Adicional',
+    `<p style="color:var(--text-secondary);margin-bottom:1rem">
+       ¿Está seguro de que desea eliminar el cargo <strong>${escapeHTML(cargoDesc)}</strong> (${fmtGs(cargoMonto)}) de esta deuda?
+     </p>
+     <p style="color:var(--text-muted);font-size:.85rem">
+       El total de la deuda y el saldo pendiente se recalcularán automáticamente.
+     </p>`,
+    `<button class="btn btn-secondary modal-close">Cancelar</button>
+     <button class="btn btn-danger" id="btnConfDelCargo"><i data-lucide="trash-2"></i>Eliminar Cargo</button>`
+  );
+
+  document.getElementById('btnConfDelCargo').addEventListener('click', async () => {
+    try {
+      await api.delete(`/deudas/${deudaId}/cargos/${cargoId}`);
+      cachedDeudoresList = null;
+      cachedPlanillaList = null;
+      showToast('Cargo eliminado correctamente');
+      closeModal(overlay);
+      renderFichaFuncionario(funcId);
+    } catch (err) {
+      showToast(err.message || 'Error al eliminar cargo', 'error');
+    }
+  });
+}
+
 function showRegistrarDescuentoModal(deudaId, saldo, planMonto, funcId) {
   const defaultMonto = planMonto ? Math.min(planMonto, saldo) : '';
   const overlay = createModal(
@@ -1309,6 +1745,8 @@ function showRegistrarDescuentoModal(deudaId, saldo, planMonto, funcId) {
 
     try {
       await api.post(`/deudas/${deudaId}/descuentos`, { fecha, monto, nota: nota || null });
+      cachedDeudoresList = null;
+      cachedPlanillaList = null;
       showToast('Descuento registrado');
       closeModal(overlay);
       renderFichaFuncionario(funcId);
@@ -1335,6 +1773,8 @@ function showAnularDescuentoModal(descId, funcId) {
     if (!motivo) return showToast('Ingrese el motivo de anulación', 'error');
     try {
       await api.put(`/deudas/descuentos/${descId}/anular`, { motivoAnulacion: motivo });
+      cachedDeudoresList = null;
+      cachedPlanillaList = null;
       showToast('Descuento anulado');
       closeModal(overlay);
       renderFichaFuncionario(funcId);
@@ -1362,6 +1802,8 @@ function showAnularDeudaModal(deudaId, funcId) {
     if (!motivo) return showToast('Ingrese el motivo de anulación', 'error');
     try {
       await api.put(`/deudas/${deudaId}/anular`, { motivoAnulacion: motivo });
+      cachedDeudoresList = null;
+      cachedPlanillaList = null;
       showToast('Deuda anulada');
       closeModal(overlay);
       renderFichaFuncionario(funcId);
@@ -1439,6 +1881,8 @@ function showPlanModal(deudaId, montoOriginal, saldo, funcId) {
 
     try {
       await api.put(`/deudas/${deudaId}/plan`, { montoPorDescuento, frecuencia, fechaInicio });
+      cachedDeudoresList = null;
+      cachedPlanillaList = null;
       showToast('Plan guardado');
       closeModal(overlay);
       renderFichaFuncionario(funcId);
