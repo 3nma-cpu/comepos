@@ -3243,6 +3243,53 @@ tbody tr:last-child td {
     flex-wrap: wrap;
 }
 
+/* Acciones rápidas en tabla de deudores (+ cargo / − descuento) */
+.deuda-quick-actions {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+}
+
+.deuda-quick-btn {
+    width: 28px;
+    height: 28px;
+    padding: 0 !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: background .15s ease, border-color .15s ease, transform .1s ease;
+}
+
+.deuda-quick-btn svg {
+    width: 15px;
+    height: 15px;
+    stroke-width: 2.6;
+}
+
+.deuda-quick-btn:active {
+    transform: scale(.92);
+}
+
+.deuda-quick-add {
+    color: var(--success);
+}
+
+.deuda-quick-add:hover {
+    background: color-mix(in srgb, var(--success) 15%, transparent);
+    border-color: color-mix(in srgb, var(--success) 40%, transparent);
+}
+
+.deuda-quick-sub {
+    color: var(--warning, #f59e0b);
+}
+
+.deuda-quick-sub:hover {
+    background: color-mix(in srgb, var(--warning, #f59e0b) 15%, transparent);
+    border-color: color-mix(in srgb, var(--warning, #f59e0b) 40%, transparent);
+}
+
 .deuda-stat {
     background: var(--bg-card);
     border: 1px solid var(--border);

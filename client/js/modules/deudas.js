@@ -886,7 +886,12 @@ async function renderDeudores() {
         <td style="text-align:right;font-weight:600;color:${d.saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGsPlain(d.saldo)}</td>
         <td>${estadoBadge(d.estado)}</td>
         <td>
-          <button class="btn btn-ghost btn-sm deuda-func-link" data-func="${d.funcionarioId}" title="Ver ficha"><i data-lucide="eye"></i></button>
+          <div class="deuda-quick-actions">
+            ${d.estado === 'ACTIVA' ? `
+            <button class="btn btn-ghost btn-sm deuda-quick-btn deuda-quick-add" id="btnQuickCargo-${d.id}" data-quick-cargo="${d.id}" title="Anexar nueva deuda / cargo"><i data-lucide="plus"></i></button>
+            <button class="btn btn-ghost btn-sm deuda-quick-btn deuda-quick-sub" id="btnQuickDesc-${d.id}" data-quick-desc="${d.id}" title="Registrar descuento"><i data-lucide="minus"></i></button>` : ''}
+            <button class="btn btn-ghost btn-sm deuda-func-link" data-func="${d.funcionarioId}" title="Ver ficha"><i data-lucide="eye"></i></button>
+          </div>
         </td>
       </tr>`;
     }).join('');
@@ -896,6 +901,29 @@ async function renderDeudores() {
       el.addEventListener('click', () => {
         currentTab = 'deudores';
         navigate(`deudas/funcionario/${el.dataset.func}`);
+      });
+    });
+
+    // Acciones rápidas: anexar cargo (+) y registrar descuento (−) sin entrar a la ficha
+    const refreshAfterQuick = () => loadDeudores(true);
+
+    tbody.querySelectorAll('[data-quick-cargo]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const d = deudas.find(x => x.id === btn.dataset.quickCargo);
+        if (!d) return;
+        const label = `${d.funcionario?.name || ''} — ${d.descripcion || ''} (Saldo: ${fmtGs(d.saldo)})`;
+        showAgregarCargoModal(d.id, d.funcionarioId, d.porcentajeInteres ?? 0, label, refreshAfterQuick);
+      });
+    });
+
+    tbody.querySelectorAll('[data-quick-desc]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const d = deudas.find(x => x.id === btn.dataset.quickDesc);
+        if (!d) return;
+        const label = `${d.funcionario?.name || ''} — ${d.descripcion || ''}`;
+        showRegistrarDescuentoModal(d.id, d.saldo, d.planDescuento?.montoPorDescuento || null, d.funcionarioId, refreshAfterQuick, label);
       });
     });
   }
@@ -1532,7 +1560,7 @@ function setupDeudaCardEvents(funcId) {
 // Modales
 // ============================================
 
-function showAgregarCargoModal(deudaId, funcId, defaultPct = 0, deudaDesc = '') {
+function showAgregarCargoModal(deudaId, funcId, defaultPct = 0, deudaDesc = '', onSuccess = null) {
   const overlay = createModal(
     'Agregar Deuda / Cargo Adicional',
     `<div style="background:var(--bg-secondary);border:1px solid var(--border);padding:.75rem 1rem;border-radius:var(--radius);margin-bottom:1rem;font-size:.85rem">
@@ -1668,7 +1696,8 @@ function showAgregarCargoModal(deudaId, funcId, defaultPct = 0, deudaDesc = '') 
       cachedPlanillaList = null;
       showToast('Cargo agregado a la deuda correctamente');
       closeModal(overlay);
-      renderFichaFuncionario(funcId);
+      if (typeof onSuccess === 'function') onSuccess();
+      else renderFichaFuncionario(funcId);
     } catch (err) {
       showToast(err.message || 'Error al agregar cargo', 'error');
       const btn = document.getElementById('btnModalSaveCargo');
@@ -1706,11 +1735,15 @@ function showEliminarCargoModal(deudaId, cargoId, cargoDesc, cargoMonto, funcId)
   });
 }
 
-function showRegistrarDescuentoModal(deudaId, saldo, planMonto, funcId) {
+function showRegistrarDescuentoModal(deudaId, saldo, planMonto, funcId, onSuccess = null, deudaLabel = '') {
   const defaultMonto = planMonto ? Math.min(planMonto, saldo) : '';
   const overlay = createModal(
     'Registrar Descuento',
-    `<div class="form-group">
+    `${deudaLabel ? `<div style="background:var(--bg-secondary);border:1px solid var(--border);padding:.75rem 1rem;border-radius:var(--radius);margin-bottom:1rem;font-size:.85rem">
+       <span style="color:var(--text-muted)">Descuento a aplicar sobre:</span><br/>
+       <strong style="color:var(--text);font-size:.9rem">${escapeHTML(deudaLabel)}</strong>
+     </div>` : ''}
+     <div class="form-group">
        <label>Monto a descontar (Gs.) *</label>
        <input type="text" class="form-control" id="descMonto" value="${defaultMonto ? Number(defaultMonto).toLocaleString('es-PY') : ''}" placeholder="Monto" />
        <small style="color:var(--text-muted)">Saldo disponible: ${fmtGs(saldo)}</small>
@@ -1749,7 +1782,8 @@ function showRegistrarDescuentoModal(deudaId, saldo, planMonto, funcId) {
       cachedPlanillaList = null;
       showToast('Descuento registrado');
       closeModal(overlay);
-      renderFichaFuncionario(funcId);
+      if (typeof onSuccess === 'function') onSuccess();
+      else renderFichaFuncionario(funcId);
     } catch (err) {
       showToast(err.message || 'Error', 'error');
     }
