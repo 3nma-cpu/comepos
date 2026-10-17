@@ -16,7 +16,8 @@ router.get('/', async (req, res) => {
     });
     res.json(users.map(u => ({
       id: u.id, username: u.username, name: u.name, email: u.email,
-      roleId: u.roleId, roleName: u.role.name, active: u.active
+      roleId: u.roleId, roleName: u.role.name, active: u.active,
+      blocked: u.blocked, failedAttempts: u.failedAttempts
     })));
   } catch (err) {
     res.status(500).json({ error: 'Error al obtener usuarios' });
@@ -54,7 +55,7 @@ router.post('/', async (req, res) => {
 // PUT /api/users/:id
 router.put('/:id', validateUUID, async (req, res) => {
   try {
-    const { name, username, email, password, roleId, active } = req.body;
+    const { name, username, email, password, roleId, active, blocked, unblock } = req.body;
     const targetId = req.params.id;
 
     // Prevenir auto-escalación: un usuario no puede cambiar su propio rol ni desactivarse
@@ -77,12 +78,25 @@ router.put('/:id', validateUUID, async (req, res) => {
       data.email = email;
     }
     if (roleId !== undefined) data.roleId = roleId;
-    if (active !== undefined) data.active = Boolean(active);
+    if (active !== undefined) {
+      data.active = Boolean(active);
+      if (data.active) {
+        data.blocked = false;
+        data.failedAttempts = 0;
+      }
+    }
+    if (unblock === true || blocked === false) {
+      data.blocked = false;
+      data.failedAttempts = 0;
+      data.active = true;
+    }
     if (password) {
       if (typeof password !== 'string' || password.length < 6) {
         return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
       }
       data.password = await bcrypt.hash(password, 10);
+      data.blocked = false;
+      data.failedAttempts = 0;
     }
 
     const user = await prisma.user.update({
@@ -90,7 +104,7 @@ router.put('/:id', validateUUID, async (req, res) => {
       data,
       include: { role: true }
     });
-    res.json({ id: user.id, username: user.username, name: user.name, email: user.email, roleId: user.roleId, roleName: user.role.name, active: user.active });
+    res.json({ id: user.id, username: user.username, name: user.name, email: user.email, roleId: user.roleId, roleName: user.role.name, active: user.active, blocked: user.blocked, failedAttempts: user.failedAttempts });
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Usuario no encontrado' });
     if (err.code === 'P2002') return res.status(409).json({ error: 'El usuario o email ya existe' });

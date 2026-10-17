@@ -35,8 +35,10 @@ model User {
   email     String   @unique
   avatarUrl String?  @db.Text
   roleId    String
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
+  active         Boolean  @default(true)
+  failedAttempts Int      @default(0)
+  blocked        Boolean  @default(false)
+  createdAt      DateTime @default(now())
   updatedAt DateTime @updatedAt
   role      Role       @relation(fields: [roleId], references: [id])
   sales     Sale[]     @relation("SaleUser")

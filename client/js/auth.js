@@ -5,12 +5,7 @@
 import { api } from './api.js';
 
 export async function login(username, password) {
-  try {
-    return await api.login(username, password);
-  } catch (err) {
-    console.error('Login error:', err);
-    return null;
-  }
+  return await api.login(username, password);
 }
 
 export function logout() {
@@ -80,12 +75,13 @@ export function renderLoginScreen(onLogin) {
     btn.textContent = 'Verificando...';
     err.style.display = 'none';
 
-    const user = await login(username, password);
-
-    if (user) {
-      onLogin(user);
-    } else {
-      err.textContent = 'Usuario o contraseña incorrectos';
+    try {
+      const user = await login(username, password);
+      if (user) {
+        onLogin(user);
+      }
+    } catch (error) {
+      err.textContent = error.message || 'Usuario o contraseña incorrectos';
       err.style.display = 'block';
       btn.disabled = false;
       btn.textContent = 'Iniciar Sesión';

@@ -23,7 +23,7 @@ async function fetchAPI(endpoint, options = {}) {
       headers
     });
 
-    if (response.status === 401) {
+    if (response.status === 401 && !endpoint.includes('/auth/login')) {
       // Token expired or invalid
       localStorage.removeItem('comepos_session');
       window.location.hash = '';

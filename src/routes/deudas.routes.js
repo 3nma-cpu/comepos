@@ -1156,12 +1156,15 @@ router.get('/tarjeta/:funcionarioId', async (req, res) => {
             `).join('')}
             <div style="font-size:8.5pt;font-weight:700;color:#495057;text-transform:uppercase;margin-top:10px;margin-bottom:6px;border-bottom:1px solid #e9ecef;padding-bottom:3px">Descuentos Registrados:</div>
           ` : ''}
-          ${d.descuentos.length === 0 ? '<p style="font-size:9.5pt;color:#888;font-style:italic">Sin descuentos registrados</p>' :
-          d.descuentos.map(desc => `
-            <div class="descuento-row${desc.anulado ? ' anulado' : ''}">
-              <span>${formatFecha(desc.fecha)}${desc.nota ? ' &mdash; ' + desc.nota : ''}${desc.anulado ? ' [ANULADO]' : ''}</span>
-              <span style="color:#15803d;font-weight:600">-Gs. ${formatGs(desc.monto)}</span>
-            </div>`).join('')}
+          ${(() => {
+            const valids = (d.descuentos || []).filter(desc => !desc.anulado);
+            if (valids.length === 0) return '<p style="font-size:9.5pt;color:#888;font-style:italic">Sin descuentos registrados</p>';
+            return valids.map(desc => `
+              <div class="descuento-row">
+                <span>${formatFecha(desc.fecha)}${desc.nota ? ' &mdash; ' + desc.nota : ''}</span>
+                <span style="color:#15803d;font-weight:600">-Gs. ${formatGs(desc.monto)}</span>
+              </div>`).join('');
+          })()}
         </div>
         <div class="saldo-line">Saldo: Gs. ${formatGs(d.saldo)}</div>
       </div>`).join('')}

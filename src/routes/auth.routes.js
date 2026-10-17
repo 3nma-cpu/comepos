@@ -20,14 +20,53 @@ router.post('/login', loginRateLimiter, async (req, res) => {
       include: { role: { include: { permissions: true } } }
     });
 
-    // Mensaje genérico para evitar user enumeration
-    if (!user || !user.active) {
+    if (!user) {
       return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+    }
+
+    if (user.blocked || (user.failedAttempts || 0) >= 3) {
+      return res.status(403).json({
+        error: 'Esta cuenta ha sido bloqueada por superar el límite de intentos fallidos. Por favor, comuníquese con el administrador.'
+      });
+    }
+
+    if (!user.active) {
+      return res.status(403).json({
+        error: 'Esta cuenta está inactiva. Por favor, comuníquese con el administrador.'
+      });
     }
 
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
-      return res.status(401).json({ error: 'Usuario o contraseña incorrectos' });
+      const newAttempts = (user.failedAttempts || 0) + 1;
+      const isBlocked = newAttempts >= 3;
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          failedAttempts: newAttempts,
+          blocked: isBlocked
+        }
+      });
+
+      if (isBlocked) {
+        return res.status(403).json({
+          error: 'Ha superado el límite de 3 intentos fallidos. Su cuenta ha sido bloqueada. Por favor, comuníquese con el administrador.'
+        });
+      }
+
+      const remaining = 3 - newAttempts;
+      return res.status(401).json({
+        error: `Contraseña incorrecta. Le queda${remaining === 1 ? '' : 'n'} ${remaining} intento${remaining === 1 ? '' : 's'} antes del bloqueo.`
+      });
+    }
+
+    // Login exitoso: si tenía intentos fallidos acumulados, resetear a 0
+    if (user.failedAttempts > 0 || user.blocked) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedAttempts: 0, blocked: false }
+      });
     }
 
     const permissions = user.role.permissions.map(p => p.module);

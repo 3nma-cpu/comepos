@@ -771,17 +771,14 @@ async function renderDeudores() {
       <button class="btn btn-ghost" id="btnRefreshDeudores" title="Recargar listado"><i data-lucide="refresh-cw"></i></button>
       <button class="btn btn-secondary" id="btnExportDeudas"><i data-lucide="download"></i>Excel</button>
     </div>
-    <div id="deudoresTotals" class="deuda-totals-bar"></div>
+    <div id="deudoresTotals" class="deuda-totals-bar" style="margin-bottom:1.5rem"></div>
     <div class="table-container">
       <table>
         <thead>
           <tr>
             <th>Funcionario</th>
             <th>Cat</th>
-            <th>CI</th>
-            <th>Descripción</th>
             <th>Último Descuento</th>
-            <th style="text-align:right">Préstamo Bruto</th>
             <th style="text-align:right">Total Deuda</th>
             <th style="text-align:right">Descontado</th>
             <th style="text-align:right">Saldo</th>
@@ -832,7 +829,7 @@ async function renderDeudores() {
     if (!tbody || !totalsDiv) return;
 
     if (!deudas.length) {
-      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;color:var(--text-muted);padding:2rem">No se encontraron deudas</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:2rem">No se encontraron deudas</td></tr>`;
       totalsDiv.innerHTML = '';
       return;
     }
@@ -860,7 +857,6 @@ async function renderDeudores() {
       <div class="deuda-stat"><span>Saldo Pendiente</span><strong style="color:var(--danger)">${fmtGs(totalSaldo)}</strong></div>`;
 
     tbody.innerHTML = deudas.map(d => {
-      const bruto = d.montoBruto ?? d.montoOriginal;
       const cat = d.funcionario?.category || 'ADM';
 
       // Obtener fecha del último descuento válido
@@ -877,10 +873,7 @@ async function renderDeudores() {
       <tr>
         <td><a href="javascript:void(0)" class="deuda-func-link" data-func="${d.funcionarioId}" style="color:var(--text);font-weight:600">${escapeHTML(d.funcionario?.name || '')}</a></td>
         <td><span class="badge ${cat === 'CHOFER' ? 'badge-warning' : 'badge-primary'}">${cat}</span></td>
-        <td>${escapeHTML(d.funcionario?.cedula || '')}</td>
-        <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(d.descripcion)}">${escapeHTML(d.descripcion)}</td>
         <td style="white-space:nowrap">${ultimoDescFecha ? formatDate(ultimoDescFecha) : '<span style="color:var(--text-muted)">—</span>'}</td>
-        <td style="text-align:right;font-weight:500">${fmtGsPlain(bruto)}</td>
         <td style="text-align:right;font-weight:600">${fmtGsPlain(d.montoOriginal)}</td>
         <td style="text-align:right;color:var(--success)">${fmtGsPlain(d.totalDescontado)}</td>
         <td style="text-align:right;font-weight:600;color:${d.saldo > 0 ? 'var(--danger)' : 'var(--success)'}">${fmtGsPlain(d.saldo)}</td>
@@ -939,9 +932,8 @@ async function renderDeudores() {
 
   document.getElementById('btnExportDeudas').addEventListener('click', () => {
     if (!allDeudas.length) return showToast('No hay datos para exportar', 'info');
-    const headers = ['Funcionario', 'Categoría', 'CI', 'Descripción', 'Último Descuento', 'Préstamo Bruto', 'Total a Cobrar', 'Descontado', 'Saldo', 'Estado'];
+    const headers = ['Funcionario', 'Categoría', 'Último Descuento', 'Total Deuda', 'Descontado', 'Saldo', 'Estado'];
     const rows = allDeudas.map(d => {
-      const bruto = d.montoBruto ?? d.montoOriginal;
       let ultimoDescFecha = d.ultimoDescuentoFecha;
       if (!ultimoDescFecha && d.descuentos && d.descuentos.length > 0) {
         const valids = d.descuentos.filter(x => !x.anulado);
@@ -951,8 +943,8 @@ async function renderDeudores() {
         }
       }
       return [
-        d.funcionario?.name, d.funcionario?.category || 'ADM', d.funcionario?.cedula, d.descripcion,
-        ultimoDescFecha ? formatDate(ultimoDescFecha) : '—', bruto, d.montoOriginal, d.totalDescontado, d.saldo, d.estado
+        d.funcionario?.name, d.funcionario?.category || 'ADM',
+        ultimoDescFecha ? formatDate(ultimoDescFecha) : '—', d.montoOriginal, d.totalDescontado, d.saldo, d.estado
       ];
     });
     exportExcel(headers, rows, 'Deudas_Funcionarios.xlsx', 'Deudas');
@@ -1466,20 +1458,19 @@ function renderDeudaCard(deuda, funcionario) {
       </div>
     </div>` : ''}
 
-    ${deuda.descuentos.length > 0 ? `
+    ${descuentosValidos.length > 0 ? `
     <div class="deuda-descuentos-list">
       <div style="padding:.5rem 1rem;font-size:.82rem;font-weight:600;color:var(--text-secondary);border-bottom:1px solid var(--border)">
-        Descuentos (${descuentosValidos.length}/${deuda.descuentos.length})
+        Descuentos (${descuentosValidos.length})
       </div>
-      ${deuda.descuentos.map(desc => `
-      <div class="deuda-descuento-row${desc.anulado ? ' anulado' : ''}" data-desc-id="${desc.id}">
+      ${descuentosValidos.map(desc => `
+      <div class="deuda-descuento-row" data-desc-id="${desc.id}">
         <div style="flex:1;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
           <span>${formatDate(desc.fecha)}</span>
           <strong>${fmtGs(desc.monto)}</strong>
           ${desc.nota ? `<span style="color:var(--text-muted);font-size:.8rem">${escapeHTML(desc.nota)}</span>` : ''}
-          ${desc.anulado ? `<span class="badge badge-danger" style="font-size:.7rem">ANULADO${desc.motivoAnulacion ? ': ' + escapeHTML(desc.motivoAnulacion) : ''}</span>` : ''}
         </div>
-        ${!desc.anulado && deuda.estado !== 'ANULADA' ? `<button class="btn btn-ghost btn-sm btn-anular-desc" data-desc-id="${desc.id}" title="Anular descuento"><i data-lucide="x-circle"></i></button>` : ''}
+        ${deuda.estado !== 'ANULADA' ? `<button class="btn btn-ghost btn-sm btn-anular-desc" data-desc-id="${desc.id}" title="Anular descuento"><i data-lucide="x-circle"></i></button>` : ''}
       </div>`).join('')}
     </div>` : ''}
 

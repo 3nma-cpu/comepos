@@ -53,9 +53,13 @@ function renderTable(users, roleMap) {
       <td>${escapeHTML(u.username)}</td>
       <td style="color:var(--text-secondary)">${escapeHTML(u.email)}</td>
       <td><span class="badge badge-primary">${roleMap[u.roleId] || 'Sin rol'}</span></td>
-      <td><span class="badge ${u.active ? 'badge-success' : 'badge-danger'}">${u.active ? 'Activo' : 'Inactivo'}</span></td>
+      <td>
+        ${u.blocked ? `<span class="badge badge-danger" title="${u.failedAttempts || 3} intentos fallidos">Bloqueado</span>` :
+          (u.active ? `<span class="badge badge-success">Activo</span>` : `<span class="badge badge-danger">Inactivo</span>`)}
+      </td>
       <td>
         <button class="btn btn-ghost btn-sm btn-icon" data-edit="${u.id}" title="Editar"><i data-lucide="pencil"></i></button>
+        ${u.blocked ? `<button class="btn btn-ghost btn-sm btn-icon" data-unblock="${u.id}" title="Desbloquear usuario" style="color:var(--warning)"><i data-lucide="unlock"></i></button>` : ''}
         <button class="btn btn-ghost btn-sm btn-icon" data-toggle="${u.id}" title="${u.active ? 'Desactivar' : 'Activar'}"><i data-lucide="${u.active ? 'user-x' : 'user-check'}"></i></button>
         <button class="btn btn-ghost btn-sm btn-icon" data-delete="${u.id}" title="Eliminar"><i data-lucide="trash-2"></i></button>
       </td>
@@ -70,13 +74,29 @@ function renderTable(users, roleMap) {
         };
     });
 
+    tbody.querySelectorAll('[data-unblock]').forEach(btn => {
+        btn.onclick = async () => {
+            const user = users.find(u => u.id === btn.dataset.unblock);
+            if (user) {
+                try {
+                    await api.put(`/users/${user.id}`, { unblock: true });
+                    showToast(`Usuario ${user.username} desbloqueado exitosamente`);
+                    renderUsers();
+                } catch (e) {
+                    showToast(e.message, 'error');
+                }
+            }
+        };
+    });
+
     tbody.querySelectorAll('[data-toggle]').forEach(btn => {
         btn.onclick = async () => {
             const user = users.find(u => u.id === btn.dataset.toggle);
             if (user) {
                 try {
-                    await api.put(`/users/${user.id}`, { active: !user.active });
-                    showToast(`Usuario ${user.active ? 'desactivado' : 'activado'}`);
+                    const willActive = !user.active || user.blocked;
+                    await api.put(`/users/${user.id}`, { active: willActive, unblock: willActive });
+                    showToast(`Usuario ${willActive ? 'activado' : 'desactivado'}`);
                     renderUsers();
                 } catch (e) {
                     showToast(e.message, 'error');
@@ -103,6 +123,13 @@ function renderTable(users, roleMap) {
 function openUserModal(user, roles, currentUsers) {
     const isEdit = !!user;
     const body = `
+    ${isEdit && user.blocked ? `
+    <div style="background:rgba(239,68,68,0.12);border:1px solid var(--danger);color:var(--text);padding:.75rem 1rem;border-radius:var(--radius);margin-bottom:1rem;font-size:.85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <span style="color:var(--danger);font-weight:600"><i data-lucide="shield-alert" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:6px"></i>Usuario bloqueado por superar 3 intentos fallidos</span>
+      <label style="display:inline-flex;align-items:center;gap:.4rem;cursor:pointer;margin:0;font-size:.85rem;font-weight:600;color:var(--success)">
+        <input type="checkbox" id="mUserUnblock" checked /> Desbloquear cuenta
+      </label>
+    </div>` : ''}
     <div class="form-row">
       <div class="form-group"><label>Nombre Completo</label><input type="text" class="form-control" id="mUserName" value="${isEdit ? escapeHTML(user.name) : ''}" required /></div>
       <div class="form-group"><label>Usuario</label><input type="text" class="form-control" id="mUserUsername" value="${isEdit ? escapeHTML(user.username) : ''}" required /></div>
@@ -138,6 +165,8 @@ function openUserModal(user, roles, currentUsers) {
             if (isEdit) {
                 const updates = { name, username, email, roleId };
                 if (password) updates.password = password;
+                const chkUnblock = document.getElementById('mUserUnblock');
+                if (chkUnblock && chkUnblock.checked) updates.unblock = true;
                 await api.put(`/users/${user.id}`, updates);
                 showToast('Usuario actualizado');
             } else {
